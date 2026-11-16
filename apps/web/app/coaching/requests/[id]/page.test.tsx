@@ -429,6 +429,39 @@ it("期限切れは「選んだコーチ」枠と別のコーチへのリンク�
   }
 });
 
+it("お支払い待ちの依頼の支払いボタンは「確定してお支払いへ」で、金額も方法名も含まず、紹介IDの欄は「紹介ID」だけ", async () => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/coaching/requests/review-1") {
+      return {
+        id: "review-1",
+        status: "awaiting_payment",
+        tier: "coach",
+        event: "100m",
+        focus: [],
+        question: "スタートの姿勢について",
+        created_at: new Date().toISOString(),
+        due_at: new Date(Date.now() + 86400000).toISOString(),
+        requested_coach_id: "coach-1",
+        requested_coach_name: "デモコーチ",
+        total_price_yen: 500,
+      };
+    }
+    if (path.endsWith("/referral")) return { referral: null };
+    return {};
+  });
+  const { container, root } = await renderPage();
+  try {
+    const labels = [...container.querySelectorAll("button")].map((b) => b.textContent);
+    expect(labels).toContain("確定してお支払いへ");
+    expect(labels.some((t) => t?.includes("で払う") || t?.includes("500円"))).toBe(false);
+    const referralLabel = [...container.querySelectorAll("label")].find((l) => l.textContent?.startsWith("紹介ID"));
+    expect(referralLabel?.firstChild?.textContent).toBe("紹介ID");
+    expect(container.textContent).not.toContain("友達からもらった場合");
+  } finally {
+    await unmountPage(container, root);
+  }
+});
+
 const unpaidRequest = (status: string, extra: Record<string, unknown> = {}) => ({
   id: "review-1",
   status,
@@ -462,7 +495,6 @@ it("お支払い待ちはキャンセルボタンを出し、案内文は2時間
     await unmountPage(container, root);
   }
 });
-
 it("お支払い待ちのキャンセルは専用の本文で確認し、取り消すとお支払い欄が消える", async () => {
   let canceled = false;
   apiFetch.mockImplementation(async (path: string, init?: { method?: string }) => {

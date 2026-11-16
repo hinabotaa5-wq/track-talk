@@ -49,3 +49,10 @@ it("紹介者にすでに数えられている購入者には、その旨を伝�
   await renderInput("", null, "counted");
   expect(container.textContent).toContain("この紹介IDの紹介者には、あなたの購入がすでに数えられています。");
 });
+
+it("入力欄のラベルは「紹介ID」だけで、「友達からもらった場合」を含まない", async () => {
+  await renderInput("", null);
+  const label = container.querySelector("label");
+  expect(label?.firstChild?.textContent).toBe("紹介ID");
+  expect(container.textContent).not.toContain("友達からもらった場合");
+});

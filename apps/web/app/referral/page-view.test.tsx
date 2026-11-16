@@ -27,7 +27,7 @@ const JA_TEXTS = [
   "友達がコーチを選んで、申し込みに進む",
   "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。",
   "友達が、購入の手続きで紹介IDを入力して購入を完了する",
-  "「紹介ID（友達からもらった場合）」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。",
+  "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。",
   "友達2人が購入すると、無料チケットをプレゼント",
   "あと何人かは、マイページで確認できます。",
   "知っておいてほしいこと",
@@ -62,7 +62,7 @@ it("ステップ4の見本を表示し、実際の input 要素はない", async
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralGuideView />));
   const text = container.textContent ?? "";
-  expect(text).toContain("紹介ID（友達からもらった場合）");
+  expect(text).toContain("紹介ID");
   expect(text).toContain("K7M3QX");
   const fourth = container.querySelectorAll("ol > li")[3];
   expect(fourth?.textContent).toContain("K7M3QX");
@@ -76,7 +76,7 @@ it("英語表示では固定の英訳が出て、新規文の日本語が残ら�
   const text = container.textContent ?? "";
   expect(text).toContain("How it works");
   expect(text).toContain("The free ticket is good for one video review and expires 6 months after it is granted.");
-  expect(text).toContain("Your friend types the code into the “Referral code (from a friend)” field. If they skip it, the purchase will not count as a referral. Once the purchase is complete, it counts as one referral for the person who shared the code.");
+  expect(text).toContain("Your friend types the code into the “Referral code” field. If they skip it, the purchase will not count as a referral. Once the purchase is complete, it counts as one referral for the person who shared the code.");
   expect(text).toContain("Your 6-character referral code appears on the purchase completion screen and on your My Page.");
   expect(text).toContain("Your friend chooses a coach and starts a request");
   expect(text).toContain("Purchase without a referral code to get your own code");

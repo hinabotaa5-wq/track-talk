@@ -337,7 +337,7 @@ export default function NewReviewRequestPage() {
         <div className="space-y-3">
           <PurchaseConfirm
             rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
-            confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ（{v0}）", { v0: formatYen(cashPrice) })}
+            confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ")}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}

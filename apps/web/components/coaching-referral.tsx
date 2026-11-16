@@ -46,7 +46,7 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
   const noOwnCode = mine.loaded && !mine.referral?.active && code.trim() !== "" && !warning;
   return <div className="space-y-1">
     <label className="block text-sm">
-      {L("紹介ID（友達からもらった場合）")}
+      {L("紹介ID")}
       <input type="text" className="mt-1 block w-full rounded-lg border border-slate-500/40 bg-transparent p-2"
         autoComplete="off" autoCapitalize="characters" maxLength={32} value={code} disabled={disabled}
         onChange={(event) => onChange(event.target.value)} />

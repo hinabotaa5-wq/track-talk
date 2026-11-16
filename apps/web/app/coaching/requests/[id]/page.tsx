@@ -164,7 +164,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
           disabled={pending || !declared}
           onClick={() => void pay(m)}
           className="min-h-11 w-full rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition active:scale-[0.98] disabled:opacity-50"
-        >{L("{v0}で払う", { v0: reviewPayMethodLabels[m] })}</button>
+        >{L("確定してお支払いへ")}</button>
       ))}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </section>
