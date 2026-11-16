@@ -87,7 +87,8 @@ WHERE id = $1
   AND requester_id = $2::uuid
   AND started_at IS NULL
   AND ((status = 'in_review' AND due_at > statement_timestamp())
-    OR (status = 'needs_info' AND resubmit_by > statement_timestamp()))
+    OR (status = 'needs_info' AND resubmit_by > statement_timestamp())
+    OR status = 'awaiting_payment')
 RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
 `
 
