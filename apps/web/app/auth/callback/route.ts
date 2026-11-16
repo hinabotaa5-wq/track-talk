@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
     dest.hash = next.hash;
   }
   const success = redirectWithinSite(dest);
+  // https のときだけ Secure を付ける。http（ローカル開発など）で付けるとセッションを保存できない。
+  const secure = request.nextUrl.protocol === "https:";
   const supabase = createServerClient(url, key, {
     ...(process.env.SUPABASE_COOKIE_NAME
       ? { cookieOptions: { name: process.env.SUPABASE_COOKIE_NAME } }
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
       },
       setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          success.cookies.set(name, value, { ...options, sameSite: "lax" });
+          success.cookies.set(name, value, { ...options, sameSite: "lax", ...(secure ? { secure: true } : {}) });
         });
         Object.entries(headers).forEach(([name, value]) => {
           success.headers.set(name, value);
