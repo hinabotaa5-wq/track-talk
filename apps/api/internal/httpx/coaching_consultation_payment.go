@@ -150,6 +150,17 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 	if err != nil {
 		return err
 	}
+	// 海外で発行されたカードの支払いは成立させず（コーチに届けず・知らせず）、既存の「閉じて返金」に回す
+	// （単発の #796 と同じ判定。発行国が取れないときは通す）。即時確定で仮押さえがないため全額返金になる。
+	// 発行国は未払いの相談にだけ読む。確定済みへの再送は下の PaymentState の確認で素通りする。
+	nonJP, country := false, ""
+	if initial.Funding == "cash" && initial.PaymentState == "unpaid" {
+		pi, err := s.stripe.GetPaymentIntent(ctx, sess.PaymentIntent)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errStripe, err)
+		}
+		nonJP, country = pi.IsNonJPCard(), pi.CardCountry
+	}
 	var saved db.CoachingConsultation
 	notify := false
 	err = s.tx(ctx, func(q *db.Queries) error {
@@ -193,6 +204,10 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 		}
 		if rootErr != nil && !errors.Is(rootErr, pgx.ErrNoRows) {
 			return rootErr
+		}
+		if nonJP {
+			slog.Warn("non-jp card blocked", "consultation", c.ID, "country", country)
+			valid = false
 		}
 		if !valid && c.Status == "offered" {
 			c, err = q.CloseConsultation(ctx, db.CloseConsultationParams{ID: id, Status: "expired"})

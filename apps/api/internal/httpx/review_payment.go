@@ -272,6 +272,9 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 	return nil
 }
 
+// nonJPCardMessage は、海外で発行されたカードを断ったときの理由の文言（単発・チケット購入で共通）。
+const nonJPCardMessage = "海外で発行されたカードはご利用いただけません。日本で発行された別のカードでお申し込みください。"
+
 // cancelNonJPCardCheckout は、非JPカードの仮押さえを取り消し、依頼を作らずに
 // 支払いを取り消し済みにする（本体 #796）。migration なし（通知の種別も増やさない）。
 // 利用者への理由の表示は戻り値の文言で返し、戻り画面の sync が 422 で返す。
@@ -310,7 +313,7 @@ func (s *Server) cancelNonJPCardCheckout(ctx context.Context, pay db.ReviewPayme
 	}
 	return &ticketRuleError{
 		code:    "card_country_not_supported",
-		message: "海外で発行されたカードはご利用いただけません。日本で発行された別のカードでお申し込みください。",
+		message: nonJPCardMessage,
 	}
 }
 

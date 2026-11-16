@@ -20,6 +20,18 @@ import (
 func (s *Server) prepareTicketRefund(ctx context.Context, id uuid.UUID) (db.CoachingTicketRefund, error) {
 	var out db.CoachingTicketRefund
 	err := s.tx(ctx, func(q *db.Queries) error {
+		var err error
+		out, err = reserveTicketRefund(ctx, q, id)
+		return err
+	})
+	return out, err
+}
+
+// reserveTicketRefund は prepareTicketRefund の中身。呼び出し側のトランザクションの中で、
+// 未使用・未予約の枚数を利用可能残高から除いて返金の記録を作る（購入の確定と同じトランザクションでも使う）。
+func reserveTicketRefund(ctx context.Context, q *db.Queries, id uuid.UUID) (db.CoachingTicketRefund, error) {
+	var out db.CoachingTicketRefund
+	err := func() error {
 		p, err := q.LockTicketPurchase(ctx, id)
 		if err != nil {
 			return err
@@ -61,7 +73,7 @@ func (s *Server) prepareTicketRefund(ctx context.Context, id uuid.UUID) (db.Coac
 			return err
 		}
 		return moveTickets(ctx, q, l.ID, "refund-"+out.ID.String(), "refund", -n, 0, 0, n)
-	})
+	}()
 	return out, err
 }
 
@@ -194,8 +206,20 @@ func (s *Server) processTicketRefund(ctx context.Context, id uuid.UUID) error {
 				if err := moveTicketsExpiring(ctx, q, lot.ID, "refund-failed-"+id.String(), "refund_failed", 0, 0, 0, -refund.Quantity, refund.Quantity); err != nil {
 					return err
 				}
-			} else if err := moveTickets(ctx, q, lot.ID, "refund-failed-"+id.String(), "refund_failed", refund.Quantity, 0, 0, -refund.Quantity); err != nil {
-				return err
+			} else {
+				// 海外発行カードの購入で全量を返金に回したものは、返金が失敗しても使える枚数に戻さない。
+				// 運営者の対応待ち（needs_action）にして、Stripe の外で返してから完了を記録する。
+				pi, err := s.stripe.GetPaymentIntent(ctx, *p.PaymentIntentID)
+				if err != nil {
+					return err
+				}
+				if pi.IsNonJPCard() {
+					slog.Error("non-jp ticket refund failed; needs operator action", "refund", id, "country", pi.CardCountry)
+					return q.MarkTicketRefundNeedsAction(ctx, id)
+				}
+				if err := moveTickets(ctx, q, lot.ID, "refund-failed-"+id.String(), "refund_failed", refund.Quantity, 0, 0, -refund.Quantity); err != nil {
+					return err
+				}
 			}
 		}
 		return q.SaveTicketRefund(ctx, db.SaveTicketRefundParams{ID: id, StripeRefundID: &remote.ID, Status: status})
