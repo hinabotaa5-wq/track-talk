@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -378,7 +379,22 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 	if err != nil {
 		return fmt.Errorf("ticket checkout missing purchase id")
 	}
+	// 海外で発行されたカードの購入は、チケットを使える形で付与せず全額を返金する（単発の #796 と同じ判定）。
+	// 即時確定で仮押さえがないため、確定と同じトランザクションの中で全量を返金に回し、使える枚数が
+	// 一度も 0 を超えた状態で確定しないようにする。発行国が取れないときはブロックしない。
+	// 発行国は支払い待ちの購入にだけ読む（確定済みの購入への再送では Stripe を呼ばない）。
+	nonJP, country := false, ""
+	if pre, err := s.q.GetTicketPurchase(ctx, id); err == nil && pre.Status == "pending" {
+		pi, err := s.stripe.GetPaymentIntent(ctx, sess.PaymentIntent)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errStripe, err)
+		}
+		nonJP, country = pi.IsNonJPCard(), pi.CardCountry
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
 	var orphan bool
+	var blockedRefund *uuid.UUID
 	err = s.tx(ctx, func(q *db.Queries) error {
 		p, err := q.LockTicketPurchase(ctx, id)
 		if err != nil {
@@ -407,6 +423,15 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 		if err := q.InsertTicketLedger(ctx, db.InsertTicketLedgerParams{ID: uuid.New(), LotID: lotID, PurchaseRef: &id, OperationKey: "purchase-" + id.String(), Kind: "purchase", AvailableDelta: p.Quantity}); err != nil {
 			return err
 		}
+		if nonJP {
+			// 全量を返金に回す（利用可能残高 0）。返金される購入は紹介の起点にしない。
+			refund, err := reserveTicketRefund(ctx, q, id)
+			if err != nil {
+				return err
+			}
+			blockedRefund = &refund.ID
+			return nil
+		}
 		orphan = p.OwnerID == nil
 		if p.ProductID == "six" || p.ProductID == "single" {
 			return recordCoachingReferral(ctx, q, p.OwnerID, &p.ID, nil, p.ReferralCode)
@@ -415,6 +440,14 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 	})
 	if err != nil {
 		return err
+	}
+	if blockedRefund != nil {
+		slog.Warn("non-jp card blocked", "ticket_purchase", id, "country", country)
+		// 返金の記録は確定済み。Stripe への返金が一時的に失敗しても tick が拾い直す。
+		if err := s.processTicketRefund(ctx, *blockedRefund); err != nil {
+			slog.Error("non-jp ticket refund", "refund", *blockedRefund, "err", err)
+		}
+		return nil
 	}
 	// 決済中に退会済みだった場合は利用先がないため、未使用分の返金を確保する。
 	if orphan {
@@ -704,6 +737,15 @@ func (s *Server) myTicketPurchase(w http.ResponseWriter, r *http.Request) {
 	if purchase.Status != "pending" {
 		if l, err := s.q.GetPurchasedTicketLot(r.Context(), &id); err == nil {
 			out["expires_at"] = l.ExpiresAt
+			// 海外発行カードで全量を返金に回した購入は、戻り画面に単発と同じ理由を返す（本体 #796 と同じ文言）。
+			// 全量が一度も使われずに返金へ回った購入だけ発行国を読み直す（それ以外では Stripe を呼ばない）。
+			if l.Refunded == purchase.Quantity && l.Consumed == 0 && l.Reserved == 0 && l.Expired == 0 &&
+				purchase.PaymentIntentID != nil && s.stripe.Configured() {
+				if pi, err := s.stripe.GetPaymentIntent(r.Context(), *purchase.PaymentIntentID); err == nil && pi.IsNonJPCard() {
+					Error(w, http.StatusUnprocessableEntity, "card_country_not_supported", nonJPCardMessage)
+					return
+				}
+			}
 		}
 	}
 	JSON(w, 200, out)
