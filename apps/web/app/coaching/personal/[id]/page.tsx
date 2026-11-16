@@ -117,30 +117,42 @@ function CoachingContractView() {
 
   const isCoach = contract.role === "coach";
 
+  const backHref = isCoach ? "/coach" : "/me/coaching/personal";
+  const backLabel = isCoach ? L("コーチ画面へ") : L("申し込みの一覧へ");
+  const partnerName = isCoach
+    ? L("{v0}さん", { v0: contract.requester?.nickname ?? L("名前なし") })
+    : (contract.coach?.nickname ?? L("名前なし"));
   return (
     <div className="mx-auto max-w-md space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">{L("パーソナル指導")}</h1>
-        <p className="text-sm font-semibold text-blue-300">{contractStatusLabel(contract)}</p>
-      </div>
+      <header className="sticky top-0 z-10 -mx-4 flex items-center gap-3 bg-background/80 px-4 py-3 backdrop-blur">
+        <Link href={backHref} aria-label={backLabel} className="shrink-0 text-2xl leading-none text-slate-100">
+          ‹
+        </Link>
+        {isCoach ? (
+          <CoachAvatar url="" name={contract.requester?.nickname ?? null} size={36} />
+        ) : contract.coach ? (
+          <CoachAvatar url={contract.coach.photo_url} name={contract.coach.nickname} size={36} />
+        ) : null}
+        <div className="min-w-0">
+          <h1 className="truncate text-base font-bold text-white">{partnerName}</h1>
+          <p className="text-xs font-semibold text-blue-300">{contractStatusLabel(contract)}</p>
+        </div>
+      </header>
 
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4">
-        {isCoach ? (
-          <p className="font-bold text-white">{L("{v0}さん", { v0: contract.requester?.nickname ?? L("名前なし") })}</p>
-        ) : contract.coach ? (
-          <div className="flex items-center gap-3">
-            <CoachAvatar url={contract.coach.photo_url} name={contract.coach.nickname} />
-            <p className="font-bold text-white">{contract.coach.nickname ?? L("名前なし")}</p>
+        <details>
+          <summary className="cursor-pointer font-semibold">{L("申し込み内容")}</summary>
+          <div className="mt-3 space-y-3">
+            <ContractDetails contract={contract} />
+            {contract.starts_at ? <p className="text-sm text-slate-200">{L("期間: {v0}", { v0: contractPeriod(contract) })}</p> : null}
           </div>
-        ) : null}
-        <ContractDetails contract={contract} />
+        </details>
         {contract.status === "applied" ? (
           <p className="text-sm text-slate-200">{L("{v0}までにコーチから返事が届きます。", { v0: formatDateTime(contract.respond_by) })}</p>
         ) : null}
         {contract.status === "accepted" && contract.start_by ? (
           <p className="text-sm text-slate-200">{waitingText(contract, isCoach)}</p>
         ) : null}
-        {contract.starts_at ? <p className="text-sm text-slate-200">{L("期間: {v0}", { v0: contractPeriod(contract) })}</p> : null}
         {!isCoach && contract.payment ? (
           <p className="text-xs text-slate-300">{L("お支払い {v0}（{v1}）{v2}", { v0: formatYen(contract.payment.amount_yen), v1: formatDateTime(contract.payment.paid_at), v2: contract.payment.refunded_yen > 0 && contract.payment.refunded_at
               ? L(" · 返金 {amount}（{at}）", { amount: formatYen(contract.payment.refunded_yen), at: formatDateTime(contract.payment.refunded_at) })
@@ -180,10 +192,6 @@ function CoachingContractView() {
         >{L("申し込みを取り下げる")}</button>
       ) : null}
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
-
-      <Link href={isCoach ? "/coach" : "/me/coaching/personal"} className="block text-center text-sm text-blue-300 underline">
-        {isCoach ? L("コーチ画面へ") : L("申し込みの一覧へ")}
-      </Link>
     </div>
   );
 }

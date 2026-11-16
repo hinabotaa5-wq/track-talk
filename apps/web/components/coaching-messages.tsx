@@ -17,6 +17,7 @@ import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import type { CoachingSupport } from "@/lib/coaching-support";
 import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
+import { Paperclip } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 // パーソナル指導のやりとり欄。期間中は文章と動画を送れ、コーチはメニューも作って送れる。
@@ -29,12 +30,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 const maxVideoBytes = 100 * 1024 * 1024;
 const maxBodyChars = 2000;
 
-function senderName(m: CoachingMessage, contract: CoachingContract): string {
-  if (m.mine) return L("あなた");
-  if (!m.sender_active) return L("退会したユーザー");
-  if (m.sender_role === "coach") return contract.coach?.nickname ?? L("コーチ");
-  if (m.sender_role === "guardian") return L("保護者");
-  return L("{v0}さん", { v0: contract.requester?.nickname ?? L("名前なし") });
+// 日本時間の暦日キー。日付の区切りを出す判定に使う。
+function jstDayKey(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
 
 function MenuCard({ menu }: { menu: PlanMenu }) {
@@ -106,13 +104,10 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
   return (
     <li id={`message-${message.id}`} className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] space-y-2 rounded-2xl p-3 text-sm ${
-          message.mine ? "bg-blue-600/60 text-pure-white" : "border border-white/20 bg-white/10 text-slate-100"
+        className={`max-w-[85%] space-y-2 rounded-3xl p-3 text-sm ${
+          message.mine ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white" : "bg-neutral-800 text-slate-100"
         }`}
       >
-        <p className="text-xs text-slate-300">
-          {senderName(message, contract)} · {formatDateTime(message.created_at)}
-        </p>
         {message.review_submission_id ? <a href={`#message-${message.review_submission_id}`} className="block text-xs text-blue-200 underline">{L("この動画への回答")}</a> : null}
         {message.body ? <p className="whitespace-pre-wrap">{message.body}</p> : null}
         {message.video_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間（契約の終わりから30日）を過ぎたため削除しました。")}</p> : null}
@@ -127,7 +122,7 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
           />
         ) : null}
         {message.menu ? <MenuCard menu={message.menu} /> : null}
-        {message.mine ? null : <ReportButton message={message} access={access} />}
+        {message.mine || contract.role === "coach" ? null : <ReportButton message={message} access={access} />}
       </div>
     </li>
   );
@@ -227,22 +222,13 @@ function Composer({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-3">
+    <form onSubmit={onSubmit} className="sticky bottom-2 z-10 space-y-2">
       {support ? <label className="block text-sm">{L("回答する動画")}<select aria-label={L("回答する動画")} value={reviewID} onChange={(e) => setReviewID(e.target.value)} className="mt-1 block w-full rounded border border-white/25 bg-slate-900 p-2"><option value="">{L("通常のメッセージ（回数に含めない）")}</option>{support.videos.filter((v) => !v.answer_id).map((v) => <option key={v.question_id} value={v.question_id}>{L("{v0} の動画", { v0: formatDateTime(v.created_at) })}</option>)}</select></label> : null}
-      <Textarea
-        rows={3}
-        value={body}
-        maxLength={maxBodyChars}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder={
-          isCoach
-            ? L("練習の様子への返事や、次にやることを書きます")
-            : access.guardianToken
-              ? L("コーチへの質問や、家での様子を書きます")
-              : L("練習の様子や、聞きたいことを書きます")
-        }
-        aria-label={L("メッセージ")}
-      />
+      {isCoach && !menu ? (
+        <div className="flex justify-end">
+          <button type="button" className="text-sm text-blue-300 underline" onClick={() => setMenu(emptyMenu())}>{L("メニュー作成")}</button>
+        </div>
+      ) : null}
       {menu ? (
         <div className="space-y-2 rounded-xl border border-blue-400/40 bg-blue-500/10 p-2">
           <div className="flex items-center justify-between">
@@ -293,10 +279,18 @@ function Composer({
           ) : null}
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center gap-3 text-sm">
+      {file ? <p className="text-xs text-slate-300">{L("動画: {name}", { name: file.name })}</p> : null}
+      {upload ? <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} /> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {guard.warning}
+      <ContactNotice />
+      <div className="flex items-end gap-2 rounded-full border border-white/20 glass bg-white/10 p-2">
         {canVideo ? (
-          <label className="cursor-pointer text-blue-300 underline">
-            {file ? L("動画: {name}", { name: file.name }) : L("動画をつける（{maxReviewSeconds}秒まで）", { maxReviewSeconds })}
+          <label
+            aria-label={file ? L("動画: {name}", { name: file.name }) : L("動画をつける（{maxReviewSeconds}秒まで）", { maxReviewSeconds })}
+            className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-blue-300"
+          >
+            <Paperclip className="size-5" aria-hidden />
             <input
               key={fileKey}
               type="file"
@@ -306,15 +300,23 @@ function Composer({
             />
           </label>
         ) : null}
-        {isCoach && !menu ? (
-          <button type="button" className="text-blue-300 underline" onClick={() => setMenu(emptyMenu())}>{L("メニュー作成")}</button>
-        ) : null}
+        <Textarea
+          rows={1}
+          value={body}
+          maxLength={maxBodyChars}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={
+            isCoach
+              ? L("練習の様子への返事や、次にやることを書きます")
+              : access.guardianToken
+                ? L("コーチへの質問や、家での様子を書きます")
+                : L("練習の様子や、聞きたいことを書きます")
+          }
+          aria-label={L("メッセージ")}
+          className="min-w-0 flex-1"
+        />
+        <Button type="submit" className="shrink-0 rounded-full" disabled={pending || (!body.trim() && !file && !menu)}>{L("送る")}</Button>
       </div>
-      {upload ? <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} /> : null}
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      <Button type="submit" className="w-full" disabled={pending || (!body.trim() && !file && !menu)}>{L("送る")}</Button>
-      {guard.warning}
-      <ContactNotice />
     </form>
   );
 }
@@ -367,6 +369,34 @@ export function CoachingMessages({
 }) {
   const [messages, setMessages] = useState<CoachingMessage[] | null>(null);
   const [error, setError] = useState("");
+  const chatEnd = useRef<HTMLDivElement>(null);
+  const didInitialScroll = useRef(false);
+  const scrollAfterSend = useRef(false);
+  const [latestVisible, setLatestVisible] = useState(true);
+
+  const scrollToEnd = useCallback(() => {
+    const el = chatEnd.current;
+    if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "end" });
+  }, []);
+
+  useEffect(() => {
+    if (!messages) return;
+    if (!didInitialScroll.current) {
+      didInitialScroll.current = true;
+      scrollToEnd();
+    } else if (scrollAfterSend.current) {
+      scrollAfterSend.current = false;
+      scrollToEnd();
+    }
+  }, [messages, scrollToEnd]);
+
+  useEffect(() => {
+    const el = chatEnd.current;
+    if (!el || typeof IntersectionObserver !== "function") return;
+    const observer = new IntersectionObserver((entries) => setLatestVisible(entries[0]?.isIntersecting ?? true), { threshold: 0.1 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [messages]);
   // 読み込みが重なったり、送信した直後に始まった読み込みが返ったりしても、古い一覧で上書きしないよう、
   // 最新の読み込みだけ反映する（送信したら、それまでに始まった読み込みを無効にする）。
   const loadSeq = useRef(0);
@@ -420,9 +450,18 @@ export function CoachingMessages({
   const ended = contract.status === "ended" || contract.status === "refunded";
   // 終わったあとに読めるのは、通報・紛争の対応中で保全しているときだけ。
   const preservedNote = L("通報・紛争の対応中のため、対応が終わるまで読むことだけができます。");
+  type Group = { key: string; day: string; messages: CoachingMessage[] };
+  const groups: Group[] = [];
+  for (const m of messages ?? []) {
+    const day = jstDayKey(m.created_at);
+    const senderKey = `${m.mine ? "mine" : "other"}:${m.sender_role}`;
+    const last = groups[groups.length - 1];
+    if (!last || last.day !== day || last.key !== senderKey) groups.push({ key: senderKey, day, messages: [m] });
+    else last.messages.push(m);
+  }
   return (
     <div className="space-y-4">
-      <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-xs text-slate-200">
+      <p className="text-center text-xs text-slate-400">
         {isGuardian
           ? L("保護者のページでは、やりとりを見ることだけができます（送信はできません）。気になるやりとりは通報できます。")
           : contract.minor
@@ -445,18 +484,41 @@ export function CoachingMessages({
                 : L("まずはあいさつと、いまの練習の様子を送りましょう。")}
           </p>
         ) : null}
-        <ul className="space-y-3">
-          {messages?.map((m) => (
-            <MessageItem key={m.id} message={m} contract={contract} access={access} />
+        <div className="space-y-3">
+          {groups.map((g, gi) => (
+            <div key={`${g.day}-${gi}`} className="space-y-3">
+              {gi === 0 || groups[gi - 1].day !== g.day ? (
+                <p className="text-center text-xs text-slate-400">{formatDateTime(g.messages[0].created_at)}</p>
+              ) : null}
+              <ul className="space-y-0.5" data-message-group={g.key}>
+                {g.messages.map((m) => (
+                  <MessageItem key={m.id} message={m} contract={contract} access={access} />
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+          <div ref={chatEnd} />
+        </div>
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        {!latestVisible && messages && messages.length > 0 ? (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              aria-label={L("最新のメッセージへ")}
+              onClick={scrollToEnd}
+              className="flex size-10 items-center justify-center rounded-full border border-white/25 bg-white/10 text-slate-100"
+            >
+              ↓
+            </button>
+          </div>
+        ) : null}
       </section>
       {contract.status === "active" && !coachingMessagingEnabled ? (
         <p className="text-sm text-slate-300">{L(messagingClosedNote)}</p>
       ) : viewClosed ? null : contract.status === "active" && isGuardian ? null : contract.status === "active" ? (
         <Composer contract={contract} access={access} onSent={(m) => {
             loadSeq.current++;
+            scrollAfterSend.current = true;
             setMessages((list) => [...(list ?? []), m]);
           }} />
       ) : contract.status === "suspended" ? (
