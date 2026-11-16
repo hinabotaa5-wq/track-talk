@@ -140,7 +140,7 @@ function TicketsPage() {
       {confirming ? (
         <PurchaseConfirm
           rows={ticketPackConfirmRows({ quantity: confirming.quantity, amountYen: confirming.amount_yen, validityMonths: summary.validity_months ?? ticketValidityMonths })}
-          confirmLabel={L("確定してお支払いへ（{v0}）", { v0: formatYen(confirming.amount_yen) })}
+          confirmLabel={L("確定してお支払いへ")}
           onConfirm={() => void buy(confirming.id)}
           onBack={() => { setConfirming(null); setError(""); }}
           pending={pending}

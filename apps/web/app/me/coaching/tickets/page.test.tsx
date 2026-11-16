@@ -36,6 +36,7 @@ async function buy() {
   }
   const next = confirmed();
   if (!next) return;
+  expect(next.textContent).toBe("確定してお支払いへ");
   await act(async () => next.click());
 }
 

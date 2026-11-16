@@ -32,7 +32,7 @@ function StepCard({ step, index, children }: { step: Step; index: number; childr
 function ReferralCodeMock() {
   return (
     <div className="mt-3 rounded-lg border border-dashed border-slate-500/50 p-3">
-      <p className="text-sm">{L("紹介ID（友達からもらった場合）")}</p>
+      <p className="text-sm">{L("紹介ID")}</p>
       <p className="mt-1 rounded-lg border border-slate-500/40 px-3 py-2 font-mono tracking-wider text-slate-400">K7M3QX</p>
     </div>
   );
@@ -42,7 +42,7 @@ const steps: Step[] = [
   { icon: Ticket, title: "紹介IDを使わずに購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。" },
   { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで紹介IDをコピーできます。" },
   { icon: GraduationCap, title: "友達がコーチを選んで、申し込みに進む", body: "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。" },
-  { icon: Keyboard, title: "友達が、購入の手続きで紹介IDを入力して購入を完了する", body: "「紹介ID（友達からもらった場合）」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。" },
+  { icon: Keyboard, title: "友達が、購入の手続きで紹介IDを入力して購入を完了する", body: "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。" },
   { icon: Gift, title: "友達2人が購入すると、無料チケットをプレゼント", body: "あと何人かは、マイページで確認できます。" },
 ];
 
