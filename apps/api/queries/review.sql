@@ -273,7 +273,8 @@ WHERE id = sqlc.arg(id)
   AND requester_id = sqlc.arg(requester_id)::uuid
   AND started_at IS NULL
   AND ((status = 'in_review' AND due_at > statement_timestamp())
-    OR (status = 'needs_info' AND resubmit_by > statement_timestamp()))
+    OR (status = 'needs_info' AND resubmit_by > statement_timestamp())
+    OR status = 'awaiting_payment')
 RETURNING *;
 
 -- name: PauseCoachAfterReviewTimeout :exec

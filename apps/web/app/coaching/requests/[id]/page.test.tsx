@@ -14,8 +14,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/auth-provider", () => ({
   useAuth: () => ({ session: { user: { id: "athlete" } }, token: "token", loading: false }),
 }));
+const confirmMock = vi.hoisted(() => vi.fn<(options: { title: string; body: string; confirmLabel: string }) => Promise<boolean>>(async () => true));
 vi.mock("@/components/confirm-dialog", () => ({
-  useConfirm: () => async () => true,
+  useConfirm: () => confirmMock,
   reportConfirmOptions: (value: unknown) => value,
 }));
 const apiFetch = vi.fn();
@@ -425,5 +426,89 @@ it("期限切れは「選んだコーチ」枠と別のコーチへのリンク�
     expect(container.textContent).toContain("別のコーチを選んで申し込む");
   } finally {
     await unmountPage(container, root);
+  }
+});
+
+const unpaidRequest = (status: string, extra: Record<string, unknown> = {}) => ({
+  id: "review-1",
+  status,
+  tier: "coach",
+  event: "100m",
+  focus: [],
+  question: "スタートの姿勢について",
+  created_at: new Date().toISOString(),
+  due_at: new Date(Date.now() + 3600000).toISOString(),
+  requested_coach_id: "coach-1",
+  requested_coach_name: "デモコーチ",
+  total_price_yen: 500,
+  ...extra,
+});
+
+function cancelButton(container: HTMLDivElement) {
+  return Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "依頼をキャンセルする");
+}
+
+it("お支払い待ちはキャンセルボタンを出し、案内文は2時間の1文だけ", async () => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+    return unpaidRequest("awaiting_payment");
+  });
+  const { container, root } = await renderPage();
+  try {
+    expect(cancelButton(container)).toBeDefined();
+    expect(container.textContent).toContain("2時間たってもお支払いがなければ、この依頼は消えます。");
+    expect(container.textContent).not.toContain("コーチを探し始めます");
+  } finally {
+    await unmountPage(container, root);
+  }
+});
+
+it("お支払い待ちのキャンセルは専用の本文で確認し、取り消すとお支払い欄が消える", async () => {
+  let canceled = false;
+  apiFetch.mockImplementation(async (path: string, init?: { method?: string }) => {
+    if (path === "/v1/coaching/requests/review-1/cancel" && init?.method === "POST") {
+      canceled = true;
+      return unpaidRequest("expired", { canceled_at: new Date().toISOString() });
+    }
+    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+    return unpaidRequest("awaiting_payment");
+  });
+  const { container, root } = await renderPage();
+  try {
+    const payButtons = () => Array.from(container.querySelectorAll("button")).filter((b) => b.textContent !== "依頼をキャンセルする").length;
+    expect(payButtons()).toBeGreaterThan(0);
+    await click(cancelButton(container)!);
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "1回プランの依頼をキャンセルしますか？",
+      body: "まだお支払いは済んでいません。取り消すと、この依頼ではお支払いができなくなります。",
+      confirmLabel: "依頼をキャンセルする",
+    }));
+    expect(canceled).toBe(true);
+    expect(container.textContent).toContain("依頼をキャンセルしました");
+    expect(cancelButton(container)).toBeUndefined();
+    expect(container.textContent).not.toContain("2時間たってもお支払いがなければ");
+  } finally {
+    await unmountPage(container, root);
+  }
+});
+
+it("着手前の添削中は従来の返金の本文のまま、着手済みはキャンセルボタンを出さない", async () => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+    return unpaidRequest("in_review");
+  });
+  const first = await renderPage();
+  try {
+    await click(cancelButton(first.container)!);
+    expect(confirmMock).toHaveBeenLastCalledWith(expect.objectContaining({ body: "お支払いは全額返金・取消し、チケットは返還します。" }));
+  } finally {
+    await unmountPage(first.container, first.root);
+  }
+  apiFetch.mockImplementation(async () => unpaidRequest("in_review", { started_at: new Date().toISOString() }));
+  const second = await renderPage();
+  try {
+    expect(cancelButton(second.container)).toBeUndefined();
+  } finally {
+    await unmountPage(second.container, second.root);
   }
 });
