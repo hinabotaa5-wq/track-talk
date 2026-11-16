@@ -61,7 +61,8 @@ export function Header() {
       if (pathname === "/coach/apply") router.replace("/coach");
       else if (pathname === "/coach/about") router.replace("/coach/apply");
       else if (isCoachChildPage(pathname)) router.replace("/coach");
-      else if (history.current?.canGoBack(!!session)) router.back();
+      // 返却済みの依頼詳細など、コーチの子画面の履歴エントリへは戻らず、フォールバック（コーチ画面→コーチタブ）へ進む。
+      else if (history.current?.canGoBack(!!session) && !isCoachChildPage(history.current.previousPath() ?? "")) router.back();
       else router.replace(headerBackFallback(pathname));
     };
     if (!confirmLeave(go)) go();

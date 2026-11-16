@@ -50,6 +50,13 @@ export function trackHeaderHistory(history: History, location: Location) {
         (authPath) => path === authPath || path.startsWith(`${authPath}/`),
       );
     },
+    // 履歴の「1つ前」のパス（なければ null）。戻り先がコーチの子画面かどうかの判定に使う。
+    previousPath(): string | null {
+      const id = currentId();
+      const previous = id === null ? null : entries.get(id)?.previous;
+      if (previous == null) return null;
+      return entries.get(previous)?.href.split(/[?#]/)[0] ?? null;
+    },
     dispose() {
       if (history.pushState === push) history.pushState = originalPush;
       if (history.replaceState === replace) history.replaceState = originalReplace;
