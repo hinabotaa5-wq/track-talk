@@ -14,6 +14,7 @@ import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { coachTicketPurchaseHref, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
 import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity } from "@/lib/review-pricing";
+import { coachDisplayText } from "@/lib/coach-display";
 import type { PublicCoach } from "@/lib/types";
 import { CreditCard, Gift, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -108,7 +109,11 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
     return () => { cancelled = true; };
   }, [videoContext, token, coachID]);
 
-  const achievementLines = coach?.achievements ? coach.achievements.split("\n").map((line) => line.trim()).filter(Boolean) : [];
+  const displayName = coach ? coachDisplayText(coach.nickname, coach.nickname_en) : null;
+  const displayBestRecord = coach ? coachDisplayText(coach.best_record, coach.best_record_en) : null;
+  const displayAchievements = coach ? coachDisplayText(coach.achievements, coach.achievements_en) : null;
+  const displayHitokoto = coach ? coachDisplayText(coach.hitokoto, coach.hitokoto_en) : null;
+  const achievementLines = displayAchievements ? displayAchievements.split("\n").map((line) => line.trim()).filter(Boolean) : [];
   const ctaHref = `/coaching/new?coach=${encodeURIComponent(id)}`;
   const ctaEnabled = availability !== "unavailable";
   // チケット購入画面へのリンク。購入を完了したらこのコーチ詳細に戻る（本体 #691。2つの入口で同じ戻り先）。
@@ -138,18 +143,18 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
       {result && "error" in result ? <p role="alert" className="text-sm text-red-400">{L("コーチの詳細を読み込めませんでした")}</p> : coach === undefined ? <PageLoading screen label={L("読み込み中...")} /> : coach === null ? <p className="text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p> : <>
         <section className="glass space-y-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm" aria-label={L("コーチのプロフィール")}>
           <div className="flex items-start gap-4">
-            <CoachAvatar url={coach.photo_url} name={coach.nickname} size={112} />
+            <CoachAvatar url={coach.photo_url} name={displayName} size={112} />
             <div className="min-w-0 flex-1 space-y-1.5 break-words">
-              <h1 className="text-2xl font-bold text-white">{coach.nickname ?? L("名前なし")}</h1>
+              <h1 className="text-2xl font-bold text-white">{displayName ?? L("名前なし")}</h1>
               {coach.events.length ? <ul className="flex flex-wrap gap-1.5" aria-label={L("担当種目")}>
                 {coach.events.map((event) => <li key={event} className="rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-200">{coachEventLabels[event]}</li>)}
               </ul> : null}
             </div>
           </div>
           <dl className="space-y-4">
-            {coach.best_record ? <div>
+            {displayBestRecord ? <div>
               <dt className="text-xs text-slate-300">{L("記録")}</dt>
-              <dd className="mt-1 flex items-center gap-2 text-lg font-bold text-white"><Trophy className="size-5 shrink-0 text-amber-400" aria-hidden /><span className="break-words">{coach.best_record}</span></dd>
+              <dd className="mt-1 flex items-center gap-2 text-lg font-bold text-white"><Trophy className="size-5 shrink-0 text-amber-400" aria-hidden /><span className="break-words">{displayBestRecord}</span></dd>
             </div> : null}
             {achievementLines.length ? <div>
               <dt className="text-xs text-slate-300">{L("成績や指導経験")}</dt>
@@ -163,9 +168,9 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
               <dt className="text-xs text-slate-300">{L("担当サービス")}</dt>
               <dd className="whitespace-pre-wrap break-words text-slate-100">{(coach.service_types ?? []).map((service) => coachingServiceLabels[service]).join(L("・"))}</dd>
             </div> : null}
-            {coach.hitokoto ? <div>
+            {displayHitokoto ? <div>
               <dt className="text-xs text-slate-300">{L("ひとこと")}</dt>
-              <dd className="whitespace-pre-wrap break-words text-slate-100">{coach.hitokoto}</dd>
+              <dd className="whitespace-pre-wrap break-words text-slate-100">{displayHitokoto}</dd>
             </div> : null}
             {(coach.sns_urls ?? []).length ? <div>
               <dt className="text-xs text-slate-300">{L("SNS・ホームページ")}</dt>

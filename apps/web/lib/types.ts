@@ -671,7 +671,7 @@ export type PublicCoachingPlan = {
   // false のあいだは支払いなしのデモ版。
   payments: boolean;
   plan: CoachingPlan;
-  coach: { id: string; nickname: string | null; photo_url: string; tier: CoachTier; events: CoachEvent[] };
+  coach: { id: string; nickname: string | null; nickname_en?: string | null; photo_url: string; tier: CoachTier; events: CoachEvent[] };
   commerce?: PublicCommerce;
 };
 
@@ -865,6 +865,10 @@ export type PublicCoach = {
   service_types: CoachingServiceType[];
   id: string;
   nickname: string | null;
+  nickname_en?: string | null;
+  hitokoto_en?: string | null;
+  achievements_en?: string | null;
+  best_record_en?: string | null;
   photo_url: string;
   tier: CoachTier;
   events: CoachEvent[];
@@ -904,6 +908,7 @@ export type ReviewCoach = {
 export type SupportPlanCoach = {
   id: string;
   nickname: string | null;
+  nickname_en?: string | null;
   photo_url: string;
   events: CoachEvent[];
   kinds: ("competition_support" | "in_person")[];

@@ -239,6 +239,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Patch("/admin/products/{id}", s.updateProduct)
 			r.Post("/admin/products/{id}/hide", s.hideProduct)
 			r.Post("/admin/product-reviews/{id}/hide", s.hideProductReview)
+			r.Post("/admin/coach-profile-translations/backfill", s.backfillCoachProfileTranslations)
 			r.Get("/admin/coach-applications", s.listCoachApplications)
 			r.Post("/admin/coach-applications/{id}/approve", s.approveCoachApplication)
 			r.Post("/admin/coach-applications/{id}/reject", s.rejectCoachApplication)

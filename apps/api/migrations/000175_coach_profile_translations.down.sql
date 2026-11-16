@@ -1,0 +1,2 @@
+DROP TABLE coach_profile_translation_attempts;
+DROP TABLE coach_profile_translations;

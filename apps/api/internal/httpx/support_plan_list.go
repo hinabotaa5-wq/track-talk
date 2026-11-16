@@ -89,14 +89,19 @@ func (s *Server) listSupportPlanCoaches(w http.ResponseWriter, r *http.Request) 
 		byID[c.ProfileID] = c
 		ids = append(ids, c.ProfileID)
 	}
+	translations := s.coachTranslationsFor(ctx, rows)
 	now := time.Now()
 	today := availabilityToday(now)
 	out := make([]map[string]any, 0, len(ids))
 	for _, id := range rotateCoaches(ids, now) {
 		c := byID[id]
 		kinds := []string{}
+		var nicknameEn any
+		if tr, ok := translations[id]; ok {
+			nicknameEn = tr.NicknameEn
+		}
 		entry := map[string]any{
-			"id": id, "nickname": c.Nickname, "photo_url": s.coachPhotoURL(c.PhotoPublicID), "events": c.Events,
+			"id": id, "nickname": c.Nickname, "nickname_en": nicknameEn, "photo_url": s.coachPhotoURL(c.PhotoPublicID), "events": c.Events,
 		}
 		if cs := consults[id]; cs != nil {
 			kinds = append(kinds, "competition_support")

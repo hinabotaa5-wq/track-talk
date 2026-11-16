@@ -80,11 +80,12 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		"payments": s.stripe.Configured(),
 		"plan":     plan,
 		"coach": map[string]any{
-			"id":        p.CoachID,
-			"nickname":  p.CoachNickname,
-			"photo_url": s.coachPhotoURL(p.CoachPhotoPublicID),
-			"tier":      p.CoachTier,
-			"events":    p.CoachEvents,
+			"id":          p.CoachID,
+			"nickname":    p.CoachNickname,
+			"nickname_en": s.coachNicknameEnFor(r.Context(), p.CoachID),
+			"photo_url":   s.coachPhotoURL(p.CoachPhotoPublicID),
+			"tier":        p.CoachTier,
+			"events":      p.CoachEvents,
 		},
 	})
 }

@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { rememberCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { supportPlanListEnabled } from "@/lib/features";
+import { coachDisplayText } from "@/lib/coach-display";
 import type { SupportPlanCoach } from "@/lib/types";
 import { priceHintLabel } from "@/lib/support-consult";
 import Link from "next/link";
@@ -20,15 +21,16 @@ import { useEffect, useState } from "react";
 function CoachCard({ c, fetchedAt }: { c: SupportPlanCoach; fetchedAt: number }) {
   const cs = c.competition_support;
   if (!cs) return null;
+  const displayName = coachDisplayText(c.nickname, c.nickname_en);
   // 詳細はサポートプランの文脈で開き、サポートプランの節だけを出す（本体 #694）。
   return (
     <li id={`support-coach-${c.id}`} className="min-w-0">
       <Link href={`/coaches/${encodeURIComponent(c.id)}?tab=support`} onNavigate={() => rememberCoachDetailPreview({
-        id: c.id, nickname: c.nickname, photo_url: c.photo_url, events: c.events, support_consult: cs,
+        id: c.id, nickname: c.nickname, nickname_en: c.nickname_en, photo_url: c.photo_url, events: c.events, support_consult: cs,
       }, fetchedAt)} className="glass flex h-full gap-3 rounded-xl border border-white/20 bg-white/10 p-3 text-sm transition-colors hover:border-blue-400/50 hover:bg-white/15">
-        <CoachAvatar url={c.photo_url} name={c.nickname} size={56} />
+        <CoachAvatar url={c.photo_url} name={displayName} size={56} />
         <div className="min-w-0 flex-1 space-y-1.5 break-words">
-          <p className="font-bold text-white">{c.nickname ?? L("名前なし")}</p>
+          <p className="font-bold text-white">{displayName ?? L("名前なし")}</p>
           <p className="text-xs text-slate-200">{c.events.map((e) => coachEventLabels[e]).join(L("、"))}</p>
           <div className="text-xs text-slate-200">
             <span className="font-semibold text-slate-100">{L("1ヶ月プラン")}</span>{" "}

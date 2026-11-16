@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { planSummary } from "@/lib/coaching-plan";
+import { coachDisplayText } from "@/lib/coach-display";
 import type { CoachEvent, CoachingContract, CoachingMe, PublicCoachingPlan } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -115,6 +116,7 @@ export default function ApplyCoachingPlanPage() {
   if (loading || !session || !data || !me) return <PageLoading screen label={L("読み込み中...")} />;
 
   const { plan, coach } = data;
+  const displayName = coachDisplayText(coach.nickname, coach.nickname_en);
   const fieldError = (key: string) => (fields[key] ? <p className="text-sm text-red-400">{fields[key]}</p> : null);
 
   return (
@@ -124,15 +126,15 @@ export default function ApplyCoachingPlanPage() {
           <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">{L("デモ版")}</p>
         )}
         <h1 className="text-2xl font-bold">{L("パーソナル指導に申し込む")}</h1>
-        <SellerNote coachName={coach.nickname} />
+        <SellerNote coachName={displayName} />
         {data.commerce ? <CoachCommerceDisclosure commerce={data.commerce} /> : null}
       </div>
 
       <section className="space-y-3 rounded-2xl border border-white/20 glass bg-white/10 p-4 text-sm">
         <div className="flex items-center gap-3">
-          <CoachAvatar url={coach.photo_url} name={coach.nickname} />
+          <CoachAvatar url={coach.photo_url} name={displayName} />
           <div>
-            <p className="font-bold text-white">{coach.nickname ?? L("名前なし")}</p>
+            <p className="font-bold text-white">{displayName ?? L("名前なし")}</p>
             <p className="text-xs text-slate-300">{coachTierLabels[coach.tier]}</p>
           </div>
         </div>

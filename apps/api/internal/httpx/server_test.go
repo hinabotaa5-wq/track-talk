@@ -59,7 +59,7 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 	if err := migrate.Up(dsn); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	_, _ = pool.Exec(ctx, `TRUNCATE sense_summary_attempts, notifications, inquiries, reports, post_saves, post_likes, comments, practice_ratings, practice_applications, posts, profiles CASCADE`)
+	_, _ = pool.Exec(ctx, `TRUNCATE sense_summary_attempts, coach_profile_translation_attempts, notifications, inquiries, reports, post_saves, post_likes, comments, practice_ratings, practice_applications, posts, profiles CASCADE`)
 	v, err := auth.NewVerifier(secret, "", "authenticated")
 	if err != nil {
 		t.Fatal(err)
