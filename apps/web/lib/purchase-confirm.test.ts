@@ -4,7 +4,7 @@ import { installEnglish, setActiveLocale } from "./i18n";
 import { en } from "./i18n-en";
 
 describe("purchase-confirm", () => {
-  it("カード決済の確認文で、仮押さえ取消しと返金の表記が状態で分かれている", () => {
+  it("カード決済の確認文が運営者決定の短縮文と一致する", () => {
     setActiveLocale("ja");
     const rows = reviewConfirmRows({
       method: "card",
@@ -14,9 +14,24 @@ describe("purchase-confirm", () => {
     });
     const cancelRefundRow = rows.find((r) => r.label === "キャンセル・返金");
     expect(cancelRefundRow).toBeDefined();
-    expect(cancelRefundRow?.value).toContain("仮押さえを取り消し（請求は確定しません）");
-    expect(cancelRefundRow?.value).toContain("確定している場合は返金します");
-    expect(cancelRefundRow?.value).not.toContain("期限までに返らない場合やコーチ都合の返却では全額を返金します");
+    expect(cancelRefundRow?.value).toBe(
+      "次の画面でカードの代金を仮押さえし、回答が返った時に確定します。着手前はキャンセルでき、その場合は代金はかかりません。着手後はキャンセルできません。期限までに返らない場合やコーチが返却した場合は、代金はかかりません（確定済みの場合は返金します）。回答返却後の返金は利用規約に定める場合に限ります。",
+    );
+    for (const old of [
+      "確保（仮押さえ）",
+      "決済が確定していない場合は仮押さえを取り消し（請求は確定しません）",
+      "確定している場合は返金します",
+      "確保を取り消すので",
+    ]) {
+      expect(cancelRefundRow?.value).not.toContain(old);
+    }
+    expect(cancelRefundRow?.value).toContain("回答返却後の返金は利用規約に定める場合に限ります");
+  });
+
+  it("カード確認文の英語訳のキーが1件だけで、日本語文のままでも英語にフォールバックしない", () => {
+    expect(Object.keys(en).filter((k) => k.startsWith("次の画面でカードの代金を"))).toEqual([
+      "次の画面でカードの代金を仮押さえし、回答が返った時に確定します。着手前はキャンセルでき、その場合は代金はかかりません。着手後はキャンセルできません。期限までに返らない場合やコーチが返却した場合は、代金はかかりません（確定済みの場合は返金します）。回答返却後の返金は利用規約に定める場合に限ります。",
+    ]);
   });
 
   it("英語辞書で 1 review の表記が消え、One ticket covers one One-time Plan request. 相当になっている", () => {
@@ -40,7 +55,10 @@ describe("purchase-confirm", () => {
     });
     const cardCancelRow = cardRows.find((r) => r.label === "Cancellation and refunds");
     expect(cardCancelRow).toBeDefined();
-    expect(cardCancelRow?.value).toContain("the authorization is voided if the payment is not yet finalized (you will not be charged), or refunded if already finalized");
+    expect(cardCancelRow?.value).toBe(
+      "Your card is authorized on the next screen and charged when the review is returned. You can cancel before the coach starts, in which case you won't be charged. You can't cancel once the coach starts. If the review isn't returned by the deadline or the coach returns it, you won't be charged (if the payment has already been finalized, you will be refunded). After the review is returned, refunds follow the Terms.",
+    );
+    expect(cardCancelRow?.value).not.toContain("the authorization is voided if the payment is not yet finalized");
     setActiveLocale("ja");
   });
 
