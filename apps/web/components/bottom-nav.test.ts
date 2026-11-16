@@ -3,7 +3,7 @@ import { activeMainTab, headerBackFallback, isCoachChildPage, hasBackOnlyHeader,
 
 describe("mainTabHref", () => {
   it("詳細や利用履歴でも所属タブを維持する", () => {
-    for (const path of ["/coach", "/coach/apply", "/coach/about", "/coaching/new", "/coaching/personal/contract", "/me/coaching/tickets", "/guardian/token", "/coaches/id"]) expect(activeMainTab(path), path).toBe("coaching");
+    for (const path of ["/coach", "/coach/apply", "/coach/about", "/coaching/new", "/coaching/personal/contract", "/me/coaching/tickets", "/guardian/token", "/coaches/id", "/player"]) expect(activeMainTab(path), path).toBe("coaching");
     expect(activeMainTab("/prefectures/tokyo")).toBe("competitions");
     expect(activeMainTab("/me/sense")).toBe("memo");
     expect(activeMainTab("/injury/hamstring-strain")).toBe("injury");

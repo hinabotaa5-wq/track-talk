@@ -48,7 +48,7 @@ export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn
 
 export function activeMainTab(pathname: string) {
   if (pathname === "/" || pathname.startsWith("/reviews/")) return "home";
-  if (["/coaching", "/coaches", "/coach", "/guardian", "/me/coaching"].some((base) => pathname === base || pathname.startsWith(`${base}/`))) return "coaching";
+  if (["/coaching", "/coaches", "/coach", "/guardian", "/me/coaching", "/player"].some((base) => pathname === base || pathname.startsWith(`${base}/`))) return "coaching";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
   if (pathname.startsWith("/prefectures/")) return "competitions";
   if (pathname === "/injury" || pathname.startsWith("/injury/") || pathname === "/me/injury") return "injury";
