@@ -56,6 +56,7 @@ export function CoachTabs({ onLoadingChange }: { onLoadingChange?: (loading: boo
               <ViewSwitch
                 label={L("コーチの一覧を切り替える")}
                 layoutId="coach-list-view-pill"
+                initialPillStatic
                 views={views}
                 current={tab}
                 onSelect={select}
