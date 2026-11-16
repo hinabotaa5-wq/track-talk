@@ -14,7 +14,6 @@ import { ReviewCoachCard, ReviewResponseView } from "@/components/review-respons
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
@@ -347,20 +346,12 @@ function ReviewRequestView() {
 
       <dl className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
         <div>
-          <dt className="text-xs text-slate-300">{L("誰に見てもらうか")}</dt>
-          <dd>{coachTierLabels[request.tier]}</dd>
-        </div>
-        <div>
-          <dt className="text-xs text-slate-300">{L("種目")}</dt>
-          <dd>{coachEventLabels[request.event]}</dd>
-        </div>
-        <div>
           <dt className="text-xs text-slate-300">{L("相談内容")}</dt>
           <dd className="whitespace-pre-wrap break-words">{reviewQuestionText(request)}</dd>
         </div>
       </dl>
 
-      <Link href="/me/coaching/requests" className="block text-center text-sm text-blue-300 underline">{L("依頼の一覧へ")}</Link>
+      <Link href="/me/coaching/requests" className="block min-h-11 w-full rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-blue-300 transition active:scale-[0.98]">{L("依頼の一覧へ")}</Link>
     </div>
   );
 }
