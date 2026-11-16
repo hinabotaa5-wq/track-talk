@@ -51,18 +51,19 @@ it("見出しと本文を正本どおりに表示する", async () => {
   expect(text).toContain(BODY_JA);
 });
 
-it("バナー全体が /me へのリンクである", async () => {
+it("バナー全体が /referral へのリンクである", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
-  const link = container.querySelector('a[href="/me"]');
+  const link = container.querySelector('a[href="/referral"]');
   expect(link).not.toBeNull();
   expect(link?.getAttribute("aria-label")).toBe(HEADLINE_JA);
+  expect(container.querySelector('a[href="/me"]')).toBeNull();
 });
 
 it("黄色地に濃色文字で、見出しは太字・閉じるボタンなし", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
-  const link = container.querySelector('a[href="/me"]');
+  const link = container.querySelector('a[href="/referral"]');
   expect(link?.className).toContain("bg-yellow-400");
   expect(link?.className).toContain("text-slate-900");
   const headline = [...(container.querySelectorAll("span") ?? [])].find((el) => el.textContent === HEADLINE_JA);
@@ -82,7 +83,7 @@ it("CoachesView ではバナーがタブ行より前に描画される", async (
   expect(tabsAt).toBeGreaterThanOrEqual(0);
   expect(bannerAt).toBeLessThan(tabsAt);
   // DOM 順序でもバナーのリンクがタブより前にある。
-  const link = container.querySelector('a[href="/me"]');
+  const link = container.querySelector('a[href="/referral"]');
   const tabs = container.querySelector('[role="tabpanel"], [role="tablist"]');
   expect(link).not.toBeNull();
   expect(tabs).not.toBeNull();
