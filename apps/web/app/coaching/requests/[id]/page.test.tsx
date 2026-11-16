@@ -3,6 +3,8 @@ import { act, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { LeaveGuardProvider } from "@/components/leave-guard";
+import { en } from "@/lib/i18n-en";
+import { reviewVideosPurgedNote } from "@/lib/review";
 import ReviewRequestPage from "./page";
 
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -55,6 +57,7 @@ type RequestFixture = {
   response?: { hidden: boolean } | null;
   rating?: { stars: number | null; helpful: null } | null;
   coach?: { id: string } | null;
+  extra?: Record<string, unknown>;
 };
 
 function baseRequest(override: RequestFixture = {}) {
@@ -93,6 +96,7 @@ function baseRequest(override: RequestFixture = {}) {
       }
       : undefined;
   }
+  if (override.extra) Object.assign(request, override.extra);
   return request;
 }
 
@@ -542,5 +546,104 @@ it("着手前の添削中は従来の返金の本文のまま、着手済みは�
     expect(cancelButton(second.container)).toBeUndefined();
   } finally {
     await unmountPage(second.container, second.root);
+  }
+});
+
+async function renderWith(override: RequestFixture) {
+  apiFetch.mockImplementation(async (path: string) => {
+    const consultations = mockConsultationsEmpty(path);
+    if (consultations !== undefined) return consultations;
+    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+    return baseRequest(override);
+  });
+  return renderPage();
+}
+
+function dlTerms(container: HTMLDivElement) {
+  return Array.from(container.querySelectorAll("dl dt")).map((dt) => dt.textContent);
+}
+
+it("返却前の依頼詳細は「誰に見てもらうか」と種目を出さず、相談内容だけを枠に出す", async () => {
+  const { container, root } = await renderWith({ response: null, extra: { status: "in_review", due_at: new Date().toISOString() } });
+  try {
+    expect(container.textContent).toContain("スタートの姿勢について");
+    expect(container.textContent).not.toContain("誰に見てもらうか");
+    expect(container.textContent).not.toContain("100m");
+    expect(dlTerms(container)).toEqual(["相談内容"]);
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("動画ありの依頼は現行のプレイヤーを出し、相談内容も出す", async () => {
+  const { container, root } = await renderWith({
+    response: null,
+    extra: { status: "in_review", due_at: new Date().toISOString(), video_url: "https://example.com/run.mp4", thumbnail_url: "https://example.com/run.jpg" },
+  });
+  try {
+    const videos = container.querySelectorAll("video");
+    expect(videos).toHaveLength(1);
+    expect(videos[0].getAttribute("src")).toBe("https://example.com/run.mp4");
+    expect(videos[0].getAttribute("poster")).toBe("https://example.com/run.jpg");
+    expect(videos[0].hasAttribute("controls")).toBe(true);
+    expect(container.textContent).toContain("スタートの姿勢について");
+    expect(container.textContent).not.toContain("誰に見てもらうか");
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("動画なし（悩みのみ）の依頼は動画も保存期間の注記も出さず、相談内容だけを出す", async () => {
+  const { container, root } = await renderWith({ response: null, extra: { status: "in_review", due_at: new Date().toISOString() } });
+  try {
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.textContent).not.toContain(reviewVideosPurgedNote);
+    expect(dlTerms(container)).toEqual(["相談内容"]);
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("動画が削除済みの依頼は保存期間の注記と相談内容を出す", async () => {
+  const { container, root } = await renderWith({ response: null, extra: { status: "in_review", due_at: new Date().toISOString(), videos_purged: true } });
+  try {
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.textContent).toContain(reviewVideosPurgedNote);
+    expect(container.textContent).toContain("スタートの姿勢について");
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("返却後も「誰に見てもらうか」は出ず、相談内容とコーチカードの種目は残る", async () => {
+  const { container, root } = await renderWith({ coach: { id: "coach-1" } });
+  try {
+    expect(container.textContent).not.toContain("誰に見てもらうか");
+    expect(dlTerms(container)).toContain("相談内容");
+    expect(container.textContent).toContain("スタートの姿勢について");
+    expect(container.textContent).toContain("テストコーチ");
+    expect(container.textContent).toContain("100m");
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("英語辞書に「誰に見てもらうか」はなく、「相談内容」「種目」は残る", () => {
+  expect(Object.keys(en)).not.toContain("誰に見てもらうか");
+  expect(en["相談内容"]).toBeDefined();
+  expect(en["種目"]).toBeDefined();
+});
+
+it("「依頼の一覧へ」は枠付きのボタン形で、行き先と文言は変わらない", async () => {
+  const { container, root } = await renderWith({});
+  try {
+    const link = listLink(container);
+    expect(link.className).toContain("border");
+    expect(link.className).toContain("rounded-xl");
+    expect(link.className).not.toContain("underline");
+    expect(link.textContent).toBe("依頼の一覧へ");
+    expect(link.getAttribute("href")).toBe("/me/coaching/requests");
+  } finally {
+    await teardown(root, container);
   }
 });

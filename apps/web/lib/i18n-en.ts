@@ -383,7 +383,6 @@ export const en: Readonly<Record<string, string>> = {
   "1回プランのために確保中": "Reserved for the One-time Plan",
   "利用済み": "Used",
   "残高に返却済み": "Returned to balance",
-  "誰に見てもらうか": "Who will review",
   "依頼の一覧へ": "Back to requests",
   "この返答を運営に通報しますか？": "Report this response to the team?",
   "通報できませんでした": "Couldn't report",
