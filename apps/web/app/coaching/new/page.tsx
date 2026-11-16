@@ -473,6 +473,12 @@ export default function NewReviewRequestPage() {
           <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? L("送っています") : needsConfirm ? L("申込み内容を確認する") : L("送る")}
           </Button>
+          {!pending && estimate && (!coach || (needsDeclaration && !declared)) ? (
+            <div role="status" className="space-y-1 text-xs text-slate-300">
+              {!coach ? <p>{L("コーチを選んでください。")}</p> : null}
+              {needsDeclaration && !declared ? <p>{L("未成年の方は、保護者の同意のチェックが必要です。")}</p> : null}
+            </div>
+          ) : null}
         </form>
       )}
     </div>

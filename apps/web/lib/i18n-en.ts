@@ -276,6 +276,7 @@ export const en: Readonly<Record<string, string>> = {
   "100MB以内の動画にしてください": "Please keep the video under 100MB",
   "チケットが不足しています。先にチケットを購入してください。": "You don't have enough tickets. Please buy tickets first.",
   "購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。": "Before purchasing, please confirm that you have your guardian's permission and check the box.",
+  "未成年の方は、保護者の同意のチェックが必要です。": "Minors must check the parental consent box.",
   "デモ版": "Demo",
   "1回プラン（フォーム添削や競技に関する悩み）": "One-time Plan (form feedback or concerns about competing)",
   "フォーム添削や競技に関する悩み": "Form feedback or concerns about competing",

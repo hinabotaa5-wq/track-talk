@@ -145,3 +145,87 @@ describe("RegisterPage", () => {
     }
   });
 });
+
+// フィールドエラーの表示（本体 #870）。同意チェック・captcha の条件と送信処理は変えない。
+describe("RegisterPage のフィールドエラー表示", () => {
+  beforeEach(() => {
+    // 上の describe の beforeEach はここには効かない。漏洩テストの true が残らないよう戻す。
+    isPwnedPassword.mockResolvedValue(false);
+    signUp.mockReset();
+  });
+  function setValue(div: HTMLElement, type: string, value: string) {
+    const el = div.querySelector(`input[type="${type}"]`) as HTMLInputElement;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function fieldError(div: HTMLElement, text: string) {
+    return Array.from(div.querySelectorAll("p")).find((p) => p.textContent === text);
+  }
+
+  it("不正なメール形式で送信すると「メールアドレスを確認してください」が表示される", async () => {
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setValue(view.div, "email", "not-an-email");
+        setValue(view.div, "password", "password1234");
+        const checkbox = view.div.querySelector('input[type="checkbox"]') as HTMLInputElement;
+        if (!checkbox.checked) checkbox.click();
+      });
+      await act(async () => {
+        view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+
+      await vi.waitFor(() => expect(fieldError(view.div, "メールアドレスを確認してください")).not.toBeUndefined());
+      const error = fieldError(view.div, "メールアドレスを確認してください")!;
+      expect(error.className).toContain("text-sm");
+      expect(error.className).toContain("text-red-400");
+      expect(signUp).not.toHaveBeenCalled();
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("パスワード8文字未満で送信すると「8文字以上にしてください」が表示される", async () => {
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setValue(view.div, "email", "runner@example.com");
+        setValue(view.div, "password", "short12");
+        const checkbox = view.div.querySelector('input[type="checkbox"]') as HTMLInputElement;
+        if (!checkbox.checked) checkbox.click();
+      });
+      await act(async () => {
+        view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+
+      await vi.waitFor(() => expect(fieldError(view.div, "8文字以上にしてください")).not.toBeUndefined());
+      expect(signUp).not.toHaveBeenCalled();
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("正常な入力ではフィールドエラーが表示されず送信に進む", async () => {
+    signUp.mockResolvedValue({ data: { user: { identities: [{ id: "x" }] }, session: null }, error: null });
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setValue(view.div, "email", "runner@example.com");
+        setValue(view.div, "password", "password1234");
+        const checkbox = view.div.querySelector('input[type="checkbox"]') as HTMLInputElement;
+        if (!checkbox.checked) checkbox.click();
+      });
+      await act(async () => {
+        view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+
+      await vi.waitFor(() => expect(signUp).toHaveBeenCalled());
+      expect(view.div.textContent).not.toContain("メールアドレスを確認してください");
+      expect(view.div.textContent).not.toContain("パスワードを入力してください");
+      expect(view.div.textContent).not.toContain("8文字以上にしてください");
+    } finally {
+      await view.unmount();
+    }
+  });
+});

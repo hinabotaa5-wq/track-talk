@@ -98,7 +98,9 @@ export default function LoginPage() {
       <h1 className="text-2xl font-bold">{t(shown, "login.title")}</h1>
       <form method="post" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input type="email" placeholder={t(shown, "login.email")} {...form.register("email")} />
+        {form.formState.errors.email ? <p className="text-sm text-red-400">{form.formState.errors.email.message}</p> : null}
         <Input type="password" placeholder={t(shown, "login.password")} {...form.register("password")} />
+        {form.formState.errors.password ? <p className="text-sm text-red-400">{form.formState.errors.password.message}</p> : null}
         {captcha.widget}
         {error ? <p className="text-sm text-red-400">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={pending || !captcha.ready}>

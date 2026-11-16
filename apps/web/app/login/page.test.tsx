@@ -119,3 +119,78 @@ describe("LoginPage の下部3導線", () => {
     }
   });
 });
+
+function setInput(div: HTMLElement, type: string, value: string) {
+  const el = div.querySelector(`input[type="${type}"]`) as HTMLInputElement;
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+async function submitForm(div: HTMLElement) {
+  await act(async () => {
+    div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  });
+}
+
+function fieldError(div: HTMLElement, text: string) {
+  return Array.from(div.querySelectorAll("p")).find((p) => p.textContent === text);
+}
+
+// フィールドエラーの表示（本体 #870）。ボタンの条件・送信処理は変えない。
+describe("LoginPage のフィールドエラー表示", () => {
+  it("不正なメール形式で送信すると「メールアドレスを確認してください」が表示される", async () => {
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setInput(view.div, "email", "not-an-email");
+        setInput(view.div, "password", "password1234");
+      });
+      await submitForm(view.div);
+      await vi.waitFor(() => expect(fieldError(view.div, "メールアドレスを確認してください")).not.toBeUndefined());
+      const error = fieldError(view.div, "メールアドレスを確認してください")!;
+      expect(error.className).toContain("text-sm");
+      expect(error.className).toContain("text-red-400");
+      // メール欄の下（パスワード欄の前）に出る。
+      const email = view.div.querySelector('input[type="email"]')!;
+      const password = view.div.querySelector('input[type="password"]')!;
+      expect(email.compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(error.compareDocumentPosition(password) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("パスワード8文字未満で送信すると「8文字以上にしてください」が表示される", async () => {
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setInput(view.div, "email", "runner@example.com");
+        setInput(view.div, "password", "short12");
+      });
+      await submitForm(view.div);
+      await vi.waitFor(() => expect(fieldError(view.div, "8文字以上にしてください")).not.toBeUndefined());
+      const error = fieldError(view.div, "8文字以上にしてください")!;
+      expect(error.className).toContain("text-sm");
+      expect(error.className).toContain("text-red-400");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("正常な入力ではフィールドエラーが表示されない", async () => {
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setInput(view.div, "email", "runner@example.com");
+        setInput(view.div, "password", "password1234");
+      });
+      await submitForm(view.div);
+      await act(async () => {});
+      expect(view.div.textContent).not.toContain("メールアドレスを確認してください");
+      expect(view.div.textContent).not.toContain("パスワードを入力してください");
+      expect(view.div.textContent).not.toContain("8文字以上にしてください");
+    } finally {
+      await view.unmount();
+    }
+  });
+});

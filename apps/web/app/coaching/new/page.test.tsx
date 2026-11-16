@@ -774,3 +774,72 @@ it.each([false, true])("相談内容を必須にして申込を送る（動画�
   expect(body.video_public_id).toBe(hasVideo ? "vid1" : undefined);
   expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
 });
+
+// 送信ボタンが押せない理由の表示（本体 #870）。ボタンの条件自体は変えない。
+it("コーチ未選択では理由を表示し、コーチを選ぶと消える", async () => {
+  mockReviewOpen([reviewCoach("c1")]);
+  await render();
+  await act(async () => {});
+  const coachReason = paragraphExactly("コーチを選んでください。");
+  expect(coachReason).toBeTruthy();
+  // 理由の領域は注記トーン（text-xs）。
+  expect(coachReason?.parentElement?.className).toContain("text-xs");
+  expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);
+  // コーチを選ぶ（?coach= で開き直す）。
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c1")]);
+  await render();
+  await act(async () => {});
+  expect(paragraphExactly("コーチを選んでください。")).toBeFalsy();
+});
+
+it("未成年宣言が必要で未チェックだと理由を表示し、チェックすると消える", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c1")]);
+  await render();
+  await act(async () => {});
+  expect(paragraphExactly("コーチを選んでください。")).toBeFalsy();
+  expect(paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。")).toBeTruthy();
+  await act(async () => { container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
+  expect(paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。")).toBeFalsy();
+});
+
+it("コーチ未選択かつ宣言未チェックのとき、理由が2件とも確認ボタンの直下に表示される", async () => {
+  mockReviewOpen([reviewCoach("c1")]);
+  await render();
+  await act(async () => {});
+  const coachReason = paragraphExactly("コーチを選んでください。");
+  const declarationReason = paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。");
+  expect(coachReason).toBeTruthy();
+  expect(declarationReason).toBeTruthy();
+  const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+  expect(submit.disabled).toBe(true);
+  // 理由の領域は1つで、確認ボタンの直後にある。
+  const region = submit.nextElementSibling;
+  expect(region?.getAttribute("role")).toBe("status");
+  expect(region?.contains(coachReason!)).toBe(true);
+  expect(region?.contains(declarationReason!)).toBe(true);
+});
+
+it("条件が全てそろうと理由が表示されず、確認ボタンが有効になる", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c1")]);
+  await render();
+  await act(async () => {});
+  await act(async () => { container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
+  expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+  expect(paragraphExactly("コーチを選んでください。")).toBeFalsy();
+  expect(paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。")).toBeFalsy();
+});
+
+it("未成年宣言の理由は英語でも出る", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c1")]);
+  await render();
+  await act(async () => {});
+  expect(paragraphExactly("Minors must check the parental consent box.")).toBeTruthy();
+});
