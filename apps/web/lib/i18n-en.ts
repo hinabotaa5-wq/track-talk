@@ -325,8 +325,6 @@ export const en: Readonly<Record<string, string>> = {
   "準備中・公開までお待ちください": "In preparation. Please wait for launch.",
   "利用中の方": "For current users",
   "コーチングの利用状況": "Your coaching",
-  "依頼した1回プラン": "One-time Plans you requested",
-  "申し込んだ継続プラン": "Ongoing plans you applied for",
   "申し込みを取り下げますか？": "Withdraw this application?",
   "パーソナル指導": "Personal coaching",
   "{v0}さん": "{v0}",

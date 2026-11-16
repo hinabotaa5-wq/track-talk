@@ -267,23 +267,20 @@ it("ログイン時に401が続く場合は1回で再試行を打ち切り、復
     expect(profileStatus()).toBeNull();
   } finally { vi.useRealTimers(); }
 });
-it("コーチングが閉じている間はコーチングのセクションを出さない", async () => {
+it.each([true, false])("コーチングセクションは coachingEnabled=%s でもマイページに出さない（#863）", async (enabled) => {
+  flags.coaching = enabled;
   await renderSignedIn();
+  expect([...container.querySelectorAll("h2")].map((h) => h.textContent)).not.toContain("コーチング");
+  for (const href of ["/me/coaching/tickets", "/me/coaching/requests", "/coaching/support-consults", "/me/coaching/personal"]) {
+    expect(container.querySelector(`a[href="${href}"]`)).toBeNull();
+  }
   expect(container.textContent).not.toContain("コーチングチケット");
-  expect(container.querySelector('nav a[href="/me/coaching/tickets"]')).toBeNull();
-});
-
-it("コーチングを開けている間は旧ハブと同じ順で4リンクのセクションを出す", async () => {
-  flags.coaching = true;
-  await renderSignedIn();
-  const section = [...container.querySelectorAll("section")].find((s) => s.querySelector("h2")?.textContent === "コーチング");
-  expect(section).not.toBeUndefined();
-  expect([...section!.querySelectorAll("a")].map((a) => [a.getAttribute("href"), a.textContent])).toEqual([
-    ["/me/coaching/tickets", "コーチングチケット"],
-    ["/me/coaching/requests", "依頼した1回プラン"],
-    ["/coaching/support-consults", "1ヶ月プランの無料相談"],
-    ["/me/coaching/personal", "申し込んだ継続プラン"],
-  ]);
+  expect(container.textContent).not.toContain("依頼した1回プラン");
+  expect(container.textContent).not.toContain("申し込んだ継続プラン");
+  // 他の要素は従来どおり残る。
+  expect(container.querySelector('a[href="/me/posts"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/me/install"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/me/delete"]')).not.toBeNull();
 });
 
 it("表示言語の項目はマイページの設定一覧に出さない（運営者決定 2026-11-13）", async () => {
