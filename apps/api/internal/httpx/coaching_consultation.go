@@ -345,6 +345,7 @@ func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
 	}
 	return out
 }
+
 // consultationJSONFor は、見る人の役割に合わせた応答。コーチには支払いの状態・支払う人・重複防止のキー・未成年かどうかを見せない
 // （コーチの対応に使わない項目）。選手・保護者・管理側の応答は変えない。
 func (s *Server) consultationJSONFor(c db.CoachingConsultation, role string) map[string]any {

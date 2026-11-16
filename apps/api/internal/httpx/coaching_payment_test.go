@@ -622,7 +622,8 @@ func TestAdminCoachingRefundConcurrentRefundsOnce(t *testing.T) {
 	}
 }
 
-// 支払い待ちの申し込みも枠を使うので、定員1のプランはコーチ一覧でも満員になる。
+// 支払い待ちの申し込みも枠を使うので、定員1のプランは満員になる。コーチ一覧の応答には満員かどうかも
+// 上限人数も載せず、満員の判定は申し込み時に plan_full で返る。
 func TestCoachListCountsAcceptedContractsAsFull(t *testing.T) {
 	h, _ := setupStripe(t)
 	_, tc, planID := planCoach(t, h, 1)
@@ -637,18 +638,23 @@ func TestCoachListCountsAcceptedContractsAsFull(t *testing.T) {
 	}
 	var out struct {
 		Coaches []struct {
-			Plans []struct {
-				ID   string `json:"id"`
-				Full bool   `json:"full"`
-			} `json:"plans"`
+			Plans []map[string]any `json:"plans"`
 		} `json:"coaches"`
 	}
 	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.Bytes(), &out)
 	for _, c := range out.Coaches {
 		for _, p := range c.Plans {
-			if p.ID == planID {
-				if !p.Full {
-					t.Fatal("plan with an accepted contract is not full in the coach list")
+			if p["id"] == planID {
+				if _, ok := p["full"]; ok {
+					t.Fatal("coach list exposes full")
+				}
+				if _, ok := p["capacity"]; ok {
+					t.Fatal("coach list exposes capacity")
+				}
+				// 満員の判定は内部で効いていて、2人目の申し込みは plan_full で止まる。
+				_, tu2 := demoUser(t, h, time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC))
+				if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tu2, contractBody(planID)); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "plan_full") {
+					t.Fatalf("apply full %d %s", rec.Code, rec.Body.String())
 				}
 				return
 			}
