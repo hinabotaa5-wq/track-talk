@@ -39,7 +39,7 @@ function ReferralCodeMock() {
 }
 
 const steps: Step[] = [
-  { icon: Ticket, title: "紹介IDを使わずに購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。" },
+  { icon: Ticket, title: "購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。" },
   { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで紹介IDをコピーできます。" },
   { icon: GraduationCap, title: "友達がコーチを選んで、申し込みに進む", body: "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。" },
   { icon: Keyboard, title: "友達が、購入の手続きで紹介IDを入力して購入を完了する", body: "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。" },
@@ -47,6 +47,7 @@ const steps: Step[] = [
 ];
 
 const notes = [
+  "紹介IDを使って購入すると、この購入ではあなたの紹介IDは発行されません。",
   "紹介IDの入力は任意です。空欄でも購入できます。",
   "使えない紹介IDを入力しても、購入は止まりません（紹介として数えられないだけです）。",
   "自分の紹介IDは、自分の購入には使えません。",
@@ -76,7 +77,7 @@ export function ReferralGuideView() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-base font-bold">{L("知っておいてほしいこと")}</h2>
+        <h2 className="text-base font-bold">{L("注意点")}</h2>
         <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed">
           {notes.map((note) => (
             <li key={note}>{L(note)}</li>
@@ -85,9 +86,6 @@ export function ReferralGuideView() {
       </section>
 
       <div className="flex flex-col gap-3">
-        <Link href="/me" className="rounded-xl bg-yellow-400 px-4 py-3 text-center font-bold text-slate-900">
-          {L("あなたの紹介IDと進捗を見る")}
-        </Link>
         <Link href="/coaches" className="app-card rounded-xl px-4 py-3 text-center font-bold">
           {L("コーチ一覧へ")}
         </Link>
