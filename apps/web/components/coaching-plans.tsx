@@ -204,14 +204,10 @@ export function PublicPlanList({ plans }: { plans: CoachingPlan[] }) {
             <p className="text-xs text-slate-300">{planSummary(p)}</p>
             <PlanIncludesList plan={p} />
             <p className="mt-1 whitespace-pre-wrap text-slate-200">{p.description}</p>
-            {p.full ? (
-              <p className="mt-2 text-xs font-semibold text-amber-300">{L("いまは満員です")}</p>
-            ) : (
-              <Link
-                href={`/coaching/personal/plans/${p.id}`}
-                className="mt-2 flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
-              >{L("このプランに申し込む")}</Link>
-            )}
+            <Link
+              href={`/coaching/personal/plans/${p.id}`}
+              className="mt-2 flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
+            >{L("このプランに申し込む")}</Link>
           </li>
         ))}
       </ul>

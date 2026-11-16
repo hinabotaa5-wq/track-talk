@@ -156,6 +156,7 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reason := ""
+	ledgerOut := publicTicketLedger(ledger)
 	if !s.stripe.Configured() {
 		reason = "チケットの販売は準備中です"
 	}
@@ -165,10 +166,32 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		reason = ticketSalesClosedMessage
 	}
 	// 残高があれば販売休止中も利用できる。支払い済みチケットをデモ用にはしない。
-	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "balance_by_kind": byKind, "purchases": purchases, "ledger": ledger,
+	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "balance_by_kind": byKind, "purchases": purchases, "ledger": ledgerOut,
 		"can_purchase": s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
 		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
 		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths, "terms_version": ticketWordingVersion})
+}
+
+// ticketLedgerEntry は、本人に見せるチケット台帳の1行。台帳内部の識別キー（operation_key・lot_id）は返さない。
+type ticketLedgerEntry struct {
+	ID             uuid.UUID  `json:"id"`
+	Kind           string     `json:"kind"`
+	AvailableDelta int32      `json:"available_delta"`
+	ReservedDelta  int32      `json:"reserved_delta"`
+	ConsumedDelta  int32      `json:"consumed_delta"`
+	RefundedDelta  int32      `json:"refunded_delta"`
+	ExpiredDelta   int32      `json:"expired_delta"`
+	CreatedAt      time.Time  `json:"created_at"`
+	PurchaseRef    *uuid.UUID `json:"purchase_ref"`
+}
+
+func publicTicketLedger(rows []db.CoachingTicketLedger) []ticketLedgerEntry {
+	out := make([]ticketLedgerEntry, 0, len(rows))
+	for _, e := range rows {
+		out = append(out, ticketLedgerEntry{ID: e.ID, Kind: e.Kind, AvailableDelta: e.AvailableDelta, ReservedDelta: e.ReservedDelta,
+			ConsumedDelta: e.ConsumedDelta, RefundedDelta: e.RefundedDelta, ExpiredDelta: e.ExpiredDelta, CreatedAt: e.CreatedAt, PurchaseRef: e.PurchaseRef})
+	}
+	return out
 }
 
 // チケットの種別（本体 #687）。申込みで選んだ種別のロットだけを確保・消費する。
