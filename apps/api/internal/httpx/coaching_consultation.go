@@ -115,6 +115,10 @@ func (s *Server) consultationRoomAccess(w http.ResponseWriter, r *http.Request) 
 		return room, "requester", true
 	}
 	if room.coach != nil && *room.coach == p.ID {
+		// 担当であっても、いまも承認済みのコーチでなければ部屋は見せない（依頼・契約のやりとりと同じ確認）。
+		if !s.requireCurrentCoach(w, r, p.ID, "承認されたコーチだけが追加質問を確認できます") {
+			return room, "", false
+		}
 		return room, "coach", true
 	}
 	Error(w, 404, "not_found", "見つかりませんでした")

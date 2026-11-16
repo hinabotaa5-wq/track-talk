@@ -559,6 +559,10 @@ func (s *Server) getSupportConsult(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// コーチとして読むときだけ、いまも承認済みかを確かめる（一覧と同じ確認）。選手として読む場合は変えない。
+	if c.CoachID == me.ID && !s.requireCurrentCoach(w, r, me.ID, "承認されたコーチだけが相談を確認できます") {
+		return
+	}
 	out, err := s.consultDetail(r.Context(), c)
 	if err != nil {
 		MapDBError(w, err)
