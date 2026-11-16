@@ -282,3 +282,96 @@ func TestCoachTranslationCascade(t *testing.T) {
 		t.Fatalf("translation remains after cascade, count=%d", count)
 	}
 }
+
+const coachTranslationContactReply = `{"nickname_en":"Test Coach","hitokoto_en":"DM me @coach_taro or 090-0000-0000","achievements_en":"See https://example.com/coach","best_record_en":"100m 10.95 (2025)"}`
+
+func storedTranslationFields(t *testing.T, coach uuid.UUID) (nickname, hitokoto, achievements, bestRecord string) {
+	t.Helper()
+	queryRowArgs(t, `SELECT nickname_en, hitokoto_en, achievements_en, best_record_en FROM coach_profile_translations WHERE coach_id=$1`, []any{coach}, &nickname, &hitokoto, &achievements, &bestRecord)
+	return
+}
+
+func assertNoContactShape(t *testing.T, body string) {
+	t.Helper()
+	for _, bad := range []string{"@coach_taro", "090-0000-0000", "https://example.com"} {
+		if strings.Contains(body, bad) {
+			t.Fatalf("response contains %q: %s", bad, body)
+		}
+	}
+}
+
+// 承認経路: 連絡先の形を含む項目だけが空で保存され、承認は成功し、公開APIにも出ない。
+func TestCoachTranslationContactLikeFieldsDroppedOnApprove(t *testing.T) {
+	ai := &fakeClaude{reply: coachTranslationContactReply}
+	h, _ := setupCoachTranslation(t, ai)
+	applicant := uuid.New()
+	ta := token(t, applicant)
+	applyCoachWithHitokoto(t, h, ta)
+	withCoachPhoto(t, applicant)
+	admin := uuid.New()
+	tadmin := token(t, admin)
+	doJSON(t, h, http.MethodGet, "/v1/me", tadmin, nil)
+	setAdmin(t, admin)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+applicant.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
+	}
+	nick, hito, ach, best := storedTranslationFields(t, applicant)
+	if nick != "Test Coach" || hito != "" || ach != "" || best != "100m 10.95 (2025)" {
+		t.Fatalf("stored = %q %q %q %q", nick, hito, ach, best)
+	}
+	rec := doJSON(t, h, http.MethodGet, "/v1/coaches/"+applicant.String(), "", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get coach %d %s", rec.Code, rec.Body.String())
+	}
+	assertNoContactShape(t, rec.Body.String())
+	assertNoContactShape(t, doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String())
+	ai.mu.Lock()
+	calls := len(ai.prompts)
+	ai.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("claude calls = %d, want 1", calls)
+	}
+}
+
+// プロフィール変更経路と backfill 経路: どちらも同じ判定が効き、source_hash は新しい原文のものになる。
+func TestCoachTranslationContactLikeFieldsDroppedOnUpdateAndBackfill(t *testing.T) {
+	ai := &fakeClaude{reply: coachTranslationReply}
+	h, _ := setupCoachTranslation(t, ai)
+	applicant := uuid.New()
+	ta := token(t, applicant)
+	applyCoachWithHitokoto(t, h, ta)
+	withCoachPhoto(t, applicant)
+	admin := uuid.New()
+	tadmin := token(t, admin)
+	doJSON(t, h, http.MethodGet, "/v1/me", tadmin, nil)
+	setAdmin(t, admin)
+	doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+applicant.String()+"/approve", tadmin, nil)
+
+	ai.reply = coachTranslationContactReply
+	edit := profileUpdateBody()
+	edit["hitokoto"] = "新しいひとこと"
+	if rec := doJSON(t, h, http.MethodPut, "/v1/coach/me/profile", ta, edit); rec.Code != http.StatusOK {
+		t.Fatalf("update %d %s", rec.Code, rec.Body.String())
+	}
+	hash, _, _ := storedTranslation(t, applicant)
+	if want := coachTranslationHash("テストコーチ", "新しいひとこと", "インターハイ 100m 準決勝", "100m 10秒95（2025年）"); hash != want {
+		t.Fatalf("hash after update = %q want %q", hash, want)
+	}
+	nick, hito, ach, best := storedTranslationFields(t, applicant)
+	if nick != "Test Coach" || hito != "" || ach != "" || best != "100m 10.95 (2025)" {
+		t.Fatalf("stored after update = %q %q %q %q", nick, hito, ach, best)
+	}
+	assertNoContactShape(t, doJSON(t, h, http.MethodGet, "/v1/coaches/"+applicant.String(), "", nil).Body.String())
+
+	// backfill: 訳の行を消してから作り直しても同じ判定が効く。
+	execSQLArgs(t, `DELETE FROM coach_profile_translations`)
+	rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-profile-translations/backfill", tadmin, nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"translated":1`) {
+		t.Fatalf("backfill %d %s", rec.Code, rec.Body.String())
+	}
+	nick, hito, ach, best = storedTranslationFields(t, applicant)
+	if nick != "Test Coach" || hito != "" || ach != "" || best != "100m 10.95 (2025)" {
+		t.Fatalf("stored after backfill = %q %q %q %q", nick, hito, ach, best)
+	}
+	assertNoContactShape(t, doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String())
+}
