@@ -21,7 +21,7 @@ export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending
         {rows.map((row) => (
           <div key={row.label} className="space-y-0.5">
             <dt className="text-xs font-semibold text-slate-300">{row.label}</dt>
-            <dd className="text-slate-100">{row.value}</dd>
+            <dd className={row.multiline ? "text-slate-100 whitespace-pre-wrap break-words" : "text-slate-100"}>{row.value}</dd>
           </div>
         ))}
       </dl>

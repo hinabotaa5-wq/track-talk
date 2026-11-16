@@ -21,12 +21,24 @@ export function numberedRefundExceptions(): string {
 
 // 支払い画面（Stripe）へ進む前の最終確認に出す項目（本体 #569）。
 // 内容・回答期限・お支払い（総額・支払い方法）・キャンセルと戻り／返金の条件を、購入のたびに同じ順で見せる。
-export type ConfirmRow = { label: string; value: string };
+export type ConfirmRow = { label: string; value: string; multiline?: boolean };
+
+// 動画サイズの整形。upload-progress.tsx の formatSize と同じ規則（1MB以上 X.X MB／1KB以上 N KB／未満 N B）。
+function formatVideoSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${Math.round(bytes)} B`;
+}
 
 export type ReviewConfirmInput = {
   method: "card" | "paypay" | "tickets";
   priceYen: number;
   hasVideo: boolean;
+  // 申込内容そのもの（誤送信防止のため確認画面に出す）。
+  question: string;
+  eventLabel: string;
+  videoFileName: string | null;
+  videoFileSizeBytes: number | null;
   coachName?: string;
   // チケットで払うとき、確保される1枚の有効期限（いちばん早く失効する分から使う）。旧商品の分は期限なし。
   // 種別を選んだとき（本体 #687）は、その種別の中でいちばん早く失効する分の期限を渡す。
@@ -35,12 +47,20 @@ export type ReviewConfirmInput = {
   ticketKind?: TicketKind | null;
 };
 
-export function reviewConfirmRows({ method, priceYen, hasVideo, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
+export function reviewConfirmRows({ method, priceYen, hasVideo, question, eventLabel, videoFileName, videoFileSizeBytes, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
   const content = hasVideo
     ? (coachName ? L("1回プラン（動画1本・担当 {coachName}）", { coachName }) : L("1回プラン（動画1本）"))
     : (coachName ? L("1回プラン（悩みのみ・担当 {coachName}）", { coachName }) : L("1回プラン（悩みのみ）"));
   const rows: ConfirmRow[] = [
     { label: L("内容"), value: content },
+    { label: L("種目"), value: eventLabel },
+    { label: L("相談内容"), value: question.trim(), multiline: true },
+    {
+      label: L("動画"),
+      value: videoFileName !== null
+        ? L("{fileName}（{size}）", { fileName: videoFileName, size: formatVideoSize(videoFileSizeBytes ?? 0) })
+        : L("なし"),
+    },
     { label: L("回答期限"), value: L("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）") },
   ];
   if (method === "tickets") {
