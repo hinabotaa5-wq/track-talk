@@ -4,19 +4,38 @@ import { installEnglish, setActiveLocale } from "./i18n";
 import { en } from "./i18n-en";
 
 describe("purchase-confirm", () => {
-  it("カード決済の確認文で、仮押さえ取消しと返金の表記が状態で分かれている", () => {
+  it("カード決済の確認文が運営者決定の短縮文と一致する", () => {
     setActiveLocale("ja");
     const rows = reviewConfirmRows({
       method: "card",
       priceYen: 500,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       coachName: "テストコーチ",
     });
     const cancelRefundRow = rows.find((r) => r.label === "キャンセル・返金");
     expect(cancelRefundRow).toBeDefined();
-    expect(cancelRefundRow?.value).toContain("仮押さえを取り消し（請求は確定しません）");
-    expect(cancelRefundRow?.value).toContain("確定している場合は返金します");
-    expect(cancelRefundRow?.value).not.toContain("期限までに返らない場合やコーチ都合の返却では全額を返金します");
+    expect(cancelRefundRow?.value).toBe(
+      "次の画面でカードの代金を仮押さえし、回答が返った時に確定します。着手前はキャンセルでき、その場合は代金はかかりません。着手後はキャンセルできません。期限までに返らない場合やコーチが返却した場合は、代金はかかりません（確定済みの場合は返金します）。回答返却後の返金は利用規約に定める場合に限ります。",
+    );
+    for (const old of [
+      "確保（仮押さえ）",
+      "決済が確定していない場合は仮押さえを取り消し（請求は確定しません）",
+      "確定している場合は返金します",
+      "確保を取り消すので",
+    ]) {
+      expect(cancelRefundRow?.value).not.toContain(old);
+    }
+    expect(cancelRefundRow?.value).toContain("回答返却後の返金は利用規約に定める場合に限ります");
+  });
+
+  it("カード確認文の英語訳のキーが1件だけで、日本語文のままでも英語にフォールバックしない", () => {
+    expect(Object.keys(en).filter((k) => k.startsWith("次の画面でカードの代金を"))).toEqual([
+      "次の画面でカードの代金を仮押さえし、回答が返った時に確定します。着手前はキャンセルでき、その場合は代金はかかりません。着手後はキャンセルできません。期限までに返らない場合やコーチが返却した場合は、代金はかかりません（確定済みの場合は返金します）。回答返却後の返金は利用規約に定める場合に限ります。",
+    ]);
   });
 
   it("英語辞書で 1 review の表記が消え、One ticket covers one One-time Plan request. 相当になっている", () => {
@@ -30,17 +49,25 @@ describe("purchase-confirm", () => {
     const contentRow = rows.find((r) => r.label === "Message" || r.label === "内容");
     expect(contentRow).toBeDefined();
     expect(contentRow?.value).toContain("6 One-time Plan tickets (One ticket covers one One-time Plan request.)");
+    expect(contentRow?.value).toContain("Only the purchaser can use them.");
     expect(contentRow?.value).not.toContain("1 review");
 
     const cardRows = reviewConfirmRows({
       method: "card",
       priceYen: 500,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       coachName: "Test Coach",
     });
     const cardCancelRow = cardRows.find((r) => r.label === "Cancellation and refunds");
     expect(cardCancelRow).toBeDefined();
-    expect(cardCancelRow?.value).toContain("the authorization is voided if the payment is not yet finalized (you will not be charged), or refunded if already finalized");
+    expect(cardCancelRow?.value).toBe(
+      "Your card is authorized on the next screen and charged when the review is returned. You can cancel before the coach starts, in which case you won't be charged. You can't cancel once the coach starts. If the review isn't returned by the deadline or the coach returns it, you won't be charged (if the payment has already been finalized, you will be refunded). After the review is returned, refunds follow the Terms.",
+    );
+    expect(cardCancelRow?.value).not.toContain("the authorization is voided if the payment is not yet finalized");
     setActiveLocale("ja");
   });
 
@@ -50,6 +77,10 @@ describe("purchase-confirm", () => {
       method: "tickets",
       priceYen: 0,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       ticketKind: "reward",
     });
     const rewardCancel = rewardRows.find((r) => r.label === "キャンセル・チケットの戻り")?.value;
@@ -60,6 +91,10 @@ describe("purchase-confirm", () => {
       method: "tickets",
       priceYen: 0,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       ticketKind: "normal",
     });
     const normalCancel = normalRows.find((r) => r.label === "キャンセル・チケットの戻り")?.value;
@@ -79,6 +114,10 @@ describe("purchase-confirm", () => {
         method: "tickets",
         priceYen: 0,
         hasVideo: true,
+        question: "相談",
+        eventLabel: "100m",
+        videoFileName: "run.mp4",
+        videoFileSizeBytes: 1,
         ticketKind: "reward",
       }).find((r) => r.label === "Cancellation and ticket returns")?.value;
       expect(rewardCancel).toContain("a new ticket is issued even after expiry");
@@ -100,6 +139,86 @@ describe("purchase-confirm", () => {
       expect(refund).toContain("the one reserved ticket is returned");
       expect(refund).toContain("you receive a refund of ¥500 per ticket even after expiry");
       expect(refund).not.toContain("returned or refunded");
+      expect(refund).not.toContain("(Terms, Article 6)");
+      expect(refund).toContain("divided by 6, multiplied by the number of unused tickets");
+    } finally {
+      setActiveLocale("ja");
+    }
+  });
+
+  it("チケット購入の確認は4行（内容・総額・有効期限・払戻し）で、確認画面だけで完結する（本体 #844）", () => {
+    setActiveLocale("ja");
+    const rows = ticketPackConfirmRows({ quantity: 6, amountYen: 2500, validityMonths: 6, now: new Date("2026-11-20T10:00:00+09:00") });
+    expect(rows.map((r) => r.label)).toEqual(["内容", "総額", "有効期限", "払戻し"]);
+    expect(rows[0].value).toBe("1回プランのチケット6枚（1枚で1回プラン1件）。購入した本人だけが使えます。譲ることはできません。");
+    expect(rows[1].value).toBe("2,500円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
+    expect(rows[2].value).toContain("2027/05/20 10:00");
+    expect(rows[2].value).toContain("申し込んだ依頼が終了して戻るチケットも、有効期限を過ぎていれば失効します。");
+    const refund = rows[3].value;
+    expect(refund).toContain("購入者の都合による払戻しは原則として行いません");
+    expect(refund).toContain("確保したチケット1枚を戻します。これは確保の解除で、金銭の払戻しには当たりません");
+    expect(refund).not.toContain("有効期限を過ぎてから戻るチケットは失効します");
+    expect(refund).toContain("有効期限を過ぎていても1枚を出し直します");
+    expect(refund).toContain("（1）サービス終了時は、終了の時点で未使用のチケット（有効期限にかかわらず）について、購入金額を6で割った額に未使用の枚数を掛けた額（1円未満は四捨五入）を払い戻します。");
+    expect(refund).toContain("（3）");
+    expect(refund).toContain("チケット1枚につき500円");
+    expect(refund).toContain("失効後でも1枚につき500円");
+    expect(refund).not.toContain("利用規約第6条");
+    expect(refund).not.toMatch(/当社|チケットを戻すか返金/);
+  });
+});
+
+describe("reviewConfirmRows の申込内容の行（本体 #845）", () => {
+  const base = { method: "card" as const, priceYen: 500, coachName: "テストコーチ" };
+  const q = "  最初の行\n二行目  ";
+
+  it("カード払い：種目・相談内容・動画が内容の直後に入り、相談内容だけ multiline", () => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ ...base, hasVideo: true, question: q, eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 13107200 });
+    expect(rows.map((r) => r.label)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限", "総額", "お支払い方法", "キャンセル・返金"]);
+    expect(rows[1].value).toBe("100m");
+    expect(rows[2].value).toBe("最初の行\n二行目");
+    expect(rows[3].value).toBe("run.mp4（12.5 MB）");
+    expect(rows.filter((r) => r.multiline).map((r) => r.label)).toEqual(["相談内容"]);
+    expect(rows.filter((r) => "multiline" in r).length).toBe(1);
+  });
+
+  it("動画なし：悩みのみ表記で動画行は なし", () => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ ...base, hasVideo: false, question: "相談", eventLabel: "100m", videoFileName: null, videoFileSizeBytes: null });
+    expect(rows[0].value).toContain("悩みのみ");
+    expect(rows.find((r) => r.label === "動画")?.value).toBe("なし");
+  });
+
+  it.each([[500, "500 B"], [2048, "2 KB"], [1048576, "1.0 MB"], [1, "1 B"]])("サイズ整形 %i → %s", (size, text) => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ ...base, hasVideo: true, question: "相談", eventLabel: "100m", videoFileName: "a.mp4", videoFileSizeBytes: size });
+    expect(rows.find((r) => r.label === "動画")?.value).toBe(`a.mp4（${text}）`);
+  });
+
+  it.each(["normal", "reward"] as const)("チケット払い（%s）：先頭4行はカード払いと同じ形", (kind) => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ method: "tickets", priceYen: 0, hasVideo: true, ticketKind: kind, question: "相談", eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 1 });
+    expect(rows.slice(0, 5).map((r) => r.label)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限"]);
+    expect(rows.find((r) => r.label === "動画")?.value).toBe("run.mp4（1 B）");
+  });
+
+  it("PayPay でも同じ先頭4行", () => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ method: "paypay", priceYen: 500, hasVideo: false, question: "相談", eventLabel: "100m", videoFileName: null, videoFileSizeBytes: null });
+    expect(rows.slice(0, 5).map((r) => r.label)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限"]);
+  });
+
+  it("英語：ラベルと動画の値だけ訳され、相談内容は原文のまま", () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    try {
+      const withVideo = reviewConfirmRows({ ...base, hasVideo: true, question: "後半に失速します", eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 13107200 });
+      expect(withVideo.slice(1, 4).map((r) => r.label)).toEqual(["Event ", "Your question", "Video"]);
+      expect(withVideo[2].value).toBe("後半に失速します");
+      expect(withVideo[3].value).toBe("run.mp4 (12.5 MB)");
+      const without = reviewConfirmRows({ ...base, hasVideo: false, question: "x", eventLabel: "100m", videoFileName: null, videoFileSizeBytes: null });
+      expect(without[3].value).toBe("None");
     } finally {
       setActiveLocale("ja");
     }

@@ -153,7 +153,7 @@ function PayAgain({ request, token }: { request: ReviewRequest; token: string | 
 
   return (
     <section className="space-y-2">
-      <p className="text-sm text-slate-200">{L("お支払いが済むと、コーチを探し始めます。2時間たってもお支払いがなければ、この依頼は消えます。")}</p>
+      <p className="text-sm text-slate-200">{L("2時間たってもお支払いがなければ、この依頼は消えます。")}</p>
       <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} />
       <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
         onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} />
@@ -210,7 +210,9 @@ function ReviewRequestView() {
   async function cancelReview() {
     if (!await confirmDialog({
       title: L("1回プランの依頼をキャンセルしますか？"),
-      body: L("お支払いは全額返金・取消し、チケットは返還します。"),
+      body: request?.status === "awaiting_payment"
+        ? L("まだお支払いは済んでいません。取り消すと、この依頼ではお支払いができなくなります。")
+        : L("お支払いは全額返金・取消し、チケットは返還します。"),
       confirmLabel: L("依頼をキャンセルする"),
       cancelLabel: L("戻る"),
     }) || !acquireCancel()) return;
@@ -278,7 +280,7 @@ function ReviewRequestView() {
 
   const active = request.status === "in_review" || request.status === "needs_info";
   const deadline = request.status === "needs_info" ? request.info_request?.resubmit_by : request.due_at;
-  const canCancel = active && !request.started_at && !!deadline && now !== null && Date.parse(deadline) > now;
+  const canCancel = request.status === "awaiting_payment" || (active && !request.started_at && !!deadline && now !== null && Date.parse(deadline) > now);
 
   return (
     <div className="mx-auto max-w-md space-y-5">

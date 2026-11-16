@@ -28,7 +28,7 @@ import {
 } from "@/lib/review";
 import { initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity, ticketValidityMonths } from "@/lib/review-pricing";
+import { reviewPriceYen, ticketPackPriceYen } from "@/lib/review-pricing";
 import { reviewConfirmRows } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { looksLikeContact } from "@/lib/solicitation";
@@ -336,7 +336,7 @@ export default function NewReviewRequestPage() {
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
+            rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
             confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ（{v0}）", { v0: formatYen(cashPrice) })}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
@@ -401,24 +401,16 @@ export default function NewReviewRequestPage() {
               className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
               type="file"
               accept="video/mp4,video/quicktime,video/webm"
-              aria-describedby="review-video-help"
               onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
               disabled={pending}
             />
           </label>
-          <p id="review-video-help" className="text-xs text-slate-300">{L("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。")}</p>
 
           {upload ? (
             <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">{L("料金と受付状況を確認しています。表示されない場合はページを開き直してください。")}</p> : null}
-          {estimate ? (
-            <p className="text-sm text-slate-100">
-              {L("申し込みが確定してから24時間以内に回答が来ます。")}
-            </p>
-          ) : null}
-          {coachID ? <p className="text-xs text-slate-300">{L("受付中のコーチには決済の確認後に依頼が届きます。期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
           {estimate?.payments || ticketsUsable ? (
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
@@ -467,13 +459,16 @@ export default function NewReviewRequestPage() {
                   </Link>
                 </div>
               ) : null}
-              {!ticketsUsable && ticketSummary?.can_purchase ? (
-                <p className="text-xs text-slate-300">{L("1回あたり約{v0}（1回ずつ払うと{v1}）。先払い・{q}枚まとめての購入で、有効期限は決済から{m}か月です。", { v0: formatYen(Math.round(ticketPackPriceYen / ticketPackQuantity)), v1: formatYen(reviewPriceYen), q: ticketPackQuantity, m: ticketValidityMonths })}</p>
-              ) : null}
             </fieldset>
           ) : (
             <p className="text-xs text-slate-300">{L("デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。")}</p>
           )}
+          {estimate ? (
+            <p className="text-sm text-slate-100">
+              {L("申し込みが確定してから24時間以内に回答が来ます。")}
+            </p>
+          ) : null}
+          {coachID ? <p className="text-xs text-slate-300">{L("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
           <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? L("送っています") : needsConfirm ? L("申込み内容を確認する") : L("送る")}

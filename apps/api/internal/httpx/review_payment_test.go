@@ -312,3 +312,75 @@ func TestWithdrawRecordsCoachEarningFirst(t *testing.T) {
 		t.Fatalf("coach earnings after the requester withdrew = %d", n)
 	}
 }
+
+// お支払い待ちの依頼は、選手が自分で取り消せる。支払い行は触らず、取り消したあとに払い終えても仮押さえは解放される。
+func TestCancelAwaitingPaymentReview(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, f := setupStripe(t)
+	tadmin := adminToken(t, h)
+	_, tu := demoRequester(t, h, tadmin)
+	_, other := demoRequester(t, h, tadmin)
+
+	body := reviewBodyFor(t, h, tu)
+	body["method"] = "card"
+	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
+	var unpaid reviewRequestView
+	_ = json.Unmarshal(rec.Body.Bytes(), &unpaid)
+	if rec.Code != http.StatusCreated || unpaid.Status != "awaiting_payment" {
+		t.Fatalf("create %d %s", rec.Code, rec.Body.String())
+	}
+	path := "/v1/coaching/requests/" + unpaid.ID
+
+	// 他人の依頼は取り消せない。
+	if rec := doJSON(t, h, http.MethodPost, path+"/cancel", other, nil); rec.Code != http.StatusNotFound {
+		t.Fatalf("other cancel %d %s", rec.Code, rec.Body.String())
+	}
+	// 本人は取り消せる。支払い行は pending のまま。
+	rec = doJSON(t, h, http.MethodPost, path+"/cancel", tu, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cancel %d %s", rec.Code, rec.Body.String())
+	}
+	var canceled struct {
+		Status     string  `json:"status"`
+		CanceledAt *string `json:"canceled_at"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &canceled)
+	if canceled.Status != "expired" || canceled.CanceledAt == nil {
+		t.Fatalf("canceled %+v", canceled)
+	}
+	var payStatus string
+	queryRowArgs(t, `SELECT status FROM review_payments WHERE request_id = $1`, []any{unpaid.ID}, &payStatus)
+	if payStatus != "pending" {
+		t.Fatalf("payment must stay pending, got %s", payStatus)
+	}
+	// 取り消した依頼は払い直せない。
+	if rec := doJSON(t, h, http.MethodPost, path+"/checkout", tu, map[string]any{"method": "card", "guardian_permission": true}); rec.Code != http.StatusConflict {
+		t.Fatalf("checkout after cancel %d %s", rec.Code, rec.Body.String())
+	}
+
+	// 取り消したあとに開いていた決済画面で払い終えても、依頼は進まず仮押さえは解放される。
+	var session string
+	queryRowArgs(t, `SELECT checkout_session_id FROM review_payments WHERE request_id = $1`, []any{unpaid.ID}, &session)
+	if rec := stripeWebhook(t, h, testWebhookSecret, "checkout.session.completed", map[string]any{
+		"id": session, "payment_status": "unpaid", "payment_intent": "pi_card_after_cancel", "metadata": map[string]any{"kind": "review"},
+	}); rec.Code != http.StatusOK {
+		t.Fatalf("webhook %d %s", rec.Code, rec.Body.String())
+	}
+	if _, released := f.calls(); len(released) != 1 || released[0] != "pi_card_after_cancel" {
+		t.Fatalf("released %v", released)
+	}
+	var status string
+	queryRowArgs(t, `SELECT status FROM review_requests WHERE id = $1`, []any{unpaid.ID}, &status)
+	if status != "expired" {
+		t.Fatalf("request must stay expired, got %s", status)
+	}
+	if reviewPaymentStatus(t, unpaid.ID) != "canceled" {
+		t.Fatalf("payment %s", reviewPaymentStatus(t, unpaid.ID))
+	}
+
+	// 支払い済み（待ち行列）の依頼は、この経路では取り消せない。
+	paid := paidReview(t, h, tu, "card", "pi_card_paid_cancel")
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+paid+"/cancel", tu, nil); rec.Code != http.StatusConflict {
+		t.Fatalf("cancel paid %d %s", rec.Code, rec.Body.String())
+	}
+}

@@ -33,8 +33,8 @@ type Step = { title: string; body: string; art: ReactNode };
 function stepsFor(platform: InstallPlatform): Step[] {
   if (platform === "ios-safari") {
     return [
-      { title: L("画面下の共有ボタンをタップ"), body: L("四角から矢印が出ているマークです。"), art: <IosShareButtonArt /> },
-      { title: L("「ホーム画面に追加」を選ぶ"), body: L("メニューを下にスクロールすると見つかります。"), art: <IosAddToHomeArt /> },
+      { title: L("「共有」を開く"), body: L("画面下のアドレスバー左にある「≡」をタップし、出てきたメニューの一番上の「共有」をタップします。画面下に共有マーク（四角から上に出る矢印）が見える場合は、そのマークでも開けます。"), art: <IosShareButtonArt /> },
+      { title: L("「ホーム画面に追加」を選ぶ"), body: L("一覧の「ページを検索」の下にあります。右側の「＋」マークが目印です。"), art: <IosAddToHomeArt /> },
       { title: L("右上の「追加」をタップ"), body: L("ホーム画面に TrackTalk のアイコンができます。"), art: <IosConfirmArt /> },
     ];
   }

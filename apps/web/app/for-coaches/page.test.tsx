@@ -11,9 +11,11 @@ it("海外コーチ向けの英語の紹介ページ：確定原稿の金額・�
   expect(html).toContain('lang="en"');
   expect(text).toContain("Coach Japanese sprinters online — monthly packages and video reviews");
   expect(text).toContain("Package: athletes pay $139 (¥22,000) per month — you receive $104 (¥16,500) of that, per athlete per month.");
-  expect(text).toContain("Reviews: around $12 per review.");
+  expect(text).toContain("Reviews: around $10 per review.");
   expect(text).toContain("in Japan a single review costs the athlete ¥500 and the coach receives ¥350");
-  expect(text).toContain("up to about 28 videos");
+  expect(text).toContain("there's no set cap on videos");
+  expect(text).not.toContain("28 videos");
+  expect(text).not.toContain("$12");
   // 海外の単発には有料フォローアップを付けない（#718 運営者決定 2026-11-14）。Coach Terms 第1条・第2条と一致させる。
   expect(text).toContain("A single review has no paid follow-up add-on; an athlete who wants to keep asking questions moves to the one-month package.");
   expect(text).not.toContain("is available as an add-on");
