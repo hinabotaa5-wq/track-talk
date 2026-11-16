@@ -44,6 +44,10 @@ afterEach(async () => {
   document.querySelector('[aria-modal="true"]')?.remove();
   Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
   Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
+  // iOS ケースで差し替えた UA・タッチ点数・matchMedia を後続テストへ残さない。
+  Reflect.deleteProperty(window.navigator, "userAgent");
+  Reflect.deleteProperty(window.navigator, "maxTouchPoints");
+  Reflect.deleteProperty(window, "matchMedia");
   vi.unstubAllGlobals();
 });
 
@@ -122,6 +126,27 @@ it("offers the review-specific sheet once per completed checkout and restarts th
   expect(container.querySelector("dialog[open]")).toBeNull();
   await render(false, "second-review");
   expect(container.querySelector("dialog[open]")).not.toBeNull();
+});
+
+it.each([
+  [
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+    "Safari で、アドレスバー左の「≡」から「共有」を開く",
+  ],
+  [
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1",
+    "Safari で TrackTalk を開き、アドレスバー左の「≡」から「共有」を開く",
+  ],
+])("shows the corrected install steps on iOS (%s)", async (userAgent, firstStep) => {
+  Object.defineProperty(window.navigator, "userAgent", { configurable: true, get: () => userAgent });
+  Object.defineProperty(window.navigator, "maxTouchPoints", { configurable: true, get: () => 5 });
+  window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as typeof window.matchMedia;
+  await render(true);
+  const text = container.querySelector("dialog[open]")?.textContent ?? "";
+  expect(text).toContain(firstStep);
+  expect(text).toContain("「ホーム画面に追加」を選び、「追加」をタップ");
+  expect(text).toContain("ホーム画面の TrackTalk を開く");
+  expect(text).not.toContain("Safari の共有ボタンをタップ");
 });
 
 it.each(["granted", "denied"])("does not prompt on review completion when permission is %s", async (permission) => {

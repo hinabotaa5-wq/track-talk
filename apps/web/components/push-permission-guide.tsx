@@ -93,7 +93,7 @@ function PushGuideSheet({
             </ol>
           ) : install ? (
             <ol className="list-decimal space-y-1 pl-5">
-              <li>{device === "ios-other" ? L("Safari で TrackTalk を開き、共有ボタンをタップ") : L("Safari の共有ボタンをタップ")}</li>
+              <li>{device === "ios-other" ? L("Safari で TrackTalk を開き、アドレスバー左の「≡」から「共有」を開く") : L("Safari で、アドレスバー左の「≡」から「共有」を開く")}</li>
               <li>{L("「ホーム画面に追加」を選び、「追加」をタップ")}</li>
               <li>{L("ホーム画面の TrackTalk を開く")}</li>
             </ol>
