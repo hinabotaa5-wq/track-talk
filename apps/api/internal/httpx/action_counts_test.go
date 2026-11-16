@@ -145,9 +145,9 @@ func TestActionCountsCoach(t *testing.T) {
 	seedActionConsultation(t, athlete, me, "in_review", "none", false)
 	seedActionConsultation(t, athlete, me, "answered", "asked", false)
 	seedActionContract(t, uuid.New(), me, "applied")
+	// 無料相談は requested だけを数える（#891 補足 2026-11-17）。選手が回答して requested に戻った行もこの状態で数える。
 	seedActionSupport(t, uuid.New(), me, "requested")
-	seedActionSupport(t, uuid.New(), me, "clarifying")
-	wantActionCounts(t, h, tok, 0, 8)
+	wantActionCounts(t, h, tok, 0, 7)
 
 	// 数えないもの。
 	seedActionConsultation(t, athlete, me, "answered", "none", false) // 補足依頼なし
@@ -155,9 +155,11 @@ func TestActionCountsCoach(t *testing.T) {
 	seedActionConsultation(t, athlete, me, "offered", "none", true)   // 消去済み
 	seedActionConsultation(t, athlete, me, "declined", "none", false)
 	seedActionSupport(t, uuid.New(), me, "proposed")
+	// clarifying はコーチが確認質問を出して選手の回答待ちなので、コーチ分に数えない。
+	seedActionSupport(t, uuid.New(), me, "clarifying")
 	seedActionReview(t, athlete, me, "returned")
 	seedActionContract(t, uuid.New(), me, "active")
-	wantActionCounts(t, h, tok, 0, 8)
+	wantActionCounts(t, h, tok, 0, 7)
 }
 
 // 細目3: 他人の行は数えない。

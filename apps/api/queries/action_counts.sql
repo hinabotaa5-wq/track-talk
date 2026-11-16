@@ -12,7 +12,8 @@ SELECT (
 
 -- name: CountCoachActionItems :one
 -- コーチタブの円ボタン（コーチ）に出す件数。条件は ListCoachReviewing・ListCoachConsultations・
--- コーチ画面の契約タイル（applied）と同じで、無料相談の未返信（requested・clarifying）だけが新規。
+-- コーチ画面の契約タイル（applied）と同じで、無料相談の未返信（requested のみ）だけが新規。
+-- clarifying はコーチが確認質問を出して選手の回答待ちなので数えない（#891 補足 2026-11-17）。
 SELECT (
     (SELECT count(*) FROM review_requests rr
       WHERE rr.coach_id = sqlc.arg(profile_id)::uuid AND rr.status IN ('in_review', 'needs_info'))
@@ -23,5 +24,5 @@ SELECT (
   + (SELECT count(*) FROM coaching_contracts cc
       WHERE cc.coach_id = sqlc.arg(profile_id)::uuid AND cc.status = 'applied')
   + (SELECT count(*) FROM support_consults sc
-      WHERE sc.coach_id = sqlc.arg(profile_id)::uuid AND sc.status IN ('requested', 'clarifying'))
+      WHERE sc.coach_id = sqlc.arg(profile_id)::uuid AND sc.status = 'requested')
 )::bigint AS coach_count;

@@ -22,12 +22,13 @@ SELECT (
   + (SELECT count(*) FROM coaching_contracts cc
       WHERE cc.coach_id = $1::uuid AND cc.status = 'applied')
   + (SELECT count(*) FROM support_consults sc
-      WHERE sc.coach_id = $1::uuid AND sc.status IN ('requested', 'clarifying'))
+      WHERE sc.coach_id = $1::uuid AND sc.status = 'requested')
 )::bigint AS coach_count
 `
 
 // コーチタブの円ボタン（コーチ）に出す件数。条件は ListCoachReviewing・ListCoachConsultations・
-// コーチ画面の契約タイル（applied）と同じで、無料相談の未返信（requested・clarifying）だけが新規。
+// コーチ画面の契約タイル（applied）と同じで、無料相談の未返信（requested のみ）だけが新規。
+// clarifying はコーチが確認質問を出して選手の回答待ちなので数えない（#891 補足 2026-11-17）。
 func (q *Queries) CountCoachActionItems(ctx context.Context, profileID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countCoachActionItems, profileID)
 	var coach_count int64
