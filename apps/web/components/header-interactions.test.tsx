@@ -14,7 +14,8 @@ import { SenseNoteComposer } from "./sense-notes";
 const apiFetch = vi.fn();
 let pathname = "/";
 const replace = vi.fn();
-vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ replace }) }));
+const back = vi.fn();
+vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ replace, back }) }));
 const guardedClick = vi.hoisted(() => vi.fn());
 const linkStatus = vi.hoisted(() => ({ pending: false }));
 vi.mock("next/link", () => ({
@@ -43,6 +44,7 @@ beforeEach(() => {
   apiFetch.mockReset();
   pathname = "/";
   replace.mockReset();
+  back.mockReset();
   linkStatus.pending = false;
   sessionStorage.clear();
   localStorage.clear();
@@ -147,6 +149,37 @@ describe("ヘッダーの開閉", () => {
     await act(async () => root.render(<Header />));
     expect(container.querySelector('button[aria-label="戻る"]')).not.toBeNull();
     expect(container.querySelector('a[aria-label="TrackTalk"]')).toBeNull();
+  });
+
+  it("紹介ページ（/referral）では戻るボタンだけを出してロゴを出さない", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = "/referral";
+    await act(async () => root.render(<Header />));
+    expect(container.querySelector('button[aria-label="戻る"]')).not.toBeNull();
+    expect(container.querySelector('a[aria-label="TrackTalk"]')).toBeNull();
+  });
+
+  it("紹介ページ（/referral）で履歴がないとき戻るボタンはコーチタブへ寄せる", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = "/referral";
+    await act(async () => root.render(<Header />));
+    await click(container.querySelector('button[aria-label="戻る"]'));
+    expect(back).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith("/coaching");
+    expect(replace).not.toHaveBeenCalledWith("/");
+    expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  it("紹介ページ（/referral）で履歴があるとき戻るボタンは履歴で1つ前に戻る", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = "/coaching";
+    await act(async () => root.render(<Header />));
+    window.history.pushState({}, "", "/referral");
+    pathname = "/referral";
+    await act(async () => root.render(<Header />));
+    await click(container.querySelector('button[aria-label="戻る"]'));
+    expect(back).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalledWith("/coaching");
   });
 
   it("ご意見を開いている間はアイコンを選択状態にする", async () => {

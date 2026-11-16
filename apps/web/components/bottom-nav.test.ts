@@ -106,3 +106,11 @@ it("コーチやプランなどの詳細は共通ヘッダーに戻るを表示�
   expect(headerBackFallback("/coach/about")).toBe("/coach/apply");
   for (const path of ["/coach", "/coach/apply", "/coach/about", "/coach/payout-guide"]) expect(isCoachChildPage(path), path).toBe(false);
 });
+
+it("紹介ページ（/referral）は戻るだけのヘッダーで、履歴がないときはコーチタブへ戻る", () => {
+  expect(showsBackButton("/referral")).toBe(true);
+  expect(hasBackOnlyHeader("/referral")).toBe(true);
+  expect(showsHeaderAccountActions("/referral")).toBe(false);
+  expect(headerBackFallback("/referral")).toBe("/coaching");
+  for (const path of ["/", "/coaching", "/competitions", "/memo", "/injury"]) expect(showsBackButton(path), path).toBe(false);
+});
