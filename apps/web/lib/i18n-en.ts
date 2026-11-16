@@ -3040,6 +3040,7 @@ export const en: Readonly<Record<string, string>> = {
   "現在は受付していません": "Not accepting requests right now",
   "チケット": "Tickets",
   "チケット{q}枚で{v0}です。1回プランの申込み1件につき1枚消費します。": "{q} tickets for {v0}. One ticket is used per One-time Plan.",
+  "単発は1回ごとにカード払いです。通常チケットは6枚セットから、無料チケットは紹介でもらった分から、申込み1件に1枚使います。": "Card pays per request. Each request uses one ticket: normal tickets from a pack of 6, free tickets from referrals.",
   "このコーチは現在、1回プランを受け付けていません": "This coach isn't currently accepting One-time Plans. You can choose another coach.",
   "1ヶ月プランの受付設定です。": "Settings for accepting the 1-month plan.",
   "誓約の文面が新しくなりました。もう一度同意してください。": "The pledge wording has been updated. Please agree again.",
