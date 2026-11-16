@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export const coachTermsVersion = "2026-11-11";
+export const coachTermsVersion = "2026-11-16";
 
 export default function CoachTermsPage() {
   return (
@@ -27,13 +27,13 @@ export default function CoachTermsPage() {
 
       <Rule title="1. Services">
         <p>
-          The Coach provides, through the TrackTalk app, online via information and communications technology: (a) one-month coaching packages — written feedback on athlete-submitted training and race videos (as a guide, up to about 28 videos per athlete per month, replies targeted within about 48 hours), answers to the athlete&apos;s coaching questions (including questions about training theory), and a training menu created at the start of the month and revised weekly; and (b) single video reviews in TrackTalk&apos;s fixed format, targeted within about 24 hours of receipt. All communication is asynchronous and in-app. Athletes never contact the Coach directly. The specific services, service period, and deadlines for each engagement are confirmed in an individual work order issued under these Terms (see clause 10).
+          The Coach provides, through the TrackTalk app, online via information and communications technology: (a) one-month coaching packages — written feedback on athlete-submitted training and race videos (with no set cap on the number of videos per athlete per month, replies targeted within about 48 hours), answers to the athlete&apos;s coaching questions (including questions about training theory), and a training menu created at the start of the month and revised weekly; and (b) single video reviews in TrackTalk&apos;s fixed format, targeted within about 24 hours of receipt. All communication is asynchronous and in-app. Athletes never contact the Coach directly. The specific services, service period, and deadlines for each engagement are confirmed in an individual work order issued under these Terms (see clause 10).
         </p>
       </Rule>
 
       <Rule title="2. Fees">
         <p>
-          (a) Package: <strong>¥16,500 per athlete per month</strong> (calculated as 75% of the tax-inclusive athlete price of ¥22,000). The fee is denominated in Japanese yen and converted to USD at the Wise transfer rate on the payment date. (b) Single review: <strong>$12 per completed review</strong>. Fees are as agreed with the Coach individually and may be revised only for future months by mutual agreement.
+          (a) Package: <strong>¥16,500 per athlete per month</strong> (calculated as 75% of the tax-inclusive athlete price of ¥22,000). The fee is denominated in Japanese yen and converted to USD at the Wise transfer rate on the payment date. (b) Single review: <strong>$10 per completed review</strong>. Fees are as agreed with the Coach individually and may be revised only for future months by mutual agreement.
         </p>
       </Rule>
 

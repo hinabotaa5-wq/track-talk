@@ -43,12 +43,12 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 
-it("見出しと本文を正本どおりに表示する", async () => {
+it("見出しだけを表示し、本文は表示しない", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const text = container.textContent ?? "";
   expect(text).toContain(HEADLINE_JA);
-  expect(text).toContain(BODY_JA);
+  expect(text).not.toContain(BODY_JA);
 });
 
 it("バナー全体が /referral へのリンクである", async () => {
@@ -64,9 +64,9 @@ it("黄色地に濃色文字で、見出しは太字・閉じるボタンなし"
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const link = container.querySelector('a[href="/referral"]');
-  expect(link?.className).toContain("bg-yellow-400");
+  expect(link?.className).toContain("bg-yellow-400/70");
   expect(link?.className).toContain("text-slate-900");
-  const headline = [...(container.querySelectorAll("span") ?? [])].find((el) => el.textContent === HEADLINE_JA);
+  const headline = [...(container.querySelectorAll("span") ?? [])].find((el) => el.textContent === HEADLINE_JA && el.querySelector("span") === null);
   expect(headline?.className).toContain("font-bold");
   expect(container.querySelector("button")).toBeNull();
   expect(link?.textContent).not.toContain("×");
@@ -90,13 +90,13 @@ it("CoachesView ではバナーがタブ行より前に描画される", async (
   expect(link!.compareDocumentPosition(tabs!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
 
-it("英語表示では正本の英訳が出る", async () => {
+it("英語表示では見出しの英訳だけが出て、本文は出ない", async () => {
   installEnglish(en);
   setActiveLocale("en");
   await act(async () => root.render(<ReferralBanner />));
   const text = container.textContent ?? "";
   expect(text).toContain(HEADLINE_EN);
-  expect(text).toContain(BODY_EN);
+  expect(text).not.toContain(BODY_EN);
   expect(text).not.toContain(HEADLINE_JA);
   expect(text).not.toContain(BODY_JA);
 });

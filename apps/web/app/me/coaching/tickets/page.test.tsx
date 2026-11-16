@@ -85,25 +85,22 @@ it("不正な戻り先は API に渡さず、購入画面を戻り先にする",
   expect(body.return_path).toBe("/me/coaching/tickets");
 });
 
-it("6枚2,500円の購入カードに4つの条件とチケットの使い方を表示する", async () => {
+it("6枚2,500円の購入カードは商品名・価格・1行・ボタンだけで、条件の説明文を置かない", async () => {
   mocks.api.mockResolvedValue(initial);
   await render();
   const card = reviewButton()?.parentElement;
-  const conditions = card?.querySelector("ul");
   expect(card?.textContent).toContain("チケット6枚");
   expect(card?.textContent).toContain("2,500円（税込）");
-  expect(card?.textContent).toContain("1回あたり約417円。");
+  expect(card?.textContent).toContain("1回あたり約417円・有効期限6か月");
   expect(card?.textContent).not.toContain("1回ずつ払うと");
-  expect(Array.from(conditions?.querySelectorAll("li") ?? [], (item) => item.textContent)).toEqual([
-    "1枚で1回プラン1件を申し込めます",
-    "有効期限は購入から6か月。過ぎると失効し、延長はしません",
-    "購入した本人だけが使えます。譲渡はできません",
-    "原則、購入者都合の払戻しはしません。サービス終了時、運営者・コーチの都合で受けられなかったとき、法令で認められる取消し・解除のときは払戻しします",
-  ]);
-  expect(conditions?.querySelector("ul")).toBeNull();
+  expect(card?.querySelector("ul, li")).toBeNull();
+  for (const old of ["1枚で1回プラン1件を申し込めます", "有効期限は購入から6か月。過ぎると失効し、延長はしません", "購入した本人だけが使えます。譲渡はできません", "原則、購入者都合の払戻しはしません。"]) {
+    expect(container.textContent).not.toContain(old);
+  }
+  expect(container.textContent).not.toContain("1回プラン1件に1枚を使います。");
   expect(card?.textContent).not.toContain("当社");
-  expect(card?.nextElementSibling?.textContent).toBe("1回プラン1件に1枚を使います。依頼時に確保し、返却時に使用済みになります。期限までに返却がなく依頼が終了した場合は、確保した1枚を戻します。チケットの有効期限を過ぎてから依頼が終了した場合、戻るチケットは失効します。運営者またはコーチの都合で有効期限内に1回プランを受けられなかった場合の失効後の返金は、利用規約第6条第5項（4）のとおりです。");
   expect(card?.querySelector("s, del")).toBeNull();
+  expect(reviewButton()?.textContent).toBe("購入内容を確認する");
 });
 
 it("購入の前に最終確認を出し、確定を押すまで支払いへ進まない", async () => {
@@ -112,9 +109,8 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   await render();
   await act(async () => reviewButton()!.click());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
-  expect(confirm.textContent).toContain("1回プランのチケット6枚（1枚で1回プラン1件）");
-  expect(confirm.textContent).toContain("2,500円（税込）。6枚分をまとめて先に支払います");
-  expect(confirm.textContent).toContain("お支払いが済んだ時に購入が確定");
+  expect(confirm.textContent).toContain("1回プランのチケット6枚（1枚で1回プラン1件）。購入した本人だけが使えます。譲ることはできません。");
+  expect(confirm.textContent).toContain("2,500円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
   expect(confirm.textContent).toContain("2027/05/20 10:00");
   // 最終確認にも例外4項目を番号付きで出す（本体 #572）。
   expect(confirm.textContent).toContain("購入者の都合による払戻しは原則として行いません");

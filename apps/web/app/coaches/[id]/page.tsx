@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 
-type ReviewEntry = { key: "card" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string };
+type ReviewEntry = { key: "card" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string; enabled: boolean };
 
 // どのプランの文脈で開いたか（本体 #694）。一覧で切り替えた先のプランの節だけを出す。
 // 一覧の切り替え（coach-tabs.tsx）と同じく、クエリ tab=support のときだけサポートプラン、
@@ -122,19 +122,22 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   // 種別ごとの残り。未ログイン・取得失敗・古い API では枚数を出さない（#684 と同じく、取れなくても入口は出す）。
   const counts = ticketSales && ticketSales.token === token ? ticketSales.counts : null;
   // 動画添削の入口（本体 #687）：単発・通常チケット・無料チケット。支払い方式を選んでから申込画面へ進む。
+  const rewardZero = counts?.reward === 0;
   const entries: ReviewEntry[] = [
-    { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(reviewPriceYen), href: `${ctaHref}&pay=card` },
+    { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
     {
       key: "normal", Icon: Ticket, label: L("通常チケット"),
       note: counts ? L("残り {n} 枚", { n: counts.normal }) : undefined,
       // 通常チケットが0枚なら購入画面へ（#684 の「購入する」と同じ遷移先・同じ戻り先）。
       href: counts?.normal === 0 ? ticketPurchaseHref : `${ctaHref}&pay=normal`,
+      enabled: ctaEnabled,
     },
     {
       key: "reward", Icon: Gift, label: L("無料チケット"),
       note: counts ? L("残り {n} 枚", { n: counts.reward }) : undefined,
-      // 無料チケットが0枚なら押せない。
-      href: counts?.reward === 0 ? undefined : `${ctaHref}&pay=reward`,
+      // 無料チケットが0枚（枚数が取れている場合）なら手順ページ（/referral）へ。受付停止中のコーチでもこの場合だけは押せる。
+      href: rewardZero ? "/referral" : `${ctaHref}&pay=reward`,
+      enabled: rewardZero || ctaEnabled,
     },
   ];
 
@@ -183,10 +186,11 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         {/* 動画添削文脈：動画添削とチケット（動画添削の購入導線）の節だけ。サポートプランの節は描画しない。 */}
         {videoContext ? <>
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
+          {ctaEnabled ? null : <p className="mx-auto w-fit rounded-full border border-red-400/70 px-3 py-1 text-center text-sm font-semibold text-red-400">{L("現在は受付していません")}</p>}
           <h2 id="coach-video-review" className="text-lg font-bold">{L("競技フォームのチェックや競技に関する悩み")}</h2>
           <p className="text-slate-200">{L("選択して下さい")}</p>
           <ul className="grid grid-cols-3 gap-2" aria-label={L("お支払い方法を選んで依頼する")}>
-            {entries.map(({ key, Icon, label, note, href }) => {
+            {entries.map(({ key, Icon, label, note, href, enabled }) => {
               const body = <>
                 <Icon className="size-5" aria-hidden />
                 <span className="text-sm font-semibold">{label}</span>
@@ -194,7 +198,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
               </>;
               const base = "flex min-h-20 w-full flex-col items-center justify-center gap-1 rounded-md px-2 py-2 text-center";
               return <li key={key} className="min-w-0" data-entry={key}>
-                {ctaEnabled && href ? <Link
+                {enabled && href ? <Link
                   href={href}
                   className={`${base} bg-blue-600 text-pure-white transition active:scale-[0.98]`}
                 >{body}</Link> : <span
@@ -204,7 +208,6 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
               </li>;
             })}
           </ul>
-          {ctaEnabled ? null : <p className="text-xs text-slate-300">{L("現在は受付していません")}</p>}
         </section>
         {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
           <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>

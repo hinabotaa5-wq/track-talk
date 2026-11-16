@@ -106,6 +106,21 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(tickets?.querySelector("a")?.classList.contains("w-full")).toBe(true);
 });
 
+// 受付停止バッジ：1か所だけ、見出しより前、枠付き・角丸・赤文字・中央寄せ（本体 #835）。
+function expectNotAcceptingBadge(text: string) {
+  const badges = Array.from(container.querySelectorAll("p")).filter((el) => el.textContent === text);
+  expect(badges).toHaveLength(1);
+  const badge = badges[0];
+  const section = container.querySelector('section[aria-labelledby="coach-video-review"]');
+  const heading = container.querySelector("h2#coach-video-review");
+  expect(section?.contains(badge)).toBe(true);
+  expect(badge.compareDocumentPosition(heading as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(container.textContent?.split(text).length).toBe(2);
+  for (const cls of ["border", "border-red-400/70", "rounded-full", "text-red-400", "text-sm", "font-semibold", "mx-auto", "w-fit", "text-center"]) {
+    expect(badge.classList.contains(cls)).toBe(true);
+  }
+}
+
 it("受付停止中でもチケットを購入できる", async () => {
   mocks.auth.token = "token";
   mocks.api.mockImplementation(async (path: string, init?: { token?: string | null }) => {
@@ -121,6 +136,7 @@ it("受付停止中でもチケットを購入できる", async () => {
   expect(container.querySelector('a[href^="/coaching/new"]')).toBeNull();
   for (const key of ["card", "normal", "reward"] as const) expect(entryDisabled(key)).toBe(true);
   expect(container.textContent).toContain("現在は受付していません");
+  expectNotAcceptingBadge("現在は受付していません");
   expect(container.textContent).toContain("選択して下さい");
   expect(container.textContent).not.toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   const purchaseLink = container.querySelector('section[aria-labelledby="coach-tickets"] a[href]');
@@ -168,7 +184,9 @@ it("種別ごとの残り枚数を出し、それぞれの支払い方式で申�
   expect(entryLink("reward")).toBe(reviewHref("reward"));
 });
 
-it("通常チケット0枚は購入画面へ、無料チケット0枚は押せない", async () => {
+const entryAnchorClass = (key: "card" | "normal" | "reward") => entry(key)?.querySelector("a[href]")?.getAttribute("class") ?? "";
+
+it("通常チケット0枚は購入画面へ、無料チケット0枚は手順ページへ", async () => {
   withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) });
   await render();
   expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
@@ -176,21 +194,54 @@ it("通常チケット0枚は購入画面へ、無料チケット0枚は押せ�
   // 「チケット」節の「購入する」と同じ遷移先・同じ戻り先（入口で動きが割れない）。
   expect(container.querySelector('section[aria-labelledby="coach-tickets"] a')?.getAttribute("href")).toBe(ticketPurchaseHref);
   expect(entry("reward")?.textContent).toBe("無料チケット残り 0 枚");
-  expect(entryLink("reward")).toBeNull();
-  expect(entryDisabled("reward")).toBe(true);
+  expect(entryLink("reward")).toBe("/referral");
+  expect(entryDisabled("reward")).toBe(false);
+  // 他の2入口と同じ青いリンクで描く。
+  for (const key of ["card", "normal", "reward"] as const) expect(entryAnchorClass(key)).toContain("bg-blue-600");
   expect(entryLink("card")).toBe(reviewHref("card"));
 });
 
-it("受付していないコーチでは通常チケット0枚でも購入へ遷移させず、チケット節の購入は押せる", async () => {
+it("受付していないコーチでは通常チケット0枚でも購入へ遷移させず、無料チケット0枚だけ手順ページへ飛べ、チケット節の購入は押せる", async () => {
   withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) }, false);
   await render();
-  for (const key of ["card", "normal", "reward"] as const) {
+  for (const key of ["card", "normal"] as const) {
     expect(entryLink(key)).toBeNull();
     expect(entryDisabled(key)).toBe(true);
   }
   expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
+  expect(entry("reward")?.textContent).toBe("無料チケット残り 0 枚");
+  expect(entryLink("reward")).toBe("/referral");
+  expect(entryDisabled("reward")).toBe(false);
+  expect(entryAnchorClass("reward")).toContain("bg-blue-600");
   expect(container.textContent).toContain("現在は受付していません");
   expect(container.querySelector(`section[aria-labelledby="coach-tickets"] a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
+});
+
+it("受付していないコーチで無料チケットが1枚以上なら、無料チケットも押せず申込画面へ行かない", async () => {
+  withTickets({ balance: { available: 1, reserved: 0 }, ...byKind(0, 1) }, false);
+  await render();
+  expect(entry("reward")?.textContent).toBe("無料チケット残り 1 枚");
+  for (const key of ["card", "normal", "reward"] as const) {
+    expect(entryLink(key)).toBeNull();
+    expect(entryDisabled(key)).toBe(true);
+  }
+  expect(container.textContent).toContain("現在は受付していません");
+});
+
+it("受付していないコーチで枚数が取れないときは、無料チケットも押せない", async () => {
+  mocks.auth.token = "token";
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === `/v1/coaches/${coachID}`) return coach;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [] };
+    throw new Error("network down");
+  });
+  await render();
+  expect(container.textContent).not.toContain("残り");
+  for (const key of ["card", "normal", "reward"] as const) {
+    expect(entryLink(key)).toBeNull();
+    expect(entryDisabled(key)).toBe(true);
+  }
+  expect(container.textContent).toContain("現在は受付していません");
 });
 
 it("受付状態とチケット要約の取得に失敗しても両方のボタンを表示する", async () => {
@@ -250,6 +301,7 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(entry("normal")?.textContent).toBe("Regular ticket");
   expect(entry("reward")?.textContent).toBe("Free ticket");
   expect(container.textContent).toContain("Not accepting requests right now");
+  expectNotAcceptingBadge("Not accepting requests right now");
   expect(container.textContent).toContain("Please select");
   expect(container.textContent).not.toContain("You can also ask for advice without a video.");
   expect(container.querySelector("h2#coach-video-review")?.textContent).toBe("Competition-form checks or concerns about competing");
