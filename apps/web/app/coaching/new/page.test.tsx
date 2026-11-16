@@ -248,11 +248,13 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).not.toContain("返却期限");
   expect(confirm?.textContent).not.toContain("2026/11/06");
   expect(confirm?.querySelector('a[href="/legal/commerce"]')?.textContent).toBe("特定商取引法に基づく表記");
-  expect(confirm?.textContent).toContain("返却時に確定します");
+  expect(confirm?.textContent).toContain("回答が返った時に確定します");
+  expect(confirm?.textContent).not.toContain("返却時に確定します");
   expect(confirm?.textContent).not.toContain("確定のタイミング");
   expect(confirm?.textContent).toContain("キャンセル・返金");
-  expect(confirm?.textContent).toContain("確保を取り消すので代金はかかりません");
-  expect(confirm?.textContent).toContain("決済が確定していない場合は仮押さえを取り消し（請求は確定しません）、確定している場合は返金します");
+  expect(confirm?.textContent).toContain("期限までに返らない場合やコーチが返却した場合は、代金はかかりません（確定済みの場合は返金します）");
+  expect(confirm?.textContent).not.toContain("確保を取り消すので代金はかかりません");
+  expect(confirm?.textContent).not.toContain("決済が確定していない場合は仮押さえを取り消し（請求は確定しません）、確定している場合は返金します");
   expect(confirm?.textContent).toContain("回答返却後の返金は利用規約に定める場合に限ります");
   expect(confirm?.textContent).not.toContain("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は");
   expect(confirm?.textContent).not.toContain("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。");
