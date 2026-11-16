@@ -195,6 +195,11 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 	if err != nil {
 		return err
 	}
+	// 支払い画面の金額・通貨が、こちらが作った支払いと一致することを確かめる。合わないものは完了させない。
+	if sess.AmountTotal != int(pay.AmountYen) || sess.Currency != "jpy" {
+		slog.Warn("review checkout mismatch", "payment", pay.ID, "want", pay.AmountYen, "got", sess.AmountTotal, "currency", sess.Currency)
+		return errors.New("review checkout does not match payment")
+	}
 	status := "captured"
 	if pay.Method == "card" {
 		// 仮押さえのときは payment_status が unpaid のまま届くので、支払いそのものの状態を確かめる。
@@ -211,6 +216,9 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		}
 		// 非JPカードは、仮押さえ成立後・打診（申込み）作成前に取り消す（本体 #796）。
 		// 発行国が取れないときはブロックしない。
+		if status == "authorized" {
+			logUnknownCardCountry(cardKindReview, pay.ID.String(), pi)
+		}
 		if status == "authorized" && pi.IsNonJPCard() {
 			return s.cancelNonJPCardCheckout(ctx, pay, sess.PaymentIntent, pi.CardCountry)
 		}
