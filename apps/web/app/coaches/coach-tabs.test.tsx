@@ -19,7 +19,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => ({ get: (key: string) => (key === "tab" ? navigation.tab : null) }),
   usePathname: () => navigation.pathname,
 }));
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get supportPlanListEnabled() { return flags.supportList; } }));
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ token: auth.token, loading: false }) }));
@@ -52,7 +52,8 @@ const render = async () => {
 const switchLink = (label: string) => [...container.querySelectorAll("a")].find((a) => a.textContent === label);
 // tabpanel 直下のパネル（開いた順）。hidden の有無で表示・退避を見分ける。
 const panels = () => [...container.querySelectorAll('[role="tabpanel"] > div')] as HTMLElement[];
-const coachButton = () => [...container.querySelectorAll('a[href="/coach"]')].find((a) => a.textContent === "コーチ");
+const coachButton = () => [...container.querySelectorAll('a[href="/coach"]')].find((a) => a.getAttribute("aria-label") === "コーチ");
+const playerButton = () => [...container.querySelectorAll('a[href="/player"]')].find((a) => a.getAttribute("aria-label") === "選手");
 const chip = (label: string, scope: ParentNode = container) =>
   [...scope.querySelectorAll('[role="radio"]')].find((el) => el.textContent === label) as HTMLElement | undefined;
 
@@ -179,23 +180,47 @@ it("継続プラン一覧のフラグが閉じている間は準備中だけを�
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches/support-plan")).toBe(false);
 });
 
-it("狭い画面でも切り替えとコーチボタンは同じ行に収まる", async () => {
+it("狭い画面でも切り替えと円ボタン2つは同じ行に収まる", async () => {
   await render();
-  const row = coachButton()?.closest("div.flex");
+  const row = container.querySelector('[role="group"]')?.closest("div.flex");
   expect(row).not.toBeNull();
-  expect(row?.querySelector('[role="group"]')).not.toBeNull();
+  expect(row?.contains(playerButton()!)).toBe(true);
+  expect(row?.contains(coachButton()!)).toBe(true);
 });
 
-// 運営者決定（2026-11-14）：ログイン状態・応募有無によらず常時出す。
-it("未ログインでもコーチボタンを文言どおり『コーチ』で出し、/coach へ導く（応募状態を取得しない）", async () => {
+// 運営者決定（2026-11-14／2026-11-17）：ログイン状態・応募有無によらず常時出す。入口はアイコンだけの円ボタン2つ。
+it("円ボタンは左が選手（/player）・右がコーチ（/coach）で、文字ラベルは無い", async () => {
+  await render();
+  expect(playerButton()?.getAttribute("href")).toBe("/player");
+  expect(playerButton()?.getAttribute("aria-label")).toBe("選手");
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(coachButton()?.getAttribute("aria-label")).toBe("コーチ");
+  expect(playerButton()?.textContent).toBe("");
+  expect(coachButton()?.textContent).toBe("");
+  const row = container.querySelector('[role="group"]')?.closest("div.flex");
+  const links = [...(row?.querySelectorAll("a") ?? [])] as HTMLAnchorElement[];
+  expect(links.indexOf(playerButton() as HTMLAnchorElement)).toBeLessThan(links.indexOf(coachButton() as HTMLAnchorElement));
+});
+
+it("英語では円ボタンの aria-label が Athlete／Coach になる", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  await render();
+  expect([...container.querySelectorAll('a[href="/player"]')].find((a) => a.getAttribute("aria-label") === "Athlete")).not.toBeUndefined();
+  expect([...container.querySelectorAll('a[href="/coach"]')].find((a) => a.getAttribute("aria-label") === "Coach")).not.toBeUndefined();
+});
+
+it("未ログインでも円ボタン2つを出し、/player・/coach へ導く（応募状態を取得しない）", async () => {
   auth.token = null;
   await render();
+  expect(playerButton()?.getAttribute("href")).toBe("/player");
   expect(coachButton()?.getAttribute("href")).toBe("/coach");
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
 
-it("ログイン済み・応募なしでもコーチボタンを出す（応募状態を取得しない）", async () => {
+it("ログイン済み・応募なしでも円ボタン2つを出す（応募状態を取得しない）", async () => {
   await render();
+  expect(playerButton()?.getAttribute("href")).toBe("/player");
   expect(coachButton()?.getAttribute("href")).toBe("/coach");
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
 });
@@ -247,7 +272,7 @@ it("継続プラン一覧のフラグが閉じている間は準備中を出し�
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches/support-plan")).toBe(false);
 });
 
-it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status=%s）でもコーチボタンを出す（応募状態を取得しない）", async (status) => {
+it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status=%s）でも円ボタン2つを出す（応募状態を取得しない）", async (status) => {
   apiFetch.mockImplementation(async (path: string) => {
     if (path === "/v1/coach/me") return { application: { status } };
     if (path === "/v1/coaches") return { coaches: [] };
@@ -269,6 +294,7 @@ it("初回の取得が終わるまで切り替えとコーチボタンを出さ�
   expect(switchLink("1回プラン")).toBeUndefined();
   expect(switchLink("継続プラン")).toBeUndefined();
   expect(coachButton()).toBeUndefined();
+  expect(playerButton()).toBeUndefined();
   expect(container.querySelector('[role="radio"]')).toBeNull();
   // 応募状態は取得しない（従来どおり）。
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me")).toBe(false);
