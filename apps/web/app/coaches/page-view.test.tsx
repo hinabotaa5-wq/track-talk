@@ -53,8 +53,9 @@ for (const locale of ["ja", "en"] as const) {
           expect(text).not.toContain(word);
         }
         expect(container.querySelector('input[name="overseas-interest-kind"]')).toBeNull();
-        // 「コーチ」ボタンは常時表示で API を読まない（2026-11-14 運営者決定）。一覧の描画では API を読みに行かない。
-        expect(apiFetch).not.toHaveBeenCalled();
+        // 「コーチ」ボタンは常時表示で、応募状態などは読まない（2026-11-14 運営者決定）。読むのはログイン中の件数（本体 #891）だけ。
+        expect(apiFetch.mock.calls.map(([path]) => path).filter((path) => path !== "/v1/me/coaching/action-counts")).toEqual([]);
+        if (!token) expect(apiFetch).not.toHaveBeenCalled();
       });
     }
   }

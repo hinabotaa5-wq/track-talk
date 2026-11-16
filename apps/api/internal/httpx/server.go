@@ -316,6 +316,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Use(RequireAuth(v, s.mfa, s.authAdmin))
 				// 利用者の準備（年齢・保護者リンク・プッシュ通知・添削用の動画）
 				r.Get("/me/coaching", s.coachingMe)
+				r.Get("/me/coaching/action-counts", s.coachingActionCounts)
 				r.Put("/me/birth-month", s.setBirthMonth)
 				r.Post("/me/guardian-link", s.issueGuardianLink)
 				r.Post("/uploads/coaching-video", s.signCoachingVideoUpload)
