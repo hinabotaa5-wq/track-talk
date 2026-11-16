@@ -2,6 +2,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
+import { en } from "@/lib/i18n-en";
 import NewReviewRequestPage from "./page";
 
 const mocks = vi.hoisted(() => ({
@@ -36,11 +38,21 @@ beforeEach(() => {
     throw new Error(`unexpected ${path}`);
   });
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 
 async function render() {
   await act(async () => root.render(<NewReviewRequestPage />));
   await act(async () => {});
+}
+
+const paymentFieldset = () => [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent?.startsWith("お支払い"));
+const paragraphExactly = (text: string) => [...container.querySelectorAll("p")].find((p) => p.textContent === text);
+// a が b より DOM 上で後ろにある（b の中には無い）こと。
+function expectAfter(a: Node | null | undefined, b: Node | null | undefined) {
+  expect(a).toBeTruthy();
+  expect(b).toBeTruthy();
+  expect(b!.contains(a!)).toBe(false);
+  expect(b!.compareDocumentPosition(a!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 }
 
 it("18歳未満は保護者の同意がなくても依頼の画面を開け、支払いの前に保護者の許可のチェックが出る", async () => {
@@ -86,6 +98,17 @@ it("「コーチを選ぶ」の見出しと選択ラジオを出さない", asyn
   expect(container.textContent).not.toContain("コーチを選ぶ");
   expect(container.querySelector('input[name="review-coach"]')).toBeNull();
   expect(container.querySelectorAll('input[type="radio"]').length).toBe(0);
+});
+
+it("動画欄には補足文を出さず、ファイル入力に aria-describedby を付けない（本体 #841）", async () => {
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  await render();
+  expect(container.textContent).toContain("動画（任意・");
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+  expect(input).not.toBeNull();
+  expect(input?.hasAttribute("aria-describedby")).toBe(false);
+  expect(container.querySelector("#review-video-help")).toBeNull();
+  expect(container.textContent).not.toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
 });
 
 it("フォーム上部に価格ボックス（動画添削（動画1本））を出さない", async () => {
@@ -187,10 +210,10 @@ it("チケットがなく販売中なら、お支払い方法に単発とチケ�
   expect(single.getAttribute("aria-pressed")).toBe("true");
   const link = payment?.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]');
   expect(link?.textContent).toContain("チケット（6枚）2,500円");
-  expect(container.textContent).toContain("1回あたり約417円（1回ずつ払うと500円）");
-  expect(container.textContent).toContain("有効期限は決済から6か月");
-  const unitNote = [...(payment?.querySelectorAll("p") ?? [])].find((p) => p.textContent?.includes("1回あたり約"));
-  expect(unitNote?.className).not.toMatch(/border|bg-/);
+  // チケット単価の説明文は出さない（本体 #841）。
+  expect(container.textContent).not.toContain("1回あたり約417円（1回ずつ払うと500円）");
+  expect(container.textContent).not.toContain("有効期限は決済から6か月");
+  expect(container.textContent).not.toContain("1回あたり約");
   expect(container.textContent).not.toContain("チケット6枚 2,500円（税込）");
   expect(container.textContent).not.toContain("通常価格");
   expect(container.querySelector("s, del")).toBeNull();
@@ -282,7 +305,8 @@ it("?coach= で受付中のコーチを初期選択する（本体 #643）", asy
   await act(async () => {});
   expect(container.textContent).not.toContain("このコーチは現在、1回プランを受け付けていません");
   expect(container.querySelector('a[href="/coaches"]')).toBeNull();
-  expect(container.textContent).toContain("受付中のコーチには決済の確認後に依頼が届きます。");
+  expect(container.textContent).toContain("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
+  expect(container.textContent).not.toContain("受付中のコーチには決済の確認後に依頼が届きます。");
   const textarea = container.querySelector("textarea")!;
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
@@ -349,24 +373,92 @@ it("受付中コーチ引き継ぎ時は種目チップを押しても選択が�
   expect(container.querySelector('a[href="/coaches"]')).toBeNull();
 });
 
-it("24時間お知らせは新文言で枠なしに出て、旧文言は入力画面に出ない", async () => {
+it("24時間お知らせは新文言で枠なしに、お支払い方法の下に出て、旧文言は入力画面に出ない（本体 #841）", async () => {
   mockReviewOpen([reviewCoach("c9")]);
   await render();
   await act(async () => {});
-  const notice = [...container.querySelectorAll("p")].find((p) => p.textContent === "申し込みが確定してから24時間以内に回答が来ます。");
+  const notice = paragraphExactly("申し込みが確定してから24時間以内に回答が来ます。");
   expect(notice).not.toBeUndefined();
   expect(notice?.className).not.toMatch(/border|bg-/);
+  expectAfter(notice, paymentFieldset());
   expect(container.textContent).not.toContain("依頼がコーチの対応中一覧に表示されてから24時間以内に返却します。");
 });
 
-it("コーチ引き継ぎ時は返金注記が文言そのままで枠なしに出る", async () => {
+it("コーチ引き継ぎ時は返金注記が単独の文で枠なしに、24時間お知らせの下に出る（本体 #841）", async () => {
   window.history.replaceState(null, "", "/coaching/new?coach=c1");
   mockReviewOpen([reviewCoach("c9"), reviewCoach("c1")]);
   await render();
   await act(async () => {});
-  const note = [...container.querySelectorAll("p")].find((p) => p.textContent?.includes("受付中のコーチには決済の確認後に依頼が届きます。"));
-  expect(note?.textContent).toBe("受付中のコーチには決済の確認後に依頼が届きます。期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
+  const note = [...container.querySelectorAll("p")].find((p) => p.textContent?.includes("期限までに回答が届かなかった場合は"));
+  expect(note?.textContent).toBe("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
   expect(note?.className).not.toMatch(/border|bg-/);
+  expect(container.textContent).not.toContain("受付中のコーチには決済の確認後に依頼が届きます。");
+  expectAfter(note, paymentFieldset());
+  expectAfter(note, paragraphExactly("申し込みが確定してから24時間以内に回答が来ます。"));
+});
+
+it("カード払いでは「カード・Apple Pay・Google Pay」→24時間→返金注記→未成年チェックの順に並ぶ（本体 #841）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [reviewCoach("c1")] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: true };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  await act(async () => {});
+  const card = paragraphExactly("カード・Apple Pay・Google Pay");
+  const hours = paragraphExactly("申し込みが確定してから24時間以内に回答が来ます。");
+  const refund = paragraphExactly("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
+  const declaration = container.querySelector<HTMLInputElement>('input[type="checkbox"]')?.closest("label");
+  expect(paymentFieldset()?.contains(card!)).toBe(true);
+  expectAfter(hours, card);
+  expectAfter(refund, hours);
+  expectAfter(declaration, refund);
+});
+
+it("チケット払いを選んでも24時間お知らせと返金注記はお支払い方法の下に出る（本体 #841）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [reviewCoach("c1")] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 2, reserved: 0 }, next_expiry: { expires_at: "2027-05-01T00:00:00Z", available: 2 }, can_purchase: true };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  await act(async () => {});
+  const tickets = [...(paymentFieldset()?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.startsWith("チケット（6枚）"))!;
+  expect(tickets.getAttribute("aria-pressed")).toBe("true");
+  expect(container.textContent).not.toContain("カード・Apple Pay・Google Pay");
+  expectAfter(paragraphExactly("申し込みが確定してから24時間以内に回答が来ます。"), paymentFieldset());
+  expectAfter(paragraphExactly("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。"), paymentFieldset());
+});
+
+it("英語表示では残した2文が英訳で出て、削除した3文の英訳は出ない（本体 #841）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [reviewCoach("c1")] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: true };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  await act(async () => {});
+  const text = container.textContent ?? "";
+  expect(paragraphExactly("You'll get a reply within 24 hours of your request being confirmed.")).toBeTruthy();
+  expect(paragraphExactly("If feedback doesn't arrive by the deadline, we'll void or fully refund your payment, or return your ticket.")).toBeTruthy();
+  expect(text).not.toContain("Attach a video if you would like form feedback");
+  expect(text).not.toContain("per review (");
+  expect(text).not.toContain("Paid in advance as a set of");
+  expect(text).not.toContain("An available coach receives the request");
 });
 
 it("チケット払いで確認画面へ進み、確定で use_tickets: true を送る", async () => {
@@ -640,7 +732,7 @@ it.each([false, true])("相談内容を必須にして申込を送る（動画�
   });
   await render();
   expect(container.textContent).toContain("動画（任意・");
-  expect(container.textContent).toContain("悩みだけでも申し込めます。");
+  expect(container.textContent).not.toContain("悩みだけでも申し込めます。");
 
   if (hasVideo) {
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
