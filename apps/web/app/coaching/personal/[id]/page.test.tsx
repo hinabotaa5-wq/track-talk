@@ -143,3 +143,40 @@ it("細目11: 英語では折りたたみ見出しが Application details にな
   expect(container.querySelector("summary")?.textContent).toBe("Application details");
   expect(container.textContent).not.toContain("申し込み内容");
 });
+
+const renderWithSharing = async (c: CoachingContract) => {
+  contractFixture = c;
+  apiFetch.mockImplementation(async (path: unknown) => {
+    if (typeof path === "string" && path.endsWith("/messages")) return { messages: [], view_closed: false };
+    if (typeof path === "string" && path.includes("/sense-notes")) return { notes: [], view_closed: false };
+    return { contract: contractFixture };
+  });
+  await render(c);
+};
+
+it("感覚メモ共有: activeな継続プランでは選手側に管理パネルが出る", async () => {
+  await renderWithSharing({ ...base, status: "active" } as CoachingContract);
+  expect(container.textContent).toContain("感覚メモの共有");
+  expect(container.textContent).toContain("チェックを外すと、コーチはそのメモを見られなくなります");
+});
+
+it("感覚メモ共有: activeな継続プランではコーチ側に閲覧パネルが出る", async () => {
+  await renderWithSharing({ ...base, status: "active", role: "coach" } as CoachingContract);
+  expect(container.textContent).toContain("選手の感覚メモ");
+  expect(container.textContent).toContain("共有されている感覚メモはありません");
+  expect(container.textContent).not.toContain("チェックを外すと");
+});
+
+it("感覚メモ共有: 開始前・終了後・1回系では出ない", async () => {
+  for (const c of [
+    { ...base, status: "applied" },
+    { ...base, status: "accepted" },
+    { ...base, status: "ended" },
+    { ...base, status: "active", plan_kind: "single" },
+    { ...base, status: "active", plan_kind: "trial" },
+  ] as CoachingContract[]) {
+    await renderWithSharing(c);
+    expect(container.textContent).not.toContain("感覚メモの共有");
+    expect(container.textContent).not.toContain("選手の感覚メモ");
+  }
+});

@@ -14,6 +14,7 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
 import { contractPeriod, ContractDetails } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
+import { SenseNoteSharing } from "@/components/sense-note-sharing";
 import { GuardianLinkForm } from "@/components/guardian-link-form";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { contractStatusLabel } from "@/lib/coaching-plan";
@@ -159,6 +160,10 @@ function CoachingContractView() {
               : "" })}</p>
         ) : null}
       </section>
+
+      {contract.status === "active" && contract.plan_kind === "period" ? (
+        <SenseNoteSharing contractId={contract.id} token={token} isCoach={isCoach} startsAt={contract.starts_at} />
+      ) : null}
 
       {!isCoach && !contract.minor && contract.payment_required && contract.status === "accepted" ? (
         waitingForPayment ? (

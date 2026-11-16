@@ -3049,4 +3049,8 @@ export const en: Readonly<Record<string, string>> = {
   "届いている相談はありません。受付設定は継続プランにあります。": "No consultations yet. Accepting settings are under Ongoing plan.",
   "1回プラン（悩みのみ・担当 {coachName}）": "One-time Plan (advice only, coach: {coachName})",
   "1回プラン（悩みのみ）": "One-time Plan (advice only)",
+  "感覚メモの共有": "Sharing sense notes",
+  "選手の感覚メモ": "Athlete's sense notes",
+  "チェックを外すと、コーチはそのメモを見られなくなります": "If you uncheck a note, the coach will no longer be able to see it.",
+  "共有されている感覚メモはありません": "No sense notes are being shared.",
 };

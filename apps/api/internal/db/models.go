@@ -1323,6 +1323,12 @@ type SenseNote struct {
 	Day       time.Time `json:"day"`
 }
 
+type SenseNoteContractExclusion struct {
+	ContractID  uuid.UUID `json:"contract_id"`
+	SenseNoteID uuid.UUID `json:"sense_note_id"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type SenseNoteSummary struct {
 	ID        uuid.UUID `json:"id"`
 	AuthorID  uuid.UUID `json:"author_id"`
