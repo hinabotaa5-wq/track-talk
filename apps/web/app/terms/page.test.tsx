@@ -260,3 +260,21 @@ it("第6条の料金と追加質問は国内コーチに適用し、海外単発
   expect(six).toContain("1回プランは1回500円（税込）");
   expect(six).toContain("1回プランの追加質問は、返却された1回プラン1件につき1回まで購入でき、料金は1回500円（税込、都度払いのみ）です");
 });
+
+it("第11条：感覚メモの「本人だけに」に継続プラン共有の例外を加え、競技会の記録は本人だけのまま（#878）", () => {
+  const text = article(11);
+  // （a）従来文はそのまま。
+  expect(text).toContain("感覚メモと競技会の記録の内容は本人だけに、ケガのグループの投稿はその参加者に表示します。");
+  // （b）固定の例外文。
+  const exception = "ただし、継続プランの契約期間中は、選手が共有をやめていない感覚メモを担当コーチが見ることができます。";
+  expect(text).toContain(exception);
+  // （c）例外文は感覚メモだけを対象にし、競技会の記録に触れない。
+  expect(exception).not.toContain("記録");
+  expect(exception).not.toContain("競技会");
+});
+
+it("最終更新日が実装日（2026年11月17日）に更新されている（#878）", () => {
+  const html = renderToStaticMarkup(<TermsPage />);
+  expect(html).toContain("最終更新日: 2026年11月17日");
+  expect(html).not.toContain("2026年11月15日");
+});
