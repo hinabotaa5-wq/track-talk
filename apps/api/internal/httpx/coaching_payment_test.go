@@ -142,7 +142,13 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/payment_intents/"):
 			// テストでは、pi_card で始まるものを仮押さえ済み、それ以外を確定済みとして答える。
 			// pi_nonjp で始まるものは米国発行、pi_unknown で始まるものは発行国不明として答える（本体 #796）。
+			// pi_failread で始まるものは読み取り失敗として答える（継続プランの契約決済の発行国確認の再送の確かめに使う）。
 			id := strings.TrimPrefix(r.URL.Path, "/v1/payment_intents/")
+			if strings.HasPrefix(id, "pi_failread") {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]any{"type": "invalid_request_error", "message": "cannot read"}})
+				return
+			}
 			status := "succeeded"
 			if strings.HasPrefix(id, "pi_card") || strings.HasPrefix(id, "pi_nonjp") || strings.HasPrefix(id, "pi_unknown") {
 				status = "requires_capture"
