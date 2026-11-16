@@ -205,6 +205,9 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		fields["question"] = "1000文字以内で記入してください"
 	case question == strings.TrimSpace(rr.Question) && !replace:
 		fields["question"] = "コーチの質問に答えるように、相談内容を直してください"
+	case looksLikeContact(question):
+		// 作成時と同じく、再提出の相談内容にも連絡先の判定をかける（本体 #485）。
+		fields["question"] = "URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは書けません"
 	}
 	if replace && !cloudinary.ValidCoachingPublicID(video) {
 		fields["video_public_id"] = "動画を選び直してください"

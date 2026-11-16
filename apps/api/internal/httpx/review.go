@@ -298,6 +298,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		if utf8.RuneCountInString(question) > 1000 {
 			fields["question"] = "1000文字以内で記入してください"
+		} else if looksLikeContact(question) {
+			// 外部の連絡先への誘導を防ぐため、相談内容にも他の接点と同じ判定をかける（本体 #485）。
+			fields["question"] = "URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは書けません"
 		}
 	} else {
 		var known bool
