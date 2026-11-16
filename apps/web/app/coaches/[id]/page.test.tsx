@@ -168,7 +168,9 @@ it("種別ごとの残り枚数を出し、それぞれの支払い方式で申�
   expect(entryLink("reward")).toBe(reviewHref("reward"));
 });
 
-it("通常チケット0枚は購入画面へ、無料チケット0枚は押せない", async () => {
+const entryAnchorClass = (key: "card" | "normal" | "reward") => entry(key)?.querySelector("a[href]")?.getAttribute("class") ?? "";
+
+it("通常チケット0枚は購入画面へ、無料チケット0枚は手順ページへ", async () => {
   withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) });
   await render();
   expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
@@ -176,21 +178,54 @@ it("通常チケット0枚は購入画面へ、無料チケット0枚は押せ�
   // 「チケット」節の「購入する」と同じ遷移先・同じ戻り先（入口で動きが割れない）。
   expect(container.querySelector('section[aria-labelledby="coach-tickets"] a')?.getAttribute("href")).toBe(ticketPurchaseHref);
   expect(entry("reward")?.textContent).toBe("無料チケット残り 0 枚");
-  expect(entryLink("reward")).toBeNull();
-  expect(entryDisabled("reward")).toBe(true);
+  expect(entryLink("reward")).toBe("/referral");
+  expect(entryDisabled("reward")).toBe(false);
+  // 他の2入口と同じ青いリンクで描く。
+  for (const key of ["card", "normal", "reward"] as const) expect(entryAnchorClass(key)).toContain("bg-blue-600");
   expect(entryLink("card")).toBe(reviewHref("card"));
 });
 
-it("受付していないコーチでは通常チケット0枚でも購入へ遷移させず、チケット節の購入は押せる", async () => {
+it("受付していないコーチでは通常チケット0枚でも購入へ遷移させず、無料チケット0枚だけ手順ページへ飛べ、チケット節の購入は押せる", async () => {
   withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) }, false);
   await render();
-  for (const key of ["card", "normal", "reward"] as const) {
+  for (const key of ["card", "normal"] as const) {
     expect(entryLink(key)).toBeNull();
     expect(entryDisabled(key)).toBe(true);
   }
   expect(entry("normal")?.textContent).toBe("通常チケット残り 0 枚");
+  expect(entry("reward")?.textContent).toBe("無料チケット残り 0 枚");
+  expect(entryLink("reward")).toBe("/referral");
+  expect(entryDisabled("reward")).toBe(false);
+  expect(entryAnchorClass("reward")).toContain("bg-blue-600");
   expect(container.textContent).toContain("現在は受付していません");
   expect(container.querySelector(`section[aria-labelledby="coach-tickets"] a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
+});
+
+it("受付していないコーチで無料チケットが1枚以上なら、無料チケットも押せず申込画面へ行かない", async () => {
+  withTickets({ balance: { available: 1, reserved: 0 }, ...byKind(0, 1) }, false);
+  await render();
+  expect(entry("reward")?.textContent).toBe("無料チケット残り 1 枚");
+  for (const key of ["card", "normal", "reward"] as const) {
+    expect(entryLink(key)).toBeNull();
+    expect(entryDisabled(key)).toBe(true);
+  }
+  expect(container.textContent).toContain("現在は受付していません");
+});
+
+it("受付していないコーチで枚数が取れないときは、無料チケットも押せない", async () => {
+  mocks.auth.token = "token";
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === `/v1/coaches/${coachID}`) return coach;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [] };
+    throw new Error("network down");
+  });
+  await render();
+  expect(container.textContent).not.toContain("残り");
+  for (const key of ["card", "normal", "reward"] as const) {
+    expect(entryLink(key)).toBeNull();
+    expect(entryDisabled(key)).toBe(true);
+  }
+  expect(container.textContent).toContain("現在は受付していません");
 });
 
 it("受付状態とチケット要約の取得に失敗しても両方のボタンを表示する", async () => {
