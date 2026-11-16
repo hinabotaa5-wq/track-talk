@@ -1,9 +1,11 @@
 package httpx_test
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -24,6 +26,7 @@ const (
 
 // fakeStripe は、Stripe の代わりに支払い画面と返金を受け付けるサーバー。
 type fakeStripe struct {
+	t             *testing.T
 	transferDelay time.Duration
 	serverConfig  config.Config
 	mu            sync.Mutex
@@ -69,6 +72,8 @@ func (f *fakeStripe) chargeCap(intent string) int {
 
 // setCheckoutState は、支払い画面を読んだときに返す中身を決める（戻り画面での確認のテストに使う）。
 func (f *fakeStripe) setCheckoutState(id string, state map[string]any) {
+	state["id"] = id
+	fillSessionFields(f.t, state)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.checkoutStates == nil {
@@ -125,7 +130,7 @@ func setupStripe(t *testing.T) (http.Handler, *fakeStripe) {
 
 func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler, *fakeStripe) {
 	t.Helper()
-	f := &fakeStripe{enabled: map[string]bool{}}
+	f := &fakeStripe{enabled: map[string]bool{}, t: t}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if user, _, _ := r.BasicAuth(); user != "sk_test_x" {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -306,8 +311,59 @@ func stripeWebhook(t *testing.T, h http.Handler, secret, typ string, object map[
 	return stripeWebhookAt(t, h, "/webhooks/stripe", secret, typ, object)
 }
 
+// fillSessionFields は、完了通知に金額・通貨・参照が欠けているときに、実際の Stripe の通知と同じく
+// 支払いの行の値を入れる（完了処理は金額・通貨・参照を照合する）。テストが自分で指定した値は変えない。
+func fillSessionFields(t *testing.T, object map[string]any) {
+	t.Helper()
+	id, _ := object["id"].(string)
+	if id == "" {
+		return
+	}
+	raw, _ := json.Marshal(object["metadata"])
+	var md map[string]string
+	_ = json.Unmarshal(raw, &md)
+	var tables []string
+	switch md["kind"] {
+	case "review":
+		tables = []string{"review_payments"}
+	case "personal":
+		tables = []string{"coaching_payments"}
+	case "":
+		tables = []string{"coaching_payments", "review_payments"}
+	default:
+		return
+	}
+	var amount int
+	var payID string
+	pool, err := pgxpool.New(context.Background(), testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	found := false
+	for _, table := range tables {
+		if err := pool.QueryRow(context.Background(), `SELECT amount_yen, id::text FROM `+table+` WHERE checkout_session_id=$1`, id).Scan(&amount, &payID); err == nil {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+	if _, ok := object["amount_total"]; !ok {
+		object["amount_total"] = amount
+	}
+	if _, ok := object["currency"]; !ok {
+		object["currency"] = "jpy"
+	}
+	if _, ok := object["client_reference_id"]; !ok {
+		object["client_reference_id"] = payID
+	}
+}
+
 func stripeWebhookAt(t *testing.T, h http.Handler, path, secret, typ string, object map[string]any) *httptest.ResponseRecorder {
 	t.Helper()
+	fillSessionFields(t, object)
 	payload, _ := json.Marshal(map[string]any{"id": "evt_" + fmt.Sprint(time.Now().UnixNano()), "type": typ, "data": map[string]any{"object": object}})
 	ts := time.Now().Unix()
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(string(payload)))

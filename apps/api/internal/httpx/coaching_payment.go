@@ -250,9 +250,16 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "読めませんでした")
 		return
 	}
-	ev, err := verifyWebhookAny(payload, r.Header.Get("Stripe-Signature"), secrets)
+	ev, fromConnectKey, err := verifyWebhookAny(payload, r.Header.Get("Stripe-Signature"), secrets)
 	if err != nil {
 		Error(w, http.StatusBadRequest, "bad_signature", "署名が正しくありません")
+		return
+	}
+	// Connect 用の鍵で署名されたイベントは、口座の同期と金銭の異常検知にだけ使う。
+	// 決済の完了・異議申し立てなど、本体用の鍵で届くべきイベントは出所が合わないので処理しない。
+	if fromConnectKey && !connectKeyEventAllowed(ev.Type) {
+		slog.Warn("stripe webhook origin mismatch", "event", ev.ID, "type", ev.Type)
+		Error(w, http.StatusBadRequest, "unsupported_event", "この通知は受け付けていません")
 		return
 	}
 	if !s.cfg.CoachingEnabled {
@@ -322,30 +329,47 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"received": true})
 }
 
+// webhookSecret は、署名を確かめる鍵と、それが Connect 用かどうか。
+type webhookSecret struct {
+	key     string
+	connect bool
+}
+
 // webhookSecrets は、署名を確かめる鍵。Stripe は platform の知らせと Connect（コーチのアカウント）の知らせで
 // 送り先ごとに鍵を分ける。公開前の通常決済通知は通常用の鍵だけで検証する。
 // 公開済み環境の既存 Connect 登録との互換性のため、公開中は従来どおり両方を受け付ける。
-func (s *Server) webhookSecrets() []string {
-	var out []string
-	keys := []string{s.cfg.StripeWebhookSecret}
-	if s.cfg.CoachingEnabled {
-		keys = append(keys, s.cfg.StripeConnectWebhookSecret)
+// ただし Connect 用の鍵で届いたイベントは、connectKeyEventAllowed の種類だけを処理する。
+func (s *Server) webhookSecrets() []webhookSecret {
+	var out []webhookSecret
+	if s.cfg.StripeWebhookSecret != "" {
+		out = append(out, webhookSecret{key: s.cfg.StripeWebhookSecret})
 	}
-	for _, k := range keys {
-		if k != "" {
-			out = append(out, k)
-		}
+	if s.cfg.CoachingEnabled && s.cfg.StripeConnectWebhookSecret != "" {
+		out = append(out, webhookSecret{key: s.cfg.StripeConnectWebhookSecret, connect: true})
 	}
 	return out
 }
 
-func verifyWebhookAny(payload []byte, header string, secrets []string) (stripe.Event, error) {
+// connectKeyEventAllowed は、Connect 用の鍵で署名されたイベントのうち処理してよい種類。
+// 口座の状態同期と、見覚えのない返金・送金の検知だけ。購入の成立や異議申し立ての処理は含めない。
+func connectKeyEventAllowed(eventType string) bool {
+	switch eventType {
+	case "account.updated", "charge.refunded", "refund.created", "refund.updated", "refund.failed",
+		"transfer.created", "transfer.reversed", "payout.created":
+		return true
+	}
+	return false
+}
+
+// verifyWebhookAny は、鍵を順に試して署名が合うものを探す。同じ内容が本体用と Connect 用の
+// どちらの鍵でも通ることはないので、最初に合った鍵の種類をそのままイベントの出所として返す。
+func verifyWebhookAny(payload []byte, header string, secrets []webhookSecret) (stripe.Event, bool, error) {
 	for _, k := range secrets {
-		if ev, err := stripe.VerifyWebhook(payload, header, k, time.Now()); err == nil {
-			return ev, nil
+		if ev, err := stripe.VerifyWebhook(payload, header, k.key, time.Now()); err == nil {
+			return ev, k.connect, nil
 		}
 	}
-	return stripe.Event{}, stripe.ErrBadSignature
+	return stripe.Event{}, false, stripe.ErrBadSignature
 }
 
 // syncCoachAccount は、コーチの Stripe アカウントの状態が変わった知らせを、受け取れるかどうかに反映する。
@@ -451,18 +475,16 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 		if err != nil {
 			return err
 		}
-		if sess.AmountTotal != int(pay.AmountYen) {
-			slog.Warn("stripe amount mismatch", "payment", pay.ID, "want", pay.AmountYen, "got", sess.AmountTotal)
+		// 金額・通貨・参照は、契約の版にかかわらず一致を求める（旧形式の契約も同じ）。合わないものは完了させない。
+		if sess.AmountTotal != int(pay.AmountYen) || sess.Currency != "jpy" || sess.ClientReferenceID != pay.ID.String() {
+			slog.Warn("stripe checkout mismatch", "payment", pay.ID, "want", pay.AmountYen, "got", sess.AmountTotal, "currency", sess.Currency)
+			return errors.New("support checkout mismatch")
 		}
 		if pay.ContractID == nil {
 			return nil
 		}
-		snapshot, e := q.GetCoachingContract(ctx, *pay.ContractID)
-		if e != nil {
+		if _, e := q.GetCoachingContract(ctx, *pay.ContractID); e != nil {
 			return e
-		}
-		if snapshot.FulfillmentVersion == 1 && (sess.AmountTotal != int(pay.AmountYen) || sess.Currency != "jpy" || sess.ClientReferenceID != pay.ID.String()) {
-			return errors.New("support checkout mismatch")
 		}
 		// 継続プランの契約決済にも、他の経路と同じカード発行国の確認を入れる。
 		// 発行国が取れないときは通す。既に処理済みの知らせの再送は
@@ -473,6 +495,7 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 			// 処理は戻すので、支払いは pending のまま残る。
 			return fmt.Errorf("%w: %w", errStripe, err)
 		}
+		logUnknownCardCountry(cardKindSupport, pay.ID.String(), pi)
 		if pi.IsNonJPCard() {
 			nonJP, country = true, pi.CardCountry
 			return nil

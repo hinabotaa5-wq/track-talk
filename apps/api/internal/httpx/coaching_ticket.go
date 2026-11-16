@@ -390,6 +390,7 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 			return fmt.Errorf("%w: %w", errStripe, err)
 		}
 		nonJP, country = pi.IsNonJPCard(), pi.CardCountry
+		logUnknownCardCountry(cardKindTicket, id.String(), pi)
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}

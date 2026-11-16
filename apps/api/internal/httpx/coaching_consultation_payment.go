@@ -160,6 +160,7 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 			return fmt.Errorf("%w: %w", errStripe, err)
 		}
 		nonJP, country = pi.IsNonJPCard(), pi.CardCountry
+		logUnknownCardCountry(cardKindConsultation, id.String(), pi)
 	}
 	var saved db.CoachingConsultation
 	notify := false
