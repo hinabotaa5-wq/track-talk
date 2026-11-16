@@ -49,6 +49,7 @@ describe("purchase-confirm", () => {
     const contentRow = rows.find((r) => r.label === "Message" || r.label === "内容");
     expect(contentRow).toBeDefined();
     expect(contentRow?.value).toContain("6 One-time Plan tickets (One ticket covers one One-time Plan request.)");
+    expect(contentRow?.value).toContain("Only the purchaser can use them.");
     expect(contentRow?.value).not.toContain("1 review");
 
     const cardRows = reviewConfirmRows({
@@ -138,9 +139,32 @@ describe("purchase-confirm", () => {
       expect(refund).toContain("the one reserved ticket is returned");
       expect(refund).toContain("you receive a refund of ¥500 per ticket even after expiry");
       expect(refund).not.toContain("returned or refunded");
+      expect(refund).not.toContain("(Terms, Article 6)");
+      expect(refund).toContain("divided by 6, multiplied by the number of unused tickets");
     } finally {
       setActiveLocale("ja");
     }
+  });
+
+  it("チケット購入の確認は4行（内容・総額・有効期限・払戻し）で、確認画面だけで完結する（本体 #844）", () => {
+    setActiveLocale("ja");
+    const rows = ticketPackConfirmRows({ quantity: 6, amountYen: 2500, validityMonths: 6, now: new Date("2026-11-20T10:00:00+09:00") });
+    expect(rows.map((r) => r.label)).toEqual(["内容", "総額", "有効期限", "払戻し"]);
+    expect(rows[0].value).toBe("1回プランのチケット6枚（1枚で1回プラン1件）。購入した本人だけが使えます。譲ることはできません。");
+    expect(rows[1].value).toBe("2,500円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
+    expect(rows[2].value).toContain("2027/05/20 10:00");
+    expect(rows[2].value).toContain("申し込んだ依頼が終了して戻るチケットも、有効期限を過ぎていれば失効します。");
+    const refund = rows[3].value;
+    expect(refund).toContain("購入者の都合による払戻しは原則として行いません");
+    expect(refund).toContain("確保したチケット1枚を戻します。これは確保の解除で、金銭の払戻しには当たりません");
+    expect(refund).not.toContain("有効期限を過ぎてから戻るチケットは失効します");
+    expect(refund).toContain("有効期限を過ぎていても1枚を出し直します");
+    expect(refund).toContain("（1）サービス終了時は、終了の時点で未使用のチケット（有効期限にかかわらず）について、購入金額を6で割った額に未使用の枚数を掛けた額（1円未満は四捨五入）を払い戻します。");
+    expect(refund).toContain("（3）");
+    expect(refund).toContain("チケット1枚につき500円");
+    expect(refund).toContain("失効後でも1枚につき500円");
+    expect(refund).not.toContain("利用規約第6条");
+    expect(refund).not.toMatch(/当社|チケットを戻すか返金/);
   });
 });
 
