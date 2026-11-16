@@ -114,6 +114,17 @@ func parseCoachTranslation(raw string) (coachTranslationContent, error) {
 	return out, nil
 }
 
+// dropContactLikeTranslation は、訳文4項目のうち連絡先らしきものを含む項目だけを空文字にする。
+// 原文の公開欄と同じ looksLikeContact をかける。空の項目は表示側で原文にフォールバックする。
+func dropContactLikeTranslation(c coachTranslationContent) coachTranslationContent {
+	for _, f := range []*string{&c.Nickname, &c.Hitokoto, &c.Achievements, &c.BestRecord} {
+		if looksLikeContact(*f) {
+			*f = ""
+		}
+	}
+	return c
+}
+
 // ensureCoachProfileTranslation は訳を1件作る。fail-open 前提で、呼び出し側は error をログに残すだけにする。
 // translated は新規保存、current は保存済みが現行で API を呼ばなかったことを表す。
 func (s *Server) ensureCoachProfileTranslation(ctx context.Context, c db.ListPublicCoachesRow) (translated bool, current bool, err error) {
@@ -145,6 +156,7 @@ func (s *Server) ensureCoachProfileTranslation(ctx context.Context, c db.ListPub
 	if err != nil {
 		return false, false, err
 	}
+	content = dropContactLikeTranslation(content)
 	if _, err := s.q.UpsertCoachProfileTranslation(ctx, db.UpsertCoachProfileTranslationParams{
 		CoachID: c.ProfileID, SourceHash: hash, NicknameEn: content.Nickname, HitokotoEn: content.Hitokoto, AchievementsEn: content.Achievements, BestRecordEn: content.BestRecord,
 	}); err != nil {
