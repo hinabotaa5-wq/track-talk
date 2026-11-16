@@ -47,7 +47,9 @@ export default function MyReviewRequestsPage() {
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-2xl font-bold">{L("1回プランの依頼")}</h1>
-      {requests.length === 0 ? <p className="text-sm text-slate-200">{L("まだ依頼はありません")}</p> : null}
+      {requests.length === 0 ? (
+        <p className="text-sm text-slate-200">{L("まだ依頼はありません。")}<Link href="/coaching" className="text-blue-300 underline">{L("コーチ一覧")}</Link>{L("から依頼できます。")}</p>
+      ) : null}
       <ul className="space-y-2">
         {requests.map((r) => (
           <li key={r.id}>
@@ -64,10 +66,6 @@ export default function MyReviewRequestsPage() {
           </li>
         ))}
       </ul>
-      <Link
-        href="/coaching/new"
-        className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white"
-      >{L("新しく頼む")}</Link>
     </div>
   );
 }
