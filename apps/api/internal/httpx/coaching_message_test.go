@@ -150,8 +150,8 @@ func TestCoachingMessages(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"stars":4`) {
 		t.Fatalf("rating in detail %s", rec.Body.String())
 	}
-	// コーチ一覧の★にも入る。
-	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); !strings.Contains(body, `"rating_average":4,"rating_count":1`) {
+	// 公開コーチ一覧には評価の件数・平均を出さない（本体 #821）。
+	if body := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String(); strings.Contains(body, `"rating_average"`) || strings.Contains(body, `"rating_count"`) {
 		t.Fatalf("rating in coach list %s", body)
 	}
 }

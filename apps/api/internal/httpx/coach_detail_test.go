@@ -40,6 +40,8 @@ func TestPublicCoachDetailMatchesList(t *testing.T) {
 		if detail.Code != http.StatusOK || !bytes.Equal(bytes.TrimSpace(detail.Body.Bytes()), entry) {
 			t.Fatalf("detail %d %s, want %s", detail.Code, detail.Body.String(), entry)
 		}
+		assertPublicCoachShape(t, entry)
+		assertPublicCoachShape(t, detail.Body.Bytes())
 		t.Logf("JSON response bytes: two coaches %d, single coach %d (support consultation: %t)", list.Body.Len(), detail.Body.Len(), row.ID == first)
 	}
 
@@ -48,6 +50,25 @@ func TestPublicCoachDetailMatchesList(t *testing.T) {
 	missing := doJSON(t, h, http.MethodGet, "/v1/coaches/"+uuid.NewString(), "", nil)
 	if hidden.Code != http.StatusNotFound || missing.Code != hidden.Code || missing.Body.String() != hidden.Body.String() {
 		t.Fatalf("unpublished %d %s, missing %d %s", hidden.Code, hidden.Body.String(), missing.Code, missing.Body.String())
+	}
+}
+
+// 公開コーチの応答に評価の件数・平均は出さない（本体 #821）。それ以外のキーは従来どおり返す。
+func assertPublicCoachShape(t *testing.T, raw []byte) {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"rating_count", "rating_average"} {
+		if _, ok := m[k]; ok {
+			t.Fatalf("%s must not be exposed: %s", k, raw)
+		}
+	}
+	for _, k := range []string{"id", "nickname", "photo_url", "tier", "events", "service_types", "best_record", "achievements", "years", "sns_urls", "hitokoto", "plans", "support_consult"} {
+		if _, ok := m[k]; !ok {
+			t.Fatalf("%s missing: %s", k, raw)
+		}
 	}
 }
 
