@@ -7,6 +7,8 @@ export async function proxy(request: NextRequest) {
   const url = process.env.SUPABASE_INTERNAL_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  // https のときだけ Secure を付ける。http（ローカル開発など）で付けるとセッションを保存できない。
+  const secure = request.nextUrl.protocol === "https:";
   let response = NextResponse.next({ request });
   let claims: unknown = null;
 
@@ -24,7 +26,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set({ name, value }));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, { ...options, sameSite: "lax" }),
+            response.cookies.set(name, value, { ...options, sameSite: "lax", ...(secure ? { secure: true } : {}) }),
           );
           Object.entries(headers).forEach(([name, value]) => response.headers.set(name, value));
         },

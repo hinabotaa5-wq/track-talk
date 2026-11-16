@@ -3,8 +3,10 @@ import { NextRequest } from "next/server";
 import type { CookieMethodsServer } from "@supabase/ssr";
 import { GET } from "./route";
 
-const { exchangeCodeForSession } = vi.hoisted(() => ({
+const { exchangeCodeForSession, sessionOptions } = vi.hoisted(() => ({
   exchangeCodeForSession: vi.fn(),
+  // setAll に渡す Cookie 属性。Supabase の既定どおり secure は含めない。
+  sessionOptions: { current: {} as Record<string, unknown> },
 }));
 
 vi.mock("@supabase/ssr", () => ({
@@ -12,7 +14,7 @@ vi.mock("@supabase/ssr", () => ({
     auth: {
       exchangeCodeForSession: async (code: string) => {
         await options.cookies.setAll?.([
-          { name: "session", value: "token", options: { path: "/", secure: true, sameSite: "none" } },
+          { name: "session", value: "token", options: sessionOptions.current },
         ], {});
         return exchangeCodeForSession(code);
       },
@@ -22,6 +24,7 @@ vi.mock("@supabase/ssr", () => ({
 
 describe("auth callback redirect", () => {
   beforeEach(() => {
+    sessionOptions.current = { path: "/", secure: true, sameSite: "none" };
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://auth.example");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-key");
     exchangeCodeForSession.mockResolvedValue({ error: null });
@@ -103,4 +106,34 @@ describe("auth callback redirect", () => {
       expect(response.cookies.get("tracktalk-next")?.maxAge).toBe(0);
     },
   );
+
+  describe("セッション Cookie の Secure 属性", () => {
+    beforeEach(() => {
+      sessionOptions.current = { path: "/", maxAge: 34560000 };
+    });
+
+    it("https では secure: true を付け、他の属性を保つ", async () => {
+      const response = await GET(new NextRequest("https://tracktalk.example/auth/callback?code=test-code"));
+      expect(response.cookies.get("session")).toMatchObject({
+        value: "token", path: "/", maxAge: 34560000, sameSite: "lax", secure: true,
+      });
+      expect(response.headers.get("set-cookie")).toMatch(/session=token.*;\s*Secure/i);
+    });
+
+    it("http では secure を付けない", async () => {
+      const response = await GET(new NextRequest("http://localhost:3000/auth/callback?code=test-code"));
+      expect(response.cookies.get("session")).toMatchObject({
+        value: "token", path: "/", maxAge: 34560000, sameSite: "lax",
+      });
+      expect(response.cookies.get("session")?.secure).toBeFalsy();
+    });
+
+    it("HttpOnly を付けない", async () => {
+      for (const origin of ["https://tracktalk.example", "http://localhost:3000"]) {
+        const response = await GET(new NextRequest(`${origin}/auth/callback?code=test-code`));
+        expect(response.cookies.get("session")?.httpOnly).toBeFalsy();
+        expect(response.headers.get("set-cookie")).not.toMatch(/httponly/i);
+      }
+    });
+  });
 });
