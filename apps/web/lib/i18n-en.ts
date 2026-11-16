@@ -1333,6 +1333,8 @@ export const en: Readonly<Record<string, string>> = {
   "動画: {name}": "Video: {name}",
   "動画をつける（{maxReviewSeconds}秒まで）": "Attach a video (up to {maxReviewSeconds}s)",
   "メニュー作成": "Create menu",
+  "申し込み内容": "Application details",
+  "最新のメッセージへ": "Go to the latest message",
   "あなた": "You",
   "退会したユーザー": "Deleted user",
   "このパーソナル指導の評価": "Rate this personal coaching",
