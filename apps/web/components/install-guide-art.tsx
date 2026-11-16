@@ -53,16 +53,18 @@ export function OpenInSafariArt() {
 
 export function IosShareButtonArt() {
   return (
-    <Frame label={L("Safari の画面下の共有ボタンをタップ")}>
-      <rect x="40" y="8" width="160" height="62" rx="8" fill="#1e293b" />
-      <text x="120" y="42" textAnchor="middle" fontSize="12" fill="#94a3b8">TrackTalk</text>
-      <rect x="0" y="86" width="240" height="46" fill="#334155" />
-      <path d="M28 109l8-7v14zM58 109l-8-7v14z" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinejoin="round" />
-      <ShareGlyph x={120} y={105} color="#fff" />
-      <rect x="172" y="101" width="14" height="14" rx="2" fill="none" stroke="#94a3b8" strokeWidth="2" />
-      <rect x="206" y="101" width="14" height="14" rx="2" fill="none" stroke="#94a3b8" strokeWidth="2" />
-      <Pulse cx={120} cy={107} r={17} />
-      <path d="M120 78v8" stroke={accent} strokeWidth="2.5" strokeLinecap="round" />
+    <Frame label={L("アドレスバー左の「≡」をタップし、メニューの一番上の「共有」をタップ")}>
+      <rect x="52" y="6" width="136" height="58" rx="10" fill="#1e293b" />
+      <rect x="58" y="12" width="124" height="22" rx="6" fill="#2563eb" opacity="0.9" />
+      <ShareGlyph x={72} y={22} color="#fff" />
+      <text x="86" y="27" fontSize="11" fontWeight="700" fill="#fff">{L("共有")}</text>
+      <text x="64" y="52" fontSize="10" fill="#94a3b8">{L("ブックマークに追加")}</text>
+      <path d="M30 86v10" stroke={accent} strokeWidth="2.5" strokeLinecap="round" />
+      <rect x="14" y="96" width="212" height="26" rx="13" fill="#334155" />
+      <text x="30" y="114" textAnchor="middle" fontSize="14" fill="#fff">≡</text>
+      <text x="122" y="113" textAnchor="middle" fontSize="10" fill="#cbd5e1">{L("tracktalk の URL")}</text>
+      <text x="204" y="114" textAnchor="middle" fontSize="13" fill="#94a3b8">↻</text>
+      <Pulse cx={30} cy={109} r={13} />
     </Frame>
   );
 }
@@ -71,17 +73,19 @@ export function IosAddToHomeArt() {
   return (
     <Frame label={L("メニューから「ホーム画面に追加」を選ぶ")}>
       <rect x="30" y="8" width="180" height="116" rx="12" fill="#1e293b" />
-      <g fontSize="11" fill="#94a3b8">
-        <text x="46" y="32">{L("コピー")}</text>
-        <text x="46" y="56">{L("ブックマークを追加")}</text>
-        <text x="46" y="106">{L("プリント")}</text>
+      <g fontSize="10" fill="#94a3b8">
+        <text x="46" y="28">{L("ブックマークの追加先…")}</text>
+        <text x="46" y="45">{L("お気に入りに追加")}</text>
+        <text x="46" y="62">{L("ページを検索")}</text>
+        <text x="46" y="101">{L("マークアップ")}</text>
+        <text x="46" y="118">{L("プリント")}</text>
       </g>
-      <rect x="36" y="64" width="168" height="26" rx="7" fill="#2563eb" opacity="0.9" />
-      <text x="46" y="81" fontSize="11" fontWeight="700" fill="#fff">{L("ホーム画面に追加")}</text>
-      <rect x="176" y="70" width="14" height="14" rx="3" fill="none" stroke="#fff" strokeWidth="1.8" />
-      <path d="M183 73v8M179 77h8" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M212 77h-14" stroke={accent} strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M200 72l-6 5 6 5" fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="36" y="68" width="168" height="24" rx="7" fill="#2563eb" opacity="0.9" />
+      <text x="46" y="84" fontSize="11" fontWeight="700" fill="#fff">{L("ホーム画面に追加")}</text>
+      <rect x="176" y="73" width="14" height="14" rx="3" fill="none" stroke="#fff" strokeWidth="1.8" />
+      <path d="M183 76v8M179 80h8" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M212 80h-14" stroke={accent} strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M200 75l-6 5 6 5" fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </Frame>
   );
 }
