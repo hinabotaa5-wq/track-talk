@@ -183,6 +183,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         {/* 動画添削文脈：動画添削とチケット（動画添削の購入導線）の節だけ。サポートプランの節は描画しない。 */}
         {videoContext ? <>
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
+          {ctaEnabled ? null : <p className="mx-auto w-fit rounded-full border border-red-400/70 px-3 py-1 text-center text-sm font-semibold text-red-400">{L("現在は受付していません")}</p>}
           <h2 id="coach-video-review" className="text-lg font-bold">{L("競技フォームのチェックや競技に関する悩み")}</h2>
           <p className="text-slate-200">{L("選択して下さい")}</p>
           <ul className="grid grid-cols-3 gap-2" aria-label={L("お支払い方法を選んで依頼する")}>
@@ -204,7 +205,6 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
               </li>;
             })}
           </ul>
-          {ctaEnabled ? null : <p className="text-xs text-slate-300">{L("現在は受付していません")}</p>}
         </section>
         {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
           <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>

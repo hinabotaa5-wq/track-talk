@@ -106,6 +106,21 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(tickets?.querySelector("a")?.classList.contains("w-full")).toBe(true);
 });
 
+// 受付停止バッジ：1か所だけ、見出しより前、枠付き・角丸・赤文字・中央寄せ（本体 #835）。
+function expectNotAcceptingBadge(text: string) {
+  const badges = Array.from(container.querySelectorAll("p")).filter((el) => el.textContent === text);
+  expect(badges).toHaveLength(1);
+  const badge = badges[0];
+  const section = container.querySelector('section[aria-labelledby="coach-video-review"]');
+  const heading = container.querySelector("h2#coach-video-review");
+  expect(section?.contains(badge)).toBe(true);
+  expect(badge.compareDocumentPosition(heading as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(container.textContent?.split(text).length).toBe(2);
+  for (const cls of ["border", "border-red-400/70", "rounded-full", "text-red-400", "text-sm", "font-semibold", "mx-auto", "w-fit", "text-center"]) {
+    expect(badge.classList.contains(cls)).toBe(true);
+  }
+}
+
 it("受付停止中でもチケットを購入できる", async () => {
   mocks.auth.token = "token";
   mocks.api.mockImplementation(async (path: string, init?: { token?: string | null }) => {
@@ -121,6 +136,7 @@ it("受付停止中でもチケットを購入できる", async () => {
   expect(container.querySelector('a[href^="/coaching/new"]')).toBeNull();
   for (const key of ["card", "normal", "reward"] as const) expect(entryDisabled(key)).toBe(true);
   expect(container.textContent).toContain("現在は受付していません");
+  expectNotAcceptingBadge("現在は受付していません");
   expect(container.textContent).toContain("選択して下さい");
   expect(container.textContent).not.toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   const purchaseLink = container.querySelector('section[aria-labelledby="coach-tickets"] a[href]');
@@ -250,6 +266,7 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(entry("normal")?.textContent).toBe("Regular ticket");
   expect(entry("reward")?.textContent).toBe("Free ticket");
   expect(container.textContent).toContain("Not accepting requests right now");
+  expectNotAcceptingBadge("Not accepting requests right now");
   expect(container.textContent).toContain("Please select");
   expect(container.textContent).not.toContain("You can also ask for advice without a video.");
   expect(container.querySelector("h2#coach-video-review")?.textContent).toBe("Competition-form checks or concerns about competing");
