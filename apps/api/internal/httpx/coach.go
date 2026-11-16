@@ -765,7 +765,7 @@ func (s *Server) publicCoaches(ctx context.Context, coachID *uuid.UUID) ([]map[s
 		if !approved[p.ID] {
 			continue
 		}
-		plan := coachingPlanJSON(db.CoachingPlan{
+		plan := publicCoachingPlanJSON(db.CoachingPlan{
 			ID: p.ID, CoachID: p.CoachID, Kind: p.Kind, Title: p.Title, Description: p.Description,
 			DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
 			VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
@@ -774,7 +774,6 @@ func (s *Server) publicCoaches(ctx context.Context, coachID *uuid.UUID) ([]map[s
 			VenueArea: p.VenueArea, VenueName: p.VenueName, SessionCount: p.SessionCount, SessionMinutes: p.SessionMinutes, TravelFeeYen: p.TravelFeeYen, MaxParticipants: p.MaxParticipants,
 			ServiceType: p.ServiceType, AdditionalConsultationPriceYen: p.AdditionalConsultationPriceYen,
 		})
-		plan["full"] = p.ActiveCount >= int32(p.Capacity)
 		plansByCoach[p.CoachID] = append(plansByCoach[p.CoachID], plan)
 	}
 	consults, err := s.publicConsultEntries(ctx, coachID)

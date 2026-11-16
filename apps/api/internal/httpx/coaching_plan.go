@@ -77,6 +77,14 @@ func coachingPlanJSON(p db.CoachingPlan) map[string]any {
 	}
 }
 
+// publicCoachingPlanJSON は、ログイン前の人にも見せるプランの応答。
+// 同時に受ける人数の上限（capacity）や、満員かどうか（full）は載せない。満員の判定はサーバー内で行い、申し込み時に返す。
+func publicCoachingPlanJSON(p db.CoachingPlan) map[string]any {
+	out := coachingPlanJSON(p)
+	delete(out, "capacity")
+	return out
+}
+
 // approvedCoach は、承認済みのコーチ本人かを確かめる。違えば 403 を返して false。
 func (s *Server) approvedCoach(w http.ResponseWriter, r *http.Request) (db.CoachProfile, bool) {
 	p, ok := s.requireProfile(w, r)

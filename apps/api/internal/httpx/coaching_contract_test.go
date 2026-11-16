@@ -92,7 +92,7 @@ func TestCoachingContractFlow(t *testing.T) {
 
 	// 申し込む前に見るプランは、ログインしなくても見られる。
 	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/plans/"+planID, "", nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"full":false`) {
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `"full"`) || strings.Contains(rec.Body.String(), `"capacity"`) {
 		t.Fatalf("public plan %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -146,8 +146,9 @@ func TestCoachingContractFlow(t *testing.T) {
 
 	// 上限の1人に届いたので、プランは満員になり、ほかの人は申し込めない。
 	rec = doJSON(t, h, http.MethodGet, "/v1/coaching/plans/"+planID, "", nil)
-	if !strings.Contains(rec.Body.String(), `"full":true`) {
-		t.Fatalf("full %s", rec.Body.String())
+	// 満員でも応答には満員かどうかも上限人数も載せない（申し込み時に plan_full で返る）。
+	if strings.Contains(rec.Body.String(), `"full"`) || strings.Contains(rec.Body.String(), `"capacity"`) {
+		t.Fatalf("exposed %s", rec.Body.String())
 	}
 	_, tu2 := demoUser(t, h, time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC))
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/contracts", tu2, contractBody(planID)); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "plan_full") {

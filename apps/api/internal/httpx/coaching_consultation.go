@@ -345,6 +345,19 @@ func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
 	}
 	return out
 }
+
+// consultationJSONFor は、見る人の役割に合わせた応答。コーチには支払いの状態・支払う人・重複防止のキー・未成年かどうかを見せない
+// （コーチの対応に使わない項目）。選手・保護者・管理側の応答は変えない。
+func (s *Server) consultationJSONFor(c db.CoachingConsultation, role string) map[string]any {
+	out := s.consultationJSON(c)
+	if role == "coach" {
+		for _, k := range []string{"payer", "payment_state", "request_key", "minor"} {
+			delete(out, k)
+		}
+	}
+	return out
+}
+
 func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 	room, role, ok := s.consultationRoomAccess(w, r)
 	if !ok {
@@ -372,7 +385,7 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 		if role == "guardian" && !c.Minor {
 			continue
 		}
-		item := s.consultationJSON(c)
+		item := s.consultationJSONFor(c, role)
 		// フォーム添削の追加質問は運営者がコーチに委託するので、コーチには取引条件を見せる。
 		if role == "coach" && room.review != nil && c.CoachID != nil {
 			if err := s.attachConsultationWorkOrder(r.Context(), item, c); err != nil {
@@ -398,10 +411,15 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 	if room.coach != nil {
 		coachID = *room.coach
 	}
-	JSON(w, 200, map[string]any{"consultations": items, "role": role, "price_yen": price, "can_purchase": offerErr == nil && role == "requester",
+	out := map[string]any{"consultations": items, "role": role, "price_yen": price, "can_purchase": offerErr == nil && role == "requester",
 		"block_reason": reason, "requires_video": requiresVideo, "coach_id": coachID, "funding": funding,
 		// 依頼した本人が18歳未満か。動画添削のあとの相談をその場で払うときは、購入のたびの宣言が要る。
-		"minor": room.minor})
+		"minor": room.minor}
+	if role == "coach" {
+		// コーチの対応には使わないので載せない。
+		delete(out, "minor")
+	}
+	JSON(w, 200, out)
 }
 
 func (s *Server) validateConsultationContent(w http.ResponseWriter, r *http.Request, body, video string, owner uuid.UUID, existing *string) (*string, bool) {
@@ -840,7 +858,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	if action == "clarify" {
 		s.notifyConsultation(r.Context(), saved, true, "回答への確認質問が届きました")
 	}
-	JSON(w, 200, map[string]any{"consultation": s.consultationJSON(saved)})
+	JSON(w, 200, map[string]any{"consultation": s.consultationJSONFor(saved, role)})
 }
 func (s *Server) coachConsultations(w http.ResponseWriter, r *http.Request) {
 	cp, ok := s.approvedCoach(w, r)

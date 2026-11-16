@@ -150,9 +150,7 @@ export default function ApplyCoachingPlanPage() {
         </div>
       </section>
 
-      {plan.full ? (
-        <p className="rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm text-slate-200">{L("このプランはいま満員です。空いたらまた申し込めます。")}</p>
-      ) : !me.demo ? (
+      {!me.demo ? (
         <DemoCodeForm
           intro={L("パーソナル指導は準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが申し込めます。")}
           token={token}

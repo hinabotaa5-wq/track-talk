@@ -56,7 +56,7 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	plan := coachingPlanJSON(db.CoachingPlan{
+	plan := publicCoachingPlanJSON(db.CoachingPlan{
 		ID: p.ID, CoachID: p.CoachID, Kind: p.Kind, Title: p.Title, Description: p.Description,
 		DurationDays: p.DurationDays, PriceYen: p.PriceYen, Capacity: p.Capacity, Published: p.Published,
 		VideoReviews: p.VideoReviews, MenuUpdates: p.MenuUpdates, ReplyFormats: p.ReplyFormats,
@@ -64,7 +64,6 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		CompetitionName:   p.CompetitionName, CompetitionDate: p.CompetitionDate, SupportStartDate: p.SupportStartDate, CallCount: p.CallCount, CallMinutes: p.CallMinutes,
 		ServiceType: p.ServiceType, AdditionalConsultationPriceYen: p.AdditionalConsultationPriceYen,
 	})
-	plan["full"] = p.ActiveCount >= int32(p.Capacity)
 	commerce, approved, err := s.identity.disclosure(r.Context(), p.ID)
 	if err != nil {
 		identityServiceError(w)

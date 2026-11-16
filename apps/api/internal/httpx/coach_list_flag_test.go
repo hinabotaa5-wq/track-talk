@@ -29,9 +29,9 @@ func TestCoachListFlagCoachingOff(t *testing.T) {
 	}
 }
 
-// コーチングを開けて一覧を閉じている間は、一覧 API はコーチングを閉じたときと同じ 404 で、
-// コーチの名前・写真などは一覧から取れない。動画添削の指名候補と申込み・支払いは従来どおり使える。
-func TestCoachListFlagOffKeepsReviewRequests(t *testing.T) {
+// コーチングを開けて一覧を閉じている間は、一覧 API も指名候補も、コーチングを閉じたときと同じ 404 で、
+// コーチの名前・写真などは一覧からも指名候補からも取れない。
+func TestCoachListFlagOffHidesNominees(t *testing.T) {
 	closed := doJSON(t, setupNoCoaching(t), http.MethodGet, "/v1/coaches", "", nil)
 
 	fakeCoachingCloudinary(t)
@@ -54,15 +54,8 @@ func TestCoachListFlagOffKeepsReviewRequests(t *testing.T) {
 	}
 
 	r := doJSON(t, h, http.MethodGet, "/v1/coaching/nominees?event=100m", tu, nil)
-	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), coach.String()) {
+	if r.Code != http.StatusNotFound || strings.Contains(r.Body.String(), coach.String()) {
 		t.Fatalf("nominees %d %s", r.Code, r.Body.String())
-	}
-	id := chosenReview(t, h, tu, coach.String(), "card", false)
-	payChosenReview(t, h, id, "card")
-	var status, requested string
-	queryRowArgs(t, `SELECT p.status, r.requested_coach_id::text FROM review_payments p JOIN review_requests r ON r.id = p.request_id WHERE p.request_id=$1`, []any{id}, &status, &requested)
-	if status != "authorized" || requested != coach.String() {
-		t.Fatalf("payment %s coach %s", status, requested)
 	}
 }
 

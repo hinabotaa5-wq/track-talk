@@ -513,8 +513,6 @@ export type CoachingPlan = PlanIncludes & {
   price_yen: number;
   capacity: number;
   published: boolean;
-  // コーチ一覧と申し込む画面だけ: 期間中の人数が上限に届いているか。
-  full?: boolean;
 };
 
 // パーソナル指導の申し込み。applied: コーチの返事待ち、active: 期間中、ended: 終わった、
