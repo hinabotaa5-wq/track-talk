@@ -26,6 +26,13 @@ func (a Admin) Enabled() bool {
 	return strings.TrimSpace(a.BaseURL) != "" && strings.TrimSpace(a.APIKey) != ""
 }
 
+// Misconfigured は、Supabase の URL を設定しているのにセッションの照合に要るサービスキーが無い状態。
+// 照合を飛ばして通すのではなく、書き込みと退会を止める判断（fail-closed）に使う。
+// URL もキーも無いローカル実行（自前の JWT 鍵）は、この状態に当たらない。
+func (a Admin) Misconfigured() bool {
+	return strings.TrimSpace(a.BaseURL) != "" && strings.TrimSpace(a.APIKey) == ""
+}
+
 func (a Admin) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	if !a.Enabled() {
 		return nil
