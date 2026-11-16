@@ -60,16 +60,10 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
 const referralHeadline = () => L("友達2人に紹介すると、1回無料！");
 const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
 
-// showUnissued を付けた画面（/me）では、IDをまだ持たない人にも発行条件を案内する。
-export function LoadedReferralCard({ token, showUnissued }: { token: string | null; showUnissued?: boolean }) {
-  const { loaded, referral } = useMyReferral(token);
+export function LoadedReferralCard({ token }: { token: string | null }) {
+  const { referral } = useMyReferral(token);
   if (referral) return <ReferralCard referral={referral} />;
-  if (!showUnissued || !loaded) return null;
-  return <section className="app-card space-y-2 rounded-xl p-4">
-    <h2 className="font-semibold">{referralHeadline()}</h2>
-    <p className="text-sm">{referralBody()}</p>
-    <p className="text-sm">{L("紹介IDを使わずに購入すると、あなたの紹介IDが発行されます。")}</p>
-  </section>;
+  return null;
 }
 
 function ReferralCard({ referral }: { referral: Referral }) {

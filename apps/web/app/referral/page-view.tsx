@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
-import { CheckCircle2, Copy, Gift, GraduationCap, Keyboard, Ticket, Users } from "lucide-react";
+import { Copy, Gift, GraduationCap, Keyboard, Ticket } from "lucide-react";
 import { L } from "@/lib/i18n";
 
 // 無料チケットの説明ページ（本体 #823）。ログイン不要の静的ページで、データ取得はしない。
@@ -38,16 +38,11 @@ function ReferralCodeMock() {
   );
 }
 
-const purchaseSteps: Step[] = [
-  { icon: Users, title: "友達から紹介IDを受け取る", body: "友達から6文字の紹介IDを教えてもらいます。" },
-  { icon: GraduationCap, title: "コーチを選んで、申し込みに進む", body: "1回プランの都度払いでも、チケット6枚パックの購入でも使えます。" },
-  { icon: Keyboard, title: "購入の手続きで、紹介IDを入力する", body: "「紹介ID（友達からもらった場合）」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。" },
-  { icon: CheckCircle2, title: "そのまま購入を完了する", body: "購入が完了すると、紹介してくれた友達に「1人分」として数えられます。" },
-];
-
-const referrerSteps: Step[] = [
-  { icon: Ticket, title: "紹介IDを使わずに購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに表示されます。" },
+const steps: Step[] = [
+  { icon: Ticket, title: "紹介IDを使わずに購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。" },
   { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで紹介IDをコピーできます。" },
+  { icon: GraduationCap, title: "友達がコーチを選んで、申し込みに進む", body: "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。" },
+  { icon: Keyboard, title: "友達が、購入の手続きで紹介IDを入力して購入を完了する", body: "「紹介ID（友達からもらった場合）」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。" },
   { icon: Gift, title: "友達2人が購入すると、無料チケットをプレゼント", body: "あと何人かは、マイページで確認できます。" },
 ];
 
@@ -70,21 +65,12 @@ export function ReferralGuideView() {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-bold">{L("IDを使って購入する流れ")}</h2>
+        <h2 className="text-lg font-bold">{L("紹介の流れ")}</h2>
         <ol className="space-y-3">
-          {purchaseSteps.map((step, index) => (
+          {steps.map((step, index) => (
             <StepCard key={step.title} step={step} index={index}>
-              {index === 2 ? <ReferralCodeMock /> : null}
+              {index === 3 ? <ReferralCodeMock /> : null}
             </StepCard>
-          ))}
-        </ol>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-bold">{L("紹介する側の流れ")}</h2>
-        <ol className="space-y-3">
-          {referrerSteps.map((step, index) => (
-            <StepCard key={step.title} step={step} index={index} />
           ))}
         </ol>
       </section>
