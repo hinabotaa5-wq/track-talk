@@ -10,6 +10,10 @@ describe("purchase-confirm", () => {
       method: "card",
       priceYen: 500,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       coachName: "テストコーチ",
     });
     const cancelRefundRow = rows.find((r) => r.label === "キャンセル・返金");
@@ -51,6 +55,10 @@ describe("purchase-confirm", () => {
       method: "card",
       priceYen: 500,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       coachName: "Test Coach",
     });
     const cardCancelRow = cardRows.find((r) => r.label === "Cancellation and refunds");
@@ -68,6 +76,10 @@ describe("purchase-confirm", () => {
       method: "tickets",
       priceYen: 0,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       ticketKind: "reward",
     });
     const rewardCancel = rewardRows.find((r) => r.label === "キャンセル・チケットの戻り")?.value;
@@ -78,6 +90,10 @@ describe("purchase-confirm", () => {
       method: "tickets",
       priceYen: 0,
       hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
       ticketKind: "normal",
     });
     const normalCancel = normalRows.find((r) => r.label === "キャンセル・チケットの戻り")?.value;
@@ -97,6 +113,10 @@ describe("purchase-confirm", () => {
         method: "tickets",
         priceYen: 0,
         hasVideo: true,
+        question: "相談",
+        eventLabel: "100m",
+        videoFileName: "run.mp4",
+        videoFileSizeBytes: 1,
         ticketKind: "reward",
       }).find((r) => r.label === "Cancellation and ticket returns")?.value;
       expect(rewardCancel).toContain("a new ticket is issued even after expiry");
@@ -118,6 +138,63 @@ describe("purchase-confirm", () => {
       expect(refund).toContain("the one reserved ticket is returned");
       expect(refund).toContain("you receive a refund of ¥500 per ticket even after expiry");
       expect(refund).not.toContain("returned or refunded");
+    } finally {
+      setActiveLocale("ja");
+    }
+  });
+});
+
+describe("reviewConfirmRows の申込内容の行（本体 #845）", () => {
+  const base = { method: "card" as const, priceYen: 500, coachName: "テストコーチ" };
+  const q = "  最初の行\n二行目  ";
+
+  it("カード払い：種目・相談内容・動画が内容の直後に入り、相談内容だけ multiline", () => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ ...base, hasVideo: true, question: q, eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 13107200 });
+    expect(rows.map((r) => r.label)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限", "総額", "お支払い方法", "キャンセル・返金"]);
+    expect(rows[1].value).toBe("100m");
+    expect(rows[2].value).toBe("最初の行\n二行目");
+    expect(rows[3].value).toBe("run.mp4（12.5 MB）");
+    expect(rows.filter((r) => r.multiline).map((r) => r.label)).toEqual(["相談内容"]);
+    expect(rows.filter((r) => "multiline" in r).length).toBe(1);
+  });
+
+  it("動画なし：悩みのみ表記で動画行は なし", () => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ ...base, hasVideo: false, question: "相談", eventLabel: "100m", videoFileName: null, videoFileSizeBytes: null });
+    expect(rows[0].value).toContain("悩みのみ");
+    expect(rows.find((r) => r.label === "動画")?.value).toBe("なし");
+  });
+
+  it.each([[500, "500 B"], [2048, "2 KB"], [1048576, "1.0 MB"], [1, "1 B"]])("サイズ整形 %i → %s", (size, text) => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ ...base, hasVideo: true, question: "相談", eventLabel: "100m", videoFileName: "a.mp4", videoFileSizeBytes: size });
+    expect(rows.find((r) => r.label === "動画")?.value).toBe(`a.mp4（${text}）`);
+  });
+
+  it.each(["normal", "reward"] as const)("チケット払い（%s）：先頭4行はカード払いと同じ形", (kind) => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ method: "tickets", priceYen: 0, hasVideo: true, ticketKind: kind, question: "相談", eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 1 });
+    expect(rows.slice(0, 5).map((r) => r.label)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限"]);
+    expect(rows.find((r) => r.label === "動画")?.value).toBe("run.mp4（1 B）");
+  });
+
+  it("PayPay でも同じ先頭4行", () => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ method: "paypay", priceYen: 500, hasVideo: false, question: "相談", eventLabel: "100m", videoFileName: null, videoFileSizeBytes: null });
+    expect(rows.slice(0, 5).map((r) => r.label)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限"]);
+  });
+
+  it("英語：ラベルと動画の値だけ訳され、相談内容は原文のまま", () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    try {
+      const withVideo = reviewConfirmRows({ ...base, hasVideo: true, question: "後半に失速します", eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 13107200 });
+      expect(withVideo.slice(1, 4).map((r) => r.label)).toEqual(["Event ", "Your question", "Video"]);
+      expect(withVideo[2].value).toBe("後半に失速します");
+      expect(withVideo[3].value).toBe("run.mp4 (12.5 MB)");
+      const without = reviewConfirmRows({ ...base, hasVideo: false, question: "x", eventLabel: "100m", videoFileName: null, videoFileSizeBytes: null });
+      expect(without[3].value).toBe("None");
     } finally {
       setActiveLocale("ja");
     }

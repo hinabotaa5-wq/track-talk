@@ -258,12 +258,20 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')).toBeNull();
   expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
 
-  await enterQuestion("後半に失速します。200mのラップは12.1 12.3です");
+  await enterQuestion("  後半に失速します。\n200mのラップは12.1 12.3です  ");
   expect(container.textContent).not.toContain(contactMessage);
   await act(async () => { submit.form!.requestSubmit(); });
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
   expect(confirm?.textContent).toContain("1回プラン（動画1本・担当 テストコーチ）");
   expect(confirm?.textContent).toContain("500円（税込）");
+  const confirmDts = [...confirm!.querySelectorAll("dt")];
+  const rowValue = (label: string) => confirmDts.find((d) => d.textContent === label)!.nextElementSibling as HTMLElement;
+  expect(confirmDts.slice(0, 5).map((d) => d.textContent)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限"]);
+  expect(rowValue("種目").textContent).toBe("100m");
+  expect(rowValue("相談内容").textContent).toBe("後半に失速します。\n200mのラップは12.1 12.3です");
+  expect(rowValue("動画").textContent).toBe("run.mp4（1 B）");
+  expect(rowValue("相談内容").className).toContain("whitespace-pre-wrap");
+  expect(confirmDts.filter((d) => (d.nextElementSibling as HTMLElement).className.includes("whitespace-pre-wrap")).length).toBe(1);
   expect(confirm?.textContent).toContain("カード・Apple Pay・Google Pay");
   expect(confirm?.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
   expect(confirm?.textContent).not.toContain("依頼がコーチの対応中一覧に表示されてから");
@@ -547,6 +555,9 @@ it("チケット版の確認は4項目で、有効期限はお支払い行の中
   const confirm = await renderTicketConfirm({ expires_at: "2027-05-01T00:00:00Z", available: 2 });
   expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
     "内容",
+    "種目",
+    "相談内容",
+    "動画",
     "回答期限",
     "お支払い",
     "キャンセル・チケットの戻り",
@@ -696,7 +707,7 @@ it("無料チケットの確認は無料チケット1枚と特典の期限を出
   await renderKinds("&pay=reward", 2, 1);
   const confirm = await fillAndConfirm();
   expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
-    "内容", "回答期限", "お支払い", "使うチケットの有効期限", "キャンセル・チケットの戻り",
+    "内容", "種目", "相談内容", "動画", "回答期限", "お支払い", "使うチケットの有効期限", "キャンセル・チケットの戻り",
   ]);
   expect(confirm.textContent).toContain("無料チケット1枚（このあとのお支払いはありません）");
   const dd = [...confirm.querySelectorAll("dt")].find((d) => d.textContent === "使うチケットの有効期限")!.nextElementSibling!;
@@ -711,7 +722,7 @@ it("通常チケットの確認は通常ロットの最速期限を出し、tick
   await renderKinds("&pay=normal", 2, 1);
   const confirm = await fillAndConfirm();
   expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
-    "内容", "回答期限", "お支払い", "キャンセル・チケットの戻り",
+    "内容", "種目", "相談内容", "動画", "回答期限", "お支払い", "キャンセル・チケットの戻り",
   ]);
   // 全体の最速（無料チケットの 4/1）ではなく、通常ロットの中の最速（5/20）。
   expect(confirm.textContent).toContain("2027/05/20");
@@ -752,6 +763,8 @@ it.each([false, true])("相談内容を必須にして申込を送る（動画�
   await act(async () => form.requestSubmit());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
   expect(confirm.textContent).toContain(hasVideo ? "1回プラン（動画1本・担当 コーチc1）" : "1回プラン（悩みのみ・担当 コーチc1）");
+  const videoDd = [...confirm.querySelectorAll("dt")].find((d) => d.textContent === "動画")!.nextElementSibling!;
+  expect(videoDd.textContent).toBe(hasVideo ? "run.mp4（1 B）" : "なし");
   await act(async () => confirm.querySelector("button")!.click());
   const paths = mocks.api.mock.calls.map(([path]) => path);
   expect(paths.includes("/v1/uploads/coaching-video")).toBe(hasVideo);

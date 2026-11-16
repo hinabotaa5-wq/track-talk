@@ -2990,6 +2990,7 @@ export const en: Readonly<Record<string, string>> = {
   "1回プラン（動画1本・担当 {coachName}）": "One-time Plan (1 video, coach: {coachName})",
   "1回プラン（動画1本）": "One-time Plan (1 video)",
   "お支払い": "Payment",
+  "{fileName}（{size}）": "{fileName} ({size})",
   "チケット1枚（有効期限 {expiry}・追加の支払いなし）": "1 ticket (expiry: {expiry}; no extra payment)",
   "期限なし（以前に購入した分）": "No expiry (purchased earlier)",
   "確定のタイミング": "When it's finalized",
