@@ -349,6 +349,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/coaching/contracts/{id}/messages", s.listCoachingMessages)
 				r.With(s.requireMessaging).Post("/coaching/contracts/{id}/messages", s.createCoachingMessage)
 				r.Get("/coaching/contracts/{id}/messages/export", s.exportCoachingMessages)
+				r.Get("/coaching/contracts/{id}/sense-notes", s.listContractSenseNotes)
+				r.Post("/coaching/contracts/{id}/sense-notes/{note_id}/share", s.shareContractSenseNote)
 				r.Post("/coaching/contracts/{id}/rating", s.rateCoachingContract)
 				r.Get("/me/coaching/contracts", s.listMyCoachingContracts)
 				// フォーム添削（利用者側）

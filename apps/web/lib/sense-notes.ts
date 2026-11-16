@@ -29,6 +29,16 @@ export type SenseNoteStats = {
   today: number;
 };
 
+// 契約共有用の感覚メモ。既存の SenseNote に共有状態を足しただけで、既存の型は変えない。
+export type ContractSenseNote = SenseNote & {
+  shared: boolean;
+};
+
+export type SenseNoteSharingResponse = {
+  notes: ContractSenseNote[];
+  view_closed: boolean;
+};
+
 export const senseNotePlaceholder = "例) リズムをつけて走ったらリラックスできた";
 
 // いまの器の中身。満杯になったら次の器に移り、満杯にした器の数を filled で返す。
