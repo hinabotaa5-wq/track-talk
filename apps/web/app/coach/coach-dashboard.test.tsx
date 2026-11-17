@@ -241,3 +241,79 @@ it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折�
   expect(labels).toHaveLength(9);
   for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
 });
+
+function statusSection() {
+  return container.querySelector('section[aria-label="受付の状態"], section[aria-label="Availability"]');
+}
+
+// mockAll の上で /v1/coach/me の GET 応答だけを差し替える。
+function mockMe(me: unknown) {
+  mockAll();
+  const base = apiFetch.getMockImplementation()!;
+  apiFetch.mockImplementation((path: string, init?: { method?: string }) =>
+    path === "/v1/coach/me" && init?.method !== "PATCH" ? Promise.resolve(me) : base(path, init));
+}
+
+it("今までの添削の件数をステータス欄に出す（#912 B1）", async () => {
+  mockMe({ application, rating: { count: 3, average: 4.5, paused: false }, completed_review_count: 3 });
+  await act(async () => root.render(<CoachDashboard />));
+  expect(statusSection()?.textContent).toContain("今までの添削：3件");
+});
+
+it("0件でも件数の行は隠さない（#912 B2）", async () => {
+  mockMe({ application, completed_review_count: 0 });
+  await act(async () => root.render(<CoachDashboard />));
+  expect(statusSection()?.textContent).toContain("今までの添削：0件");
+});
+
+it("応答に件数のキーが無いときは行を出さず、他は従来どおり（#912 B3・B5）", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  expect(container.textContent).not.toContain("今までの添削");
+  // 受付状態・タイル・バッジ・フッターは従来どおり。
+  expect(statusSection()?.textContent).toContain("受付中");
+  expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
+  expect(tileHrefs()).toHaveLength(9);
+  expect(tileLabels()).toContain("対応中（1件）");
+  expect(tileLabels()).toContain("追加相談（1件）");
+  expect(tileLabels()).toContain("契約・申込み（1件）");
+  expect(container.textContent).toContain("未払い1,050円");
+});
+
+it("英語では Reviews completed so far と出す（#912 B4）", async () => {
+  flags.locale = "en";
+  installEnglish(en);
+  setActiveLocale("en");
+  mockMe({ application, completed_review_count: 3 });
+  await act(async () => root.render(<CoachDashboard />));
+  expect(container.textContent).toContain("Reviews completed so far: 3");
+  expect(container.textContent).not.toContain("今までの添削");
+});
+
+it("件数があっても、受付トグルの保存は従来どおりで件数の行は残る（#912 B5）", async () => {
+  mockMe({ application, completed_review_count: 2 });
+  const base = apiFetch.getMockImplementation()!;
+  apiFetch.mockImplementation((path: string, init?: { method?: string }) =>
+    path === "/v1/coach/me" && init?.method === "PATCH"
+      ? Promise.resolve({ application: { ...application, on_duty: false } })
+      : base(path, init));
+  await act(async () => root.render(<CoachDashboard />));
+  const toggle = container.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  await act(async () => toggle.click());
+  expect(apiFetch).toHaveBeenCalledWith("/v1/coach/me", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ on_duty: false }) }));
+  expect(container.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("false");
+  expect(statusSection()?.textContent).toContain("受付停止中");
+  expect(statusSection()?.textContent).toContain("今までの添削：2件");
+});
+
+it("未承認・準備中の画面には件数の行を出さない（#912 B5）", async () => {
+  apiFetch.mockResolvedValue({ application: { ...application, status: "pending" }, completed_review_count: 4 });
+  await act(async () => root.render(<CoachDashboard />));
+  expect(container.textContent).not.toContain("今までの添削");
+
+  flags.enabled = false;
+  mockMe({ application, completed_review_count: 4 });
+  await renderFresh();
+  expect(container.textContent).toContain("受付開始に向けて準備中です");
+  expect(container.textContent).not.toContain("今までの添削");
+});
