@@ -253,3 +253,32 @@ func TestContractPaymentNonJPRefundedThenDomesticRepayKeepsPayment(t *testing.T)
 		t.Fatalf("contract payment %+v %+v", paid, support)
 	}
 }
+
+// TestContractPaymentNonJPAsyncSucceededMarkedForRefund は細目2：後払い完了の知らせ（async_payment_succeeded）でも、
+// 非JPカードは 422 で契約を始めず全額返金し、始めずに返金する支払いとして印が付く。国内カードなら従来どおり始まる。
+func TestContractPaymentNonJPAsyncSucceededMarkedForRefund(t *testing.T) {
+	h, f := setupStripe(t)
+	for _, c := range []struct {
+		intent string
+		code   int
+		status string
+	}{{"pi_nonjp_mr_async", http.StatusUnprocessableEntity, "accepted"}, {"pi_jp_mr_async", http.StatusOK, "active"}} {
+		tu, _, id := adultAccepted(t, h)
+		checkout(t, h, tu, id)
+		session := sessionIDFor(t, id)
+		rec := stripeWebhook(t, h, testWebhookSecret, "checkout.session.async_payment_succeeded", map[string]any{
+			"id": session, "payment_status": "paid", "payment_intent": c.intent, "amount_total": 8000,
+		})
+		if rec.Code != c.code || contractStatus(t, id) != c.status {
+			t.Fatalf("%s: webhook %d contract %s", c.intent, rec.Code, contractStatus(t, id))
+		}
+		st, must, yen, _ := paymentBySession(t, session)
+		nonJP := c.code == http.StatusUnprocessableEntity
+		if nonJP && (st != "refunded" || !must || yen != 8000 || len(refundsFor(f, c.intent)) != 1) {
+			t.Fatalf("%s: payment %s %v %d", c.intent, st, must, yen)
+		}
+		if !nonJP && (st != "paid" || must || len(refundsFor(f, c.intent)) != 0) {
+			t.Fatalf("%s: payment %s %v", c.intent, st, must)
+		}
+	}
+}
