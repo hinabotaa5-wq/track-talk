@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS coach_profile_translation_attempts_coach_attempted_at_idx;
+ALTER TABLE coach_profile_translation_attempts DROP COLUMN IF EXISTS coach_id;
