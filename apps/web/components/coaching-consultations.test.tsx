@@ -193,16 +193,32 @@ it("継続プランの相談は、質問・確認を右、回答・補足を左�
 });
 it("継続プランの相談を保護者が見るときは、選手とコーチのラベルで吹き出しを見せる", async () => {
  await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [contractThread] }, "guardian-secret");
- expect(bubble("契約の質問").head).toContain("選手の質問");
- expect(bubble("契約の回答").head).toContain("コーチの回答");
- expect(bubble("契約の確認").head).toContain("選手の確認");
- expect(bubble("契約の補足").head).toContain("コーチの補足");
+ expect(bubble("契約の質問")).toMatchObject({ side: "right", head: expect.stringContaining("選手の質問") });
+ expect(bubble("契約の回答")).toMatchObject({ side: "left", head: expect.stringContaining("コーチの回答") });
+ expect(bubble("契約の確認")).toMatchObject({ side: "right", head: expect.stringContaining("選手の確認") });
+ expect(bubble("契約の補足")).toMatchObject({ side: "left", head: expect.stringContaining("コーチの補足") });
  expect(container.textContent).not.toContain("あなたの");
 });
-it("継続プランの相談をコーチが見るときは、自分の回答・補足を「あなたの」で見せる", async () => {
+it("継続プランの相談をコーチが見るときは、自分の回答・補足を「あなたの」で右、選手の質問・確認を左に見せる", async () => {
  await render({ ...room, role: "coach", funding: "cash", can_purchase: false, consultations: [contractThread] }, undefined, "contract");
- expect(bubble("契約の質問")).toMatchObject({ side: "right", head: expect.stringContaining("選手の質問") });
- expect(bubble("契約の回答")).toMatchObject({ side: "left", head: expect.stringContaining("あなたの回答") });
- expect(bubble("契約の確認").head).toContain("選手の確認");
- expect(bubble("契約の補足").head).toContain("あなたの補足");
+ expect(bubble("契約の質問")).toMatchObject({ side: "left", head: expect.stringContaining("選手の質問") });
+ expect(bubble("契約の回答")).toMatchObject({ side: "right", head: expect.stringContaining("あなたの回答") });
+ expect(bubble("契約の確認")).toMatchObject({ side: "left", head: expect.stringContaining("選手の確認") });
+ expect(bubble("契約の補足")).toMatchObject({ side: "right", head: expect.stringContaining("あなたの補足") });
+});
+const reviewQuestion = { ...draft, question: "添削の質問", created_at: "2026-11-01T01:00:00Z" };
+const reviewAnswered = { ...reviewQuestion, status: "answered" as const, answer: "添削の回答", answered_at: "2026-11-02T02:00:00Z" };
+it("受諾待ちの追加質問をコーチが見るときは、選手の質問を左の吹き出しで見せる", async () => {
+ await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...reviewQuestion, status: "offered" as const }] });
+ expect(bubble("添削の質問")).toEqual({ side: "left", head: `選手の質問 · ${formatDateTime(reviewQuestion.created_at)}` });
+});
+it("回答済みの追加質問をコーチが見るときは、選手の質問を左、自分の回答を右の吹き出しで見せる", async () => {
+ await render({ ...room, role: "coach", can_purchase: false, consultations: [reviewAnswered] });
+ expect(bubble("添削の質問")).toMatchObject({ side: "left", head: expect.stringContaining("選手の質問") });
+ expect(bubble("添削の回答")).toEqual({ side: "right", head: `あなたの回答 · ${formatDateTime(reviewAnswered.answered_at)}` });
+});
+it("回答済みの追加質問を選手が見るときは、自分の質問を右、コーチの回答を左の吹き出しのまま見せる", async () => {
+ await render({ ...room, can_purchase: false, consultations: [reviewAnswered] });
+ expect(bubble("添削の質問")).toMatchObject({ side: "right", head: expect.stringContaining("あなたの質問") });
+ expect(bubble("添削の回答")).toMatchObject({ side: "left", head: expect.stringContaining("コーチの回答") });
 });

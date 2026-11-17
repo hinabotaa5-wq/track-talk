@@ -127,7 +127,8 @@ export function ConsultationTermsNote({ kind }: { kind: "review" | "contract" })
 }
 // 見た目だけのチャット風吹き出し。動画添削のあとの追加質問（review）とサポートプランの追加相談（contract）で
 // 表示部品を共有し、デザインが二重定義でずれないようにする。実質（回数・期限・一方通行）は変えない。
-// 質問者側は右（bg-blue-500/25・rounded-br-sm）、コーチ側は左（bg-white/10・rounded-bl-sm）。見出しは「ラベル · 時刻」。
+// 閲覧者本人の発言は右（bg-blue-500/25・rounded-br-sm）、相手の発言は左（bg-white/10・rounded-bl-sm）。
+// 選手（requester）は質問・確認が右、コーチ（coach）は回答・補足が右。保護者（guardian）は話者でないため質問・確認を右、回答・補足を左のまま。見出しは「ラベル · 時刻」。
 function ChatBubble({ side, label, at, children }: { side: "right" | "left"; label: string; at?: string | null; children: ReactNode }) {
   return <div className={side === "right" ? "flex justify-end" : "flex justify-start"}>
     <div className={side === "right" ? "max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2" : "max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2"}>
@@ -171,23 +172,26 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   const statusText = chat && c.status === "answered" ? L("回答済み・この追加質問は終了しました") : consultationStatus[c.status];
   const questionLabel = role === "requester" ? L("あなたの質問") : L("選手の質問");
   const answerLabel = role === "coach" ? L("あなたの回答") : L("コーチの回答");
+  // コーチが見るときだけ左右を入れ替え、自分の回答・補足を右・青にする。
+  const askerSide = role === "coach" ? "left" : "right";
+  const coachSide = role === "coach" ? "right" : "left";
   return <article className="space-y-3 border-t border-white/20 pt-3">
     <p className="text-sm font-semibold">{statusText} · {formatYen(c.price_yen)}</p>
     {c.hidden || c.purged ? <p className="text-sm text-slate-300">{c.hidden ? L("運営が確認のため非表示にしています") : L("保存期間が終了しました")}</p> : <>
-      <ChatBubble side="right" label={questionLabel} at={c.created_at}>
+      <ChatBubble side={askerSide} label={questionLabel} at={c.created_at}>
         <p className="whitespace-pre-wrap text-sm">{c.question}</p>
         {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
       </ChatBubble>
-      {c.answer ? <ChatBubble side="left" label={answerLabel} at={c.answered_at}>
+      {c.answer ? <ChatBubble side={coachSide} label={answerLabel} at={c.answered_at}>
         <p className="whitespace-pre-wrap text-sm">{c.answer}</p>
         {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
       </ChatBubble> : null}
       {c.videos_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間を過ぎたため削除しました（文章は引き続き見られます）。")}</p> : null}
       {kind === "contract" ? <>
-        {c.clarify_body ? <ChatBubble side="right" label={role === "requester" ? L("あなたの確認") : L("選手の確認")} at={c.clarify_requested_at}>
+        {c.clarify_body ? <ChatBubble side={askerSide} label={role === "requester" ? L("あなたの確認") : L("選手の確認")} at={c.clarify_requested_at}>
           <p className="whitespace-pre-wrap text-sm">{c.clarify_body}</p>
         </ChatBubble> : null}
-        {c.clarification ? <ChatBubble side="left" label={role === "coach" ? L("あなたの補足") : L("コーチの補足")} at={c.clarified_at}>
+        {c.clarification ? <ChatBubble side={coachSide} label={role === "coach" ? L("あなたの補足") : L("コーチの補足")} at={c.clarified_at}>
           <p className="whitespace-pre-wrap text-sm">{c.clarification}</p>
         </ChatBubble> : null}
       </> : <>
