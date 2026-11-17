@@ -51,6 +51,7 @@ it("初回読み込み中（1回プラン）はストップウォッチだけで
   await render();
   expect(stopwatches()).toHaveLength(1);
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
+  expect(container.textContent).not.toContain("友達2人に紹介すると、1回分(500円)無料！");
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
   expect(container.textContent).not.toContain("1回プランの都度払いやチケットの購入で、紹介IDが発行されます。");
   expect(container.textContent).not.toContain("1回プラン");
@@ -65,7 +66,7 @@ it("初回読み込み中（継続プラン）はストップウォッチだけ�
   await render();
   expect(stopwatches()).toHaveLength(1);
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
-  expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
+  expect(container.textContent).not.toContain("友達2人に紹介すると、1回分(500円)無料！");
   expect(container.textContent).not.toContain("1回プラン");
   expect(container.textContent).not.toContain("継続プラン");
   expect(container.querySelector('[role="radio"]')).toBeNull();
@@ -80,6 +81,7 @@ it("英語でも初回読み込み中はストップウォッチだけで、バ�
   setActiveLocale("en");
   await render();
   expect(stopwatches()).toHaveLength(1);
+  expect(container.textContent).not.toContain("Refer two friends and get one free review (¥500)!");
   expect(container.textContent).not.toContain("Refer two friends and get a free review!");
   expect(container.textContent).not.toContain("One-time Plan");
   expect(container.textContent).not.toContain("Ongoing plan");
@@ -91,7 +93,8 @@ it("読み込み完了後はバナー・タブ切り替え・一覧が出て、�
   await act(async () => finishCoaches({ coaches: [] }));
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   expect(container.querySelector(".page-loading-screen")).toBeNull();
-  expect(container.textContent).toContain("友達2人に紹介すると、1回無料！");
+  expect(container.textContent).toContain("友達2人に紹介すると、1回分(500円)無料！");
+  expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
   expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると");
   expect(container.textContent).toContain("1回プラン");
   expect(container.textContent).toContain("継続プラン");
