@@ -73,7 +73,7 @@ function ReferralCard({ referral }: { referral: Referral }) {
     <h2 className="font-semibold">{referralHeadline()}</h2>
     <p className="text-sm">{referralBody()}</p>
     <div className="flex items-center gap-3">
-      <p className="text-sm">{L("あなたの紹介ID")} <strong className="font-mono tracking-wider">{code}</strong></p>
+      <p className="text-sm">{L("あなたの紹介ID")} <strong className={active ? "font-mono tracking-wider" : "font-mono tracking-wider text-slate-500 line-through decoration-red-500 decoration-2"}>{code}</strong></p>
       {active ? <Button type="button" variant="secondary" onClick={async () => {
         try {
           await navigator.clipboard.writeText(code);
