@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CoachAvatar } from "@/components/coach-photo";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { coachingCoachListEnabled } from "@/lib/features";
+import { coachText, coachTexts, originalTextClass } from "@/lib/coaching-display";
 import { clarifyReasonLabels } from "@/lib/review";
 import type { ReviewCoach, ReviewResponse } from "@/lib/types";
 
@@ -27,27 +28,34 @@ export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
 }
 
 // コーチの返答（良い点・直す点・ドリル・見本動画・補足）。利用者とコーチの両方の画面で使う。
-export function ReviewResponseView({ response }: { response: ReviewResponse }) {
+// 海外コーチの回答3点は、和訳があれば和訳を主に・原文を直下に併記する（本体 #916）。コーチ本人の画面（mine）は原文だけ。
+export function ReviewResponseView({ response, mine = false }: { response: ReviewResponse; mine?: boolean }) {
   if (response.hidden) {
     return (
       <section className="rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm text-slate-200">{L("この返答は運営が非表示にしました。")}</section>
     );
   }
+  const good = coachText(response.good_point, response.good_point_ja, { mine });
+  const fixes = coachTexts(response.fix_points, response.fix_points_ja, { mine });
+  const drill = coachText(response.drill, response.drill_ja, { mine });
   return (
     <section className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
       <div className="space-y-1">
         <h2 className="text-xs font-semibold text-emerald-300">{L("良い点")}</h2>
-        <p className="whitespace-pre-wrap text-slate-100">{response.good_point}</p>
+        <p className="whitespace-pre-wrap text-slate-100">{good.text}</p>
+        {good.original !== null ? <p lang="en" className={originalTextClass}>{good.original}</p> : null}
       </div>
-      {response.fix_points.map((fix, i) => (
+      {fixes.map((fix, i) => (
         <div key={i} className="space-y-1">
-          <h2 className="text-xs font-semibold text-amber-300">{L("直す点{v0}", { v0: response.fix_points.length > 1 ? ` ${i + 1}` : "" })}</h2>
-          <p className="whitespace-pre-wrap text-slate-100">{fix}</p>
+          <h2 className="text-xs font-semibold text-amber-300">{L("直す点{v0}", { v0: fixes.length > 1 ? ` ${i + 1}` : "" })}</h2>
+          <p className="whitespace-pre-wrap text-slate-100">{fix.text}</p>
+          {fix.original !== null ? <p lang="en" className={originalTextClass}>{fix.original}</p> : null}
         </div>
       ))}
       <div className="space-y-1">
         <h2 className="text-xs font-semibold text-blue-300">{L("おすすめのドリル")}</h2>
-        <p className="whitespace-pre-wrap text-slate-100">{response.drill}</p>
+        <p className="whitespace-pre-wrap text-slate-100">{drill.text}</p>
+        {drill.original !== null ? <p lang="en" className={originalTextClass}>{drill.original}</p> : null}
       </div>
       {response.hitokoto ? (
         <div className="space-y-1">

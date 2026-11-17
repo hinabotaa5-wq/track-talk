@@ -10,6 +10,7 @@ import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-reques
 import { Button } from "@/components/ui/button";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { CoachingConsultations } from "@/components/coaching-consultations";
+import { coachText } from "@/lib/coaching-display";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
@@ -319,7 +320,7 @@ function ReviewRequestView() {
       ) : null}
 
       {request.withdrawal ? <ReviewWithdrawalNotice withdrawal={request.withdrawal} paid={Boolean(request.payment)} /> : null}
-      {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="requester" /> : null}
+      {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="requester" body={coachText(request.info_request.body, request.info_request_ja, { mine: false })} /> : null}
       {request.status === "needs_info" ? <ResubmitForm request={request} token={token} onChange={setRequest} /> : null}
 
       {request.video_url ? (

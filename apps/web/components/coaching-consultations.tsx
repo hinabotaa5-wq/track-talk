@@ -11,6 +11,7 @@ import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
 import { canClarify, consultationStatus, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
+import { athleteText, coachText, originalTextClass, type DisplayedText } from "@/lib/coaching-display";
 import { coachingConsultationEnabled, coachingMessagingEnabled, consultationClosedNote, messagingClosedNote } from "@/lib/features";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
@@ -136,6 +137,13 @@ function ChatBubble({ side, label, at, children }: { side: "right" | "left"; lab
     </div>
   </div>;
 }
+// 訳があれば訳を主に、原文を直下に小さく併記する（本体 #916）。
+function Translated({ shown, lang }: { shown: DisplayedText; lang: "ja" | "en" }) {
+  return <>
+    <p className="whitespace-pre-wrap text-sm">{shown.text}</p>
+    {shown.original !== null ? <p lang={lang} className={originalTextClass}>{shown.original}</p> : null}
+  </>;
+}
 function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, token, guardian, reload, needsDeclaration }: { consultation: Consultation; kind: "review" | "contract"; sendEnabled: boolean; role: ConsultationRoom["role"]; base: string; token: string | null; guardian: boolean; reload: () => Promise<void>; needsDeclaration: boolean }) {
   // 支払い画面を開き直すときも、18歳未満は毎回チェックが要る。
   const declaration = useMinorDeclaration();
@@ -171,24 +179,29 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   const statusText = chat && c.status === "answered" ? L("回答済み・この追加質問は終了しました") : consultationStatus[c.status];
   const questionLabel = role === "requester" ? L("あなたの質問") : L("選手の質問");
   const answerLabel = role === "coach" ? L("あなたの回答") : L("コーチの回答");
+  // 選手の質問・確認は選手本人の文、コーチの回答・補足はコーチ本人の文。保護者にとってはどちらも相手の文。
+  const question = athleteText(c.question, c.question_en, { mine: role === "requester" });
+  const answer = coachText(c.answer, c.answer_ja, { mine: role === "coach" });
+  const clarifyText = athleteText(c.clarify_body ?? "", c.clarify_body_en, { mine: role === "requester" });
+  const clarificationText = coachText(c.clarification ?? "", c.clarification_ja, { mine: role === "coach" });
   return <article className="space-y-3 border-t border-white/20 pt-3">
     <p className="text-sm font-semibold">{statusText} · {formatYen(c.price_yen)}</p>
     {c.hidden || c.purged ? <p className="text-sm text-slate-300">{c.hidden ? L("運営が確認のため非表示にしています") : L("保存期間が終了しました")}</p> : <>
       <ChatBubble side="right" label={questionLabel} at={c.created_at}>
-        <p className="whitespace-pre-wrap text-sm">{c.question}</p>
+        <Translated shown={question} lang="ja" />
         {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
       </ChatBubble>
       {c.answer ? <ChatBubble side="left" label={answerLabel} at={c.answered_at}>
-        <p className="whitespace-pre-wrap text-sm">{c.answer}</p>
+        <Translated shown={answer} lang="en" />
         {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
       </ChatBubble> : null}
       {c.videos_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間を過ぎたため削除しました（文章は引き続き見られます）。")}</p> : null}
       {kind === "contract" ? <>
         {c.clarify_body ? <ChatBubble side="right" label={role === "requester" ? L("あなたの確認") : L("選手の確認")} at={c.clarify_requested_at}>
-          <p className="whitespace-pre-wrap text-sm">{c.clarify_body}</p>
+          <Translated shown={clarifyText} lang="ja" />
         </ChatBubble> : null}
         {c.clarification ? <ChatBubble side="left" label={role === "coach" ? L("あなたの補足") : L("コーチの補足")} at={c.clarified_at}>
-          <p className="whitespace-pre-wrap text-sm">{c.clarification}</p>
+          <Translated shown={clarificationText} lang="en" />
         </ChatBubble> : null}
       </> : <>
         {c.clarify_body ? <p className="whitespace-pre-wrap text-sm">{L("回答への確認：{clarify_body}", { clarify_body: c.clarify_body })}</p> : null}

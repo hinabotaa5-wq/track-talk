@@ -15,6 +15,7 @@ import { coachingMessagingEnabled, messagingClosedNote } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import type { CoachingSupport } from "@/lib/coaching-support";
+import { athleteText, coachMenu, coachText, originalTextClass } from "@/lib/coaching-display";
 import type { CoachingContract, CoachingMessage, PlanMenu } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
 import { Paperclip } from "lucide-react";
@@ -35,7 +36,8 @@ function jstDayKey(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
 
-function MenuCard({ menu }: { menu: PlanMenu }) {
+// 海外コーチのメニューの和訳を出すときは、原文のメニューを直下に小さく併記する（本体 #916）。
+function MenuCard({ menu, original }: { menu: PlanMenu; original?: PlanMenu | null }) {
   return (
     <div className="space-y-1.5 rounded-lg border border-blue-400/40 bg-blue-500/10 p-2">
       <p className="text-xs font-semibold text-blue-300">{L("練習メニュー")}</p>
@@ -50,6 +52,14 @@ function MenuCard({ menu }: { menu: PlanMenu }) {
           </div>
         ))}
       </dl>
+      {original ? (
+        <div lang="en" className={originalTextClass}>
+          <p>{original.title}</p>
+          {original.period ? <p>{original.period}</p> : null}
+          {original.note ? <p>{original.note}</p> : null}
+          {original.days.map((d, i) => <p key={i}>{d.day}: {d.content}</p>)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -101,6 +111,12 @@ function ReportButton({ message, access }: { message: CoachingMessage; access: A
 }
 
 function MessageItem({ message, contract, access }: { message: CoachingMessage; contract: CoachingContract; access: Access }) {
+  // 海外コーチとのやりとりは、相手の文の訳があれば訳を主に・原文を直下に併記する（本体 #916）。自分の文は原文だけ。
+  const fromCoach = message.sender_role === "coach";
+  const body = fromCoach
+    ? coachText(message.body, message.body_ja, { mine: message.mine })
+    : athleteText(message.body, message.body_en, { mine: message.mine });
+  const menu = message.menu ? coachMenu(message.menu, message.menu_ja, { mine: message.mine || !fromCoach }) : null;
   return (
     <li id={`message-${message.id}`} className={`flex ${message.mine ? "justify-end" : "justify-start"}`}>
       <div
@@ -109,7 +125,8 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
         }`}
       >
         {message.review_submission_id ? <a href={`#message-${message.review_submission_id}`} className="block text-xs text-blue-200 underline">{L("この動画への回答")}</a> : null}
-        {message.body ? <p className="whitespace-pre-wrap">{message.body}</p> : null}
+        {message.body ? <p className="whitespace-pre-wrap">{body.text}</p> : null}
+        {message.body && body.original !== null ? <p lang={fromCoach ? "en" : "ja"} className={originalTextClass}>{body.original}</p> : null}
         {message.video_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間（契約の終わりから30日）を過ぎたため削除しました。")}</p> : null}
         {message.video_url ? (
           <video
@@ -121,7 +138,7 @@ function MessageItem({ message, contract, access }: { message: CoachingMessage; 
             className="w-full rounded-lg bg-black"
           />
         ) : null}
-        {message.menu ? <MenuCard menu={message.menu} /> : null}
+        {menu ? <MenuCard menu={menu.menu} original={menu.original} /> : null}
         {message.mine || contract.role === "coach" ? null : <ReportButton message={message} access={access} />}
       </div>
     </li>

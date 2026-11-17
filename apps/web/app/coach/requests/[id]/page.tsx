@@ -16,6 +16,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled } from "@/lib/features";
+import { athleteText, originalTextClass } from "@/lib/coaching-display";
 import { formatDateTime } from "@/lib/format";
 import { t, type Locale, L } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
@@ -204,6 +205,8 @@ export default function CoachReviewRequestPage() {
   if (loading || !session || !request) return <PageLoading screen label={t(locale, "common.loading")} />;
 
   const response = request.response;
+  // 海外コーチ向けに、選手の相談文の英訳があれば英訳を主に・原文を直下に併記する（本体 #916）。
+  const question = request.question ? athleteText(request.question, request.question_en, { mine: false, locale }) : null;
 
   return (
     <div className="mx-auto max-w-md space-y-6">
@@ -211,7 +214,8 @@ export default function CoachReviewRequestPage() {
         <h1 className="text-2xl font-bold">
           {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
         </h1>
-        <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{t(locale, "coach.detail.question", { text: reviewQuestionText(request) })}</p>
+        <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{t(locale, "coach.detail.question", { text: question ? question.text : reviewQuestionText(request) })}</p>
+        {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
         {request.status === "in_review" ? (
           <p className="text-sm text-slate-300">{t(locale, "coach.detail.due", { date: formatDateTime(request.due_at) })}</p>
         ) : null}
@@ -251,7 +255,7 @@ export default function CoachReviewRequestPage() {
 
       {sent === "response" && response ? <SentBanner text={t(locale, "coach.detail.responseSent")} /> : null}
 
-      {response ? <ReviewResponseView response={response} /> : null}
+      {response ? <ReviewResponseView response={response} mine /> : null}
 
       {response && id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
 

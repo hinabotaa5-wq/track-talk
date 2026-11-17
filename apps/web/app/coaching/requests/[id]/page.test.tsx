@@ -647,3 +647,17 @@ it("「依頼の一覧へ」は枠付きのボタン形で、行き先と文言�
     await teardown(root, container);
   }
 });
+
+// 本体 #916 B1・B2: 選手（ja）には、海外コーチの差し戻しの質問が日本語メイン＋英語原文の併記で出る。自分の相談文は英訳があっても原文だけ。
+it("B1: 差し戻しの質問の和訳を主に英語の原文を併記し、自分の相談文は原文だけ", async () => {
+  const info = { body: "Which part of the race should I look at?", reason: "scene", requested_at: new Date().toISOString(), from_status: "in_review", resubmit_by: new Date(Date.now() + 3600000).toISOString(), original_question: null, video_replaced: false, resubmitted_at: null };
+  const { container, root } = await renderWith({ response: null, extra: { status: "needs_info", due_at: new Date().toISOString(), info_request: info, info_request_ja: "レースのどの区間を見ればよいですか？", question_en: "About my start posture" } });
+  try {
+    expect(container.textContent).toContain("レースのどの区間を見ればよいですか？");
+    expect(container.querySelector("p[lang='en']")?.textContent).toBe("Which part of the race should I look at?");
+    expect(container.textContent).toContain("スタートの姿勢について");
+    expect(container.textContent).not.toContain("About my start posture");
+  } finally {
+    await teardown(root, container);
+  }
+});
