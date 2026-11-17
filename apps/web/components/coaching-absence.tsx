@@ -189,7 +189,7 @@ export function CoachingAbsence({ contract, token, guardianToken }: { contract: 
 
   const load = useCallback(() => {
     apiFetch<AbsenceList>(`${base}/absences`, guardianToken ? undefined : { token })
-      .then(setData)
+      .then((d) => setData(d && Array.isArray(d.absences) ? d : null))
       .catch(() => setData(null));
   }, [base, token, guardianToken]);
   useEffect(() => {
