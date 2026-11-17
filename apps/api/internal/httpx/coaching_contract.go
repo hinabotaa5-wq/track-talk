@@ -289,8 +289,9 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 // contractJSON は、申し込みの中身。相手の名前などは呼ぶ側で足す。
 func (s *Server) contractJSON(ct db.CoachingContract) map[string]any {
 	return map[string]any{
-		"preferred_dates":  preferredDatesJSON(ct.PreferredDates),
-		"id":               ct.ID,
+		"preferred_dates": preferredDatesJSON(ct.PreferredDates),
+		"id":              ct.ID,
+		"absence_days":    ct.AbsenceDays, "absence_from": dateString(ct.AbsenceFrom), "absence_return_on": dateString(ct.AbsenceReturnOn),
 		"competition_name": ct.CompetitionName, "competition_date": dateString(ct.CompetitionDate), "support_start_date": dateString(ct.SupportStartDate), "call_count": ct.CallCount, "call_minutes": ct.CallMinutes, "venue_area": ct.VenueArea, "venue_name": ct.VenueName, "session_count": ct.SessionCount, "session_minutes": ct.SessionMinutes, "travel_fee_yen": ct.TravelFeeYen, "max_participants": ct.MaxParticipants, "fulfillment_version": ct.FulfillmentVersion, "fulfillment_state": ct.FulfillmentState,
 		"plan_id":                           ct.PlanID,
 		"plan_kind":                         ct.PlanKind,

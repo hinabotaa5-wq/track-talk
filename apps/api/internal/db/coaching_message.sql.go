@@ -49,7 +49,7 @@ func (q *Queries) CountBlockedContact(ctx context.Context, arg CountBlockedConta
 const createCoachingMessage = `-- name: CreateCoachingMessage :one
 INSERT INTO coaching_messages (id, contract_id, sender_id, sender_role, body, video_public_id, menu)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at, review_submission_id
+RETURNING id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at, review_submission_id, system_kind
 `
 
 type CreateCoachingMessageParams struct {
@@ -83,6 +83,7 @@ func (q *Queries) CreateCoachingMessage(ctx context.Context, arg CreateCoachingM
 		&i.Menu,
 		&i.CreatedAt,
 		&i.ReviewSubmissionID,
+		&i.SystemKind,
 	)
 	return i, err
 }
@@ -146,7 +147,7 @@ func (q *Queries) GetCoachingMessageContract(ctx context.Context, id uuid.UUID) 
 }
 
 const listCoachingMessages = `-- name: ListCoachingMessages :many
-SELECT id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at, review_submission_id FROM coaching_messages
+SELECT id, contract_id, sender_id, sender_role, body, video_public_id, menu, created_at, review_submission_id, system_kind FROM coaching_messages
 WHERE contract_id = $1
 ORDER BY created_at, id
 LIMIT 1000
@@ -172,6 +173,7 @@ func (q *Queries) ListCoachingMessages(ctx context.Context, contractID uuid.UUID
 			&i.Menu,
 			&i.CreatedAt,
 			&i.ReviewSubmissionID,
+			&i.SystemKind,
 		); err != nil {
 			return nil, err
 		}

@@ -64,7 +64,8 @@ func supportDays(ct db.CoachingContract, asOf time.Time) (elapsed, total int64) 
 	if total <= 0 {
 		return 0, 0
 	}
-	elapsed = int64(asOf.Sub(start).Hours()/24) + 1
+	// 合意した不在日（#898）は提供対象日から除外し、経過日数に数えない。分母（total）は当初の期間のまま。
+	elapsed = int64(asOf.Sub(start).Hours()/24) + 1 - absentDaysThrough(ct, asOf)
 	return min(max(elapsed, 0), total), total
 }
 
@@ -151,7 +152,7 @@ func recordSupportAdvances(ctx context.Context, q *db.Queries, now time.Time) (i
 	}
 	n := 0
 	for _, r := range rows {
-		ct := db.CoachingContract{PriceYen: r.PriceYen, StartsAt: r.StartsAt, CompetitionDate: r.CompetitionDate}
+		ct := db.CoachingContract{PriceYen: r.PriceYen, StartsAt: r.StartsAt, CompetitionDate: r.CompetitionDate, AbsenceFrom: r.AbsenceFrom, AbsenceReturnOn: r.AbsenceReturnOn, AbsenceDays: r.AbsenceDays}
 		elapsed, total := supportDays(ct, through)
 		if elapsed <= 0 {
 			continue

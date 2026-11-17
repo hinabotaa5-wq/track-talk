@@ -247,6 +247,34 @@ type CoachWorkOrderDelivery struct {
 	DeliveredAt  time.Time  `json:"delivered_at"`
 }
 
+type CoachingAbsenceExtension struct {
+	ID                   uuid.UUID  `json:"id"`
+	ContractID           *uuid.UUID `json:"contract_id"`
+	CoachID              *uuid.UUID `json:"coach_id"`
+	RequesterID          *uuid.UUID `json:"requester_id"`
+	Status               string     `json:"status"`
+	AbsentFrom           time.Time  `json:"absent_from"`
+	ReturnOn             time.Time  `json:"return_on"`
+	AbsentDays           int32      `json:"absent_days"`
+	Reason               string     `json:"reason"`
+	Minor                bool       `json:"minor"`
+	PriceYen             int32      `json:"price_yen"`
+	OriginalEndsAt       time.Time  `json:"original_ends_at"`
+	ProposedEndsAt       time.Time  `json:"proposed_ends_at"`
+	RefundEstimateYen    int32      `json:"refund_estimate_yen"`
+	DeclaredAt           time.Time  `json:"declared_at"`
+	PlayerConsentedBy    *uuid.UUID `json:"player_consented_by"`
+	PlayerConsentedAt    *time.Time `json:"player_consented_at"`
+	GuardianConsentedAt  *time.Time `json:"guardian_consented_at"`
+	CoachConsentedBy     *uuid.UUID `json:"coach_consented_by"`
+	CoachConsentedAt     *time.Time `json:"coach_consented_at"`
+	AgreedAt             *time.Time `json:"agreed_at"`
+	AgreedOriginalEndsAt *time.Time `json:"agreed_original_ends_at"`
+	AgreedNewEndsAt      *time.Time `json:"agreed_new_ends_at"`
+	CoachTerms           []byte     `json:"coach_terms"`
+	ClosedAt             *time.Time `json:"closed_at"`
+}
+
 type CoachingAccessLog struct {
 	ID         uuid.UUID `json:"id"`
 	AdminID    uuid.UUID `json:"admin_id"`
@@ -393,6 +421,9 @@ type CoachingContract struct {
 	VideosPurgedAt                 *time.Time  `json:"videos_purged_at"`
 	RetentionHoldAt                *time.Time  `json:"retention_hold_at"`
 	CloseNoticeAt                  *time.Time  `json:"close_notice_at"`
+	AbsenceFrom                    *time.Time  `json:"absence_from"`
+	AbsenceReturnOn                *time.Time  `json:"absence_return_on"`
+	AbsenceDays                    int32       `json:"absence_days"`
 }
 
 type CoachingContractConsent struct {
@@ -448,6 +479,7 @@ type CoachingMessage struct {
 	Menu               []byte     `json:"menu"`
 	CreatedAt          time.Time  `json:"created_at"`
 	ReviewSubmissionID *uuid.UUID `json:"review_submission_id"`
+	SystemKind         *string    `json:"system_kind"`
 }
 
 type CoachingPayment struct {

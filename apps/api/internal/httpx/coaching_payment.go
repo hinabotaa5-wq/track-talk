@@ -664,6 +664,8 @@ func (s *Server) refundCoachingPayments(ctx context.Context) (int, error) {
 }
 
 // remainingRefund は、残りの日数分の返金額。止めている間は、止めた時点までで数える。
+// 合意した不在日（#898）は経過に数えない。日割りの分母は当初の期間日数のまま固定し、
+// 終了日が不在日数分だけ後ろ倒しになっていても、残りは「当初の終了日までの残り＋経過した不在日」で数える。
 func remainingRefund(ct db.CoachingContract, pay db.CoachingPayment, now time.Time) int32 {
 	if ct.StartsAt == nil || ct.EndsAt == nil {
 		return 0
@@ -672,7 +674,7 @@ func remainingRefund(ct db.CoachingContract, pay db.CoachingPayment, now time.Ti
 	if ct.SuspendedAt != nil {
 		at = *ct.SuspendedAt
 	}
-	left := ct.EndsAt.Sub(at)
+	left := ct.EndsAt.Sub(at) - time.Duration(ct.AbsenceDays)*24*time.Hour + absentElapsed(ct, at)
 	total := time.Duration(ct.DurationDays) * 24 * time.Hour
 	if left <= 0 || total <= 0 {
 		return 0

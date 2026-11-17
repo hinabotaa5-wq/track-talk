@@ -80,8 +80,8 @@ RETURNING *;
 -- 最初の動画から数えるプランは、動画が届いた時（7日届かなければ8日目）が始まりになる。
 SELECT ct.* FROM coaching_contracts ct
 WHERE ct.status = 'active' AND ct.payment_required AND ct.fulfillment_version=0
-  AND ct.ends_at - make_interval(days => ct.duration_days) <= now() - interval '72 hours'
-  AND NOT EXISTS (SELECT 1 FROM coaching_messages m WHERE m.contract_id = ct.id AND m.sender_role = 'coach')
+  AND ct.ends_at - make_interval(days => ct.duration_days + ct.absence_days) <= now() - interval '72 hours'
+  AND NOT EXISTS (SELECT 1 FROM coaching_messages m WHERE m.contract_id = ct.id AND m.sender_role = 'coach' AND m.system_kind IS NULL)
   AND EXISTS (SELECT 1 FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid')
 -- 返金に失敗した支払いは TouchCoachingPayment で後ろに回るので、断られ続ける行がたまっても他の行が詰まらない。
 ORDER BY (SELECT max(pay.updated_at) FROM coaching_payments pay WHERE pay.contract_id = ct.id AND pay.status = 'paid'), ct.id

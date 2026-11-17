@@ -14,6 +14,7 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { Button } from "@/components/ui/button";
 import { contractPeriod, ContractDetails } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
+import { CoachingAbsence } from "@/components/coaching-absence";
 import { SenseNoteSharing } from "@/components/sense-note-sharing";
 import { GuardianLinkForm } from "@/components/guardian-link-form";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -178,6 +179,8 @@ function CoachingContractView() {
       ) : null}
 
       {!isCoach && contract.minor && contract.status === "accepted" ? <GuardianLinkForm token={token} /> : null}
+
+      {contract.status === "active" || contract.status === "ended" || contract.status === "refunded" ? <CoachingAbsence contract={contract} token={token} /> : null}
 
       {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
         <CoachingMessages contract={contract} token={token} />

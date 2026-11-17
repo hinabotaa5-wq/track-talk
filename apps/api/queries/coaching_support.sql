@@ -72,7 +72,7 @@ SELECT ct.id FROM coaching_contracts ct WHERE ct.fulfillment_version=1
  AND (ct.fulfillment_state='refund_pending' OR (ct.fulfillment_state='open' AND
  ((ct.status='ended' AND ct.ends_at<now()-interval '48 hours')
  OR (ct.status='active' AND ct.payment_required AND ct.starts_at<now()-interval '72 hours'
-  AND NOT EXISTS(SELECT 1 FROM coaching_messages m WHERE m.contract_id=ct.id AND m.sender_role='coach')
+  AND NOT EXISTS(SELECT 1 FROM coaching_messages m WHERE m.contract_id=ct.id AND m.sender_role='coach' AND m.system_kind IS NULL)
   AND NOT EXISTS(SELECT 1 FROM coaching_calls c WHERE c.contract_id=ct.id AND c.status<>'cancelled')))))
 ORDER BY ct.updated_at LIMIT 50;
 
