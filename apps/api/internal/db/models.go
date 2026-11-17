@@ -499,6 +499,7 @@ type CoachingPayment struct {
 	RefundedAt        *time.Time `json:"refunded_at"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
+	MustRefund        bool       `json:"must_refund"`
 }
 
 type CoachingPlan struct {

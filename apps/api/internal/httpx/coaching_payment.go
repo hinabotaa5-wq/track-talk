@@ -91,6 +91,15 @@ func (s *Server) checkoutURL(ctx context.Context, ct db.CoachingContract, payer,
 }
 
 func (s *Server) checkoutURLWith(ctx context.Context, q *db.Queries, ct db.CoachingContract, payer, successURL, cancelURL string) (string, error) {
+	// 払われたのに始まらず、まだ返金できていない支払いがあれば、返金し終えるまで支払い画面を出さない。
+	// 返金待ちの支払いと新しい支払いが並ばないようにする（返金は tick が拾い直す）。
+	unrefunded, err := q.HasUnrefundedCoachingPayment(ctx, &ct.ID)
+	if err != nil {
+		return "", err
+	}
+	if unrefunded {
+		return "", &ticketRuleError{"refund_pending", "前のお支払いを返金しています。返金が済んでから、もう一度お支払いください"}
+	}
 	p, err := q.GetReusableCoachingPayment(ctx, db.GetReusableCoachingPaymentParams{ContractID: &ct.ID, Payer: payer})
 	if err == nil {
 		return p.CheckoutUrl, nil
@@ -497,12 +506,18 @@ func (s *Server) completeCoachingCheckout(ctx context.Context, sess stripe.Check
 		}
 		logUnknownCardCountry(cardKindSupport, pay.ID.String(), pi)
 		if pi.IsNonJPCard() {
+			// 始めずに返金する支払いとして印を付ける。返金が Stripe で失敗しても、
+			// 契約がほかの支払いで始まっていても、tick が返金し終えるまで拾い続ける。
+			if err := q.MarkCoachingPaymentMustRefund(ctx, pay.ID); err != nil {
+				return err
+			}
 			nonJP, country = true, pi.CardCountry
 			return nil
 		}
 		ct, err := q.StartPaidCoachingContract(ctx, *pay.ContractID)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
+			// 始められない支払い（期限切れ、二重の支払い）も、始めずに返金する支払いとして扱う。
+			return q.MarkCoachingPaymentMustRefund(ctx, pay.ID)
 		}
 		if err != nil {
 			return err
