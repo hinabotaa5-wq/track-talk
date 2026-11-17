@@ -8,13 +8,14 @@ import NewReviewRequestPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
+  upload: vi.fn(),
   me: { demo: true, birth_month: "2011-01", is_minor: true, guardian: null, push_devices: 0 } as Record<string, unknown>,
   router: { replace: vi.fn(), push: vi.fn() },
   auth: { session: {} as Record<string, unknown> | null, token: "token" as string | null, loading: false },
 }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router }));
-vi.mock("@/lib/cloudinary-upload", () => ({ eagerVideoQuery: "", uploadVideoToCloudinary: async () => ({ public_id: "vid1" }), videoDuration: async () => 1, tooLong: () => false }));
+vi.mock("@/lib/cloudinary-upload", () => ({ eagerVideoQuery: "", uploadVideoToCloudinary: (...args: unknown[]) => mocks.upload(...args), videoDuration: async () => 1, tooLong: () => false }));
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => mocks.auth }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => mocks.api(...args) }));
 
@@ -24,6 +25,9 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
   mocks.api.mockReset();
+  // アップロードは、受け取った署名の public_id で上がったことにする。
+  mocks.upload.mockReset();
+  mocks.upload.mockImplementation(async (_file: File, signed: { public_id: string }) => ({ public_id: signed.public_id }));
   mocks.router.replace.mockReset();
   mocks.router.push.mockReset();
   mocks.auth.session = {};
@@ -289,7 +293,9 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).toContain("回答返却後の返金は利用規約に定める場合に限ります");
   expect(confirm?.textContent).not.toContain("着手前に依頼画面でキャンセルした場合、期限までに添削が返らない場合、またはコーチが例外返却した場合は");
   expect(confirm?.textContent).not.toContain("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。");
-  expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
+  // 確認画面を開いた時点で署名だけは先取りする（本体 #917）が、確定を押すまで動画は上げず、依頼も作らない。
+  expect(mocks.upload).not.toHaveBeenCalled();
+  expect(mocks.api.mock.calls.some(([path]) => path === "/v1/coaching/requests")).toBe(false);
   expect([...confirm!.querySelectorAll("button")].map((b) => b.textContent)).toEqual(["確定してお支払いへ", "戻って直す"]);
 });
 
@@ -591,7 +597,8 @@ it("チケット版の確認で戻って直すと送信せず入力に戻る", a
   await act(async () => { [...confirm.querySelectorAll("button")].find((b) => b.textContent === "戻って直す")!.click(); });
   expect(container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')).toBeNull();
   expect(container.querySelector("form")).not.toBeNull();
-  expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads"))).toBe(false);
+  expect(mocks.upload).not.toHaveBeenCalled();
+  expect(mocks.api.mock.calls.some(([path]) => path === "/v1/coaching/requests")).toBe(false);
 });
 
 it("有効期限のないチケットはお支払い行に期限なしと出る", async () => {
@@ -842,4 +849,175 @@ it("未成年宣言の理由は英語でも出る", async () => {
   await render();
   await act(async () => {});
   expect(paragraphExactly("Minors must check the parental consent box.")).toBeTruthy();
+});
+
+// ---- 本体 #917：確定後の待ち表示と、動画の署名の先取り ----
+
+const signPath = "/v1/uploads/coaching-video";
+const signCalls = () => mocks.api.mock.calls.filter(([path]) => path === signPath).length;
+const confirmSection = () => container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
+const pendingStatus = () => confirmSection()?.querySelector('[role="status"]');
+
+// 申込みの画面を開いて、相談内容（と動画）を入れ、最終確認を開く。
+// sign は署名の取得の応答、request は /v1/coaching/requests の応答を返す。
+async function openReviewConfirm({ tickets = false, video = null as File | null, sign = async () => ({ public_id: "pre1" }) as unknown, request = async () => ({ id: "r1" }) as unknown }) {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [reviewCoach("c1")] };
+    if (path === "/v1/me/coaching/tickets") return tickets
+      ? { balance: { available: 2, reserved: 0 }, next_expiry: { expires_at: "2027-05-01T00:00:00Z", available: 2 }, can_purchase: true }
+      : { balance: { available: 0, reserved: 0 }, can_purchase: false };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 1500, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    if (path === signPath) return sign();
+    if (path === "/v1/coaching/requests") return request();
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  await act(async () => {});
+  const textarea = container.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "後半に失速します。");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  if (video) await pickVideo(video);
+  if (!tickets) await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async () => container.querySelector("form")!.requestSubmit());
+  await act(async () => {});
+  expect(confirmSection()).not.toBeNull();
+}
+
+async function pickVideo(video: File) {
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, "files", { value: [video], configurable: true });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  await act(async () => {});
+}
+
+async function pressConfirm() {
+  await act(async () => confirmSection()!.querySelector("button")!.click());
+  await act(async () => {});
+}
+
+it("A4: カード払いの確定後は「お支払い画面へ移動しています」とストップウォッチを出し、紹介IDの確認中から出る", async () => {
+  await openReviewConfirm({ request: () => new Promise(() => {}) });
+  expect(pendingStatus()).toBeFalsy();
+  await pressConfirm();
+  expect(pendingStatus()?.textContent).toBe("お支払い画面へ移動しています");
+  expect(pendingStatus()?.querySelector("svg.screen-loader-watch")).not.toBeNull();
+  expect([...confirmSection()!.querySelectorAll("button")].map((b) => b.disabled)).toEqual([true, true]);
+});
+
+it("A4: チケットで送る確定後は既定の「処理しています」を出す", async () => {
+  await openReviewConfirm({ tickets: true, request: () => new Promise(() => {}) });
+  expect(confirmSection()!.querySelector("button")!.textContent).toBe("確定してチケット1枚で送る");
+  await pressConfirm();
+  expect(pendingStatus()?.textContent).toBe("処理しています");
+  expect(pendingStatus()?.querySelector("svg.screen-loader-watch")).not.toBeNull();
+});
+
+it("A4: 送れなかったときは待ち表示が消えてエラー文が出る（二重送信の防止は従来どおり）", async () => {
+  let fail: (err: Error) => void = () => {};
+  await openReviewConfirm({ request: () => new Promise((_, reject) => { fail = reject; }) });
+  await pressConfirm();
+  expect(pendingStatus()?.textContent).toBe("お支払い画面へ移動しています");
+  // 待っているあいだにもう一度押しても、申込みは1回しか送らない。
+  await act(async () => confirmSection()!.querySelector("button")!.click());
+  expect(mocks.api.mock.calls.filter(([path]) => path === "/v1/coaching/requests")).toHaveLength(1);
+  await act(async () => fail(new Error("送信に失敗しました")));
+  await act(async () => {});
+  expect(container.querySelector('[role="status"] svg.screen-loader-watch')).toBeNull();
+  expect(container.textContent).not.toContain("お支払い画面へ移動しています");
+  expect(container.textContent).toContain("送信に失敗しました");
+});
+
+it("B1: 動画ありで確認画面を開くと署名を1回だけ先取りし、確定後は取り直さずにその署名で上げる", async () => {
+  const video = new File(["x"], "run.mp4", { type: "video/mp4" });
+  await openReviewConfirm({ video });
+  expect(signCalls()).toBe(1);
+  expect(mocks.upload).not.toHaveBeenCalled();
+  await pressConfirm();
+  expect(signCalls()).toBe(1);
+  expect(mocks.upload).toHaveBeenCalledTimes(1);
+  expect(mocks.upload.mock.calls[0][0]).toBe(video);
+  expect(mocks.upload.mock.calls[0][1]).toEqual({ public_id: "pre1" });
+  const body = JSON.parse(mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests")![1].body);
+  expect(body.video_public_id).toBe("pre1");
+  expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
+});
+
+it("B1: 戻って同じ動画のまま確認を開き直しても、署名は取り直さない", async () => {
+  await openReviewConfirm({ video: new File(["x"], "run.mp4", { type: "video/mp4" }) });
+  await act(async () => [...confirmSection()!.querySelectorAll("button")].find((b) => b.textContent === "戻って直す")!.click());
+  await act(async () => container.querySelector("form")!.requestSubmit());
+  await act(async () => {});
+  expect(signCalls()).toBe(1);
+});
+
+it("B2: 先取りに失敗しても画面に出さず、確定後に署名を取り直して続ける", async () => {
+  let n = 0;
+  await openReviewConfirm({
+    video: new File(["x"], "run.mp4", { type: "video/mp4" }),
+    sign: async () => { if (++n === 1) throw new Error("署名を取れませんでした"); return { public_id: "late1" }; },
+  });
+  expect(signCalls()).toBe(1);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.textContent).not.toContain("署名を取れませんでした");
+  await pressConfirm();
+  expect(signCalls()).toBe(2);
+  expect(mocks.upload.mock.calls[0][1]).toEqual({ public_id: "late1" });
+  expect(container.textContent).not.toContain("署名を取れませんでした");
+  expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
+});
+
+it("B2: 先取りから50分を過ぎていたら使わず、確定後に取り直す", async () => {
+  const now = vi.spyOn(Date, "now");
+  const start = Date.UTC(2026, 10, 18, 0, 0, 0);
+  now.mockReturnValue(start);
+  let n = 0;
+  try {
+    await openReviewConfirm({ video: new File(["x"], "run.mp4", { type: "video/mp4" }), sign: async () => ({ public_id: `sig${++n}` }) });
+    expect(signCalls()).toBe(1);
+    now.mockReturnValue(start + 50 * 60 * 1000);
+    await pressConfirm();
+    expect(signCalls()).toBe(2);
+    expect(mocks.upload.mock.calls[0][1]).toEqual({ public_id: "sig2" });
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("B3: 確認画面を開いた後に動画を選び直すと、先取り分は使わず新しい署名で送る", async () => {
+  let n = 0;
+  await openReviewConfirm({ video: new File(["x"], "first.mp4", { type: "video/mp4" }), sign: async () => ({ public_id: `sig${++n}` }) });
+  expect(signCalls()).toBe(1);
+  await act(async () => [...confirmSection()!.querySelectorAll("button")].find((b) => b.textContent === "戻って直す")!.click());
+  const second = new File(["y"], "second.mp4", { type: "video/mp4" });
+  await pickVideo(second);
+  await act(async () => container.querySelector("form")!.requestSubmit());
+  await act(async () => {});
+  await pressConfirm();
+  expect(signCalls()).toBe(2);
+  expect(mocks.upload).toHaveBeenCalledTimes(1);
+  expect(mocks.upload.mock.calls[0][0]).toBe(second);
+  expect(mocks.upload.mock.calls[0][1]).toEqual({ public_id: "sig2" });
+  const body = JSON.parse(mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests")![1].body);
+  expect(body.video_public_id).toBe("sig2");
+});
+
+it("先取りした署名でも、署名と違う public_id で上がったら従来どおり止める", async () => {
+  mocks.upload.mockImplementation(async () => ({ public_id: "other" }));
+  await openReviewConfirm({ video: new File(["x"], "run.mp4", { type: "video/mp4" }) });
+  await pressConfirm();
+  expect(mocks.api.mock.calls.some(([path]) => path === "/v1/coaching/requests")).toBe(false);
+  expect(container.textContent).toContain("アップロードに失敗しました");
+});
+
+it("B4: 動画なしの申込では署名を取りに行かない", async () => {
+  await openReviewConfirm({});
+  await pressConfirm();
+  expect(signCalls()).toBe(0);
+  expect(mocks.upload).not.toHaveBeenCalled();
+  expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
 });
