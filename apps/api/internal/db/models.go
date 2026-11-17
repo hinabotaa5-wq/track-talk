@@ -1363,6 +1363,13 @@ type SenseNoteContractExclusion struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type SenseNoteRewriteExclusion struct {
+	AuthorID   uuid.UUID `json:"author_id"`
+	ContractID uuid.UUID `json:"contract_id"`
+	Day        time.Time `json:"day"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type SenseNoteSummary struct {
 	ID        uuid.UUID `json:"id"`
 	AuthorID  uuid.UUID `json:"author_id"`

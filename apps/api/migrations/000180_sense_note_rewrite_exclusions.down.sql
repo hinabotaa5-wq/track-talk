@@ -1,0 +1,1 @@
+DROP TABLE sense_note_rewrite_exclusions;
