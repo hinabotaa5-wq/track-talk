@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
+	"github.com/jackc/pgx/v5"
 )
 
 // 感覚メモは本人だけが読み書きする。投稿とは別のテーブルで、フィードにも公開ページにも出さない。
@@ -237,7 +238,10 @@ func (s *Server) createSenseNote(w http.ResponseWriter, r *http.Request) {
 			return errFull
 		}
 		row, err = q.CreateSenseNote(r.Context(), db.CreateSenseNoteParams{ID: uuid.New(), AuthorID: me.ID, Body: body, Event: event, Day: day})
-		return err
+		if err != nil {
+			return err
+		}
+		return inheritRewriteExclusions(r.Context(), q, me.ID, row.ID, day)
 	})
 	if errors.Is(err, errFull) {
 		Error(w, http.StatusUnprocessableEntity, "validation_error", "感覚メモは1日に1つだけ書けます。その日はもう書いています")
@@ -267,13 +271,37 @@ func (s *Server) deleteSenseNote(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	n, err := s.q.DeleteSenseNote(r.Context(), db.DeleteSenseNoteParams{ID: id, AuthorID: me.ID})
-	if err != nil {
-		MapDBError(w, err)
+	// 作成と同じロックの中で、消す前に除外の状態を残してから消す（同じ日の書き直しへの引き継ぎ用）。
+	errMissing := errors.New("sense note not found")
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		if err := q.LockSenseNoteAuthor(r.Context(), me.ID); err != nil {
+			return err
+		}
+		note, err := q.GetContractSenseNote(r.Context(), db.GetContractSenseNoteParams{ID: id, AuthorID: me.ID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errMissing
+		}
+		if err != nil {
+			return err
+		}
+		if err := keepRewriteExclusions(r.Context(), q, me.ID, id, note.Day, time.Now()); err != nil {
+			return err
+		}
+		n, err := q.DeleteSenseNote(r.Context(), db.DeleteSenseNoteParams{ID: id, AuthorID: me.ID})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return errMissing
+		}
+		return nil
+	})
+	if errors.Is(err, errMissing) {
+		Error(w, http.StatusNotFound, "not_found", "感覚メモが見つかりません")
 		return
 	}
-	if n == 0 {
-		Error(w, http.StatusNotFound, "not_found", "感覚メモが見つかりません")
+	if err != nil {
+		MapDBError(w, err)
 		return
 	}
 	stats, err := s.senseNoteStats(r, me.ID)

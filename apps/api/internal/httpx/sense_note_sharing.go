@@ -1,10 +1,12 @@
 package httpx
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
@@ -174,4 +176,31 @@ func (s *Server) shareContractSenseNote(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	JSON(w, http.StatusOK, map[string]any{"shared": *req.Shared})
+}
+
+// keepRewriteExclusions は、感覚メモを消す直前に、そのメモに除外があった契約を日付（日本時間）とともに残す。
+// メモを消すと除外の行も一緒に消えるため、同じ日に書き直したメモへ引き継ぐにはここで残しておく必要がある。
+// 残すのは今日の分のメモだけ（書き直せるのは今日の分だけ）で、本文は残さない。
+// その日の古い記録は先に捨て、消す時点の除外の状態だけを正にする。
+func keepRewriteExclusions(ctx context.Context, q *db.Queries, authorID, noteID uuid.UUID, noteDay, now time.Time) error {
+	today := dateOnly(now.In(jst.Zone))
+	if err := q.ClearSenseNoteRewriteExclusions(ctx, db.ClearSenseNoteRewriteExclusionsParams{
+		AuthorID: authorID, NoteDay: dateOnly(noteDay), Today: today,
+	}); err != nil {
+		return err
+	}
+	return q.SaveSenseNoteRewriteExclusions(ctx, db.SaveSenseNoteRewriteExclusionsParams{
+		NoteID: noteID, AuthorID: authorID, Today: today,
+	})
+}
+
+// inheritRewriteExclusions は、作った感覚メモに、同じ日に消したメモの除外を契約ごとに引き継ぎ、
+// その選手の記録を捨てる。除外がなかった契約・別の日の記録は引き継がない。
+func inheritRewriteExclusions(ctx context.Context, q *db.Queries, authorID, noteID uuid.UUID, day time.Time) error {
+	if err := q.InheritSenseNoteRewriteExclusions(ctx, db.InheritSenseNoteRewriteExclusionsParams{
+		NoteID: noteID, AuthorID: authorID, Day: day,
+	}); err != nil {
+		return err
+	}
+	return q.DeleteSenseNoteRewriteExclusions(ctx, authorID)
 }

@@ -12,6 +12,27 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearSenseNoteRewriteExclusions = `-- name: ClearSenseNoteRewriteExclusions :exec
+
+DELETE FROM sense_note_rewrite_exclusions
+WHERE author_id = $1
+    AND (day = $2::date OR day < $3::date)
+`
+
+type ClearSenseNoteRewriteExclusionsParams struct {
+	AuthorID uuid.UUID `json:"author_id"`
+	NoteDay  time.Time `json:"note_day"`
+	Today    time.Time `json:"today"`
+}
+
+// 同じ日の書き直しで除外を引き継ぐための記録（sense_note_rewrite_exclusions）。
+// 記録は「選手・契約・日付」だけで、メモの本文は残さない。
+// 消すメモの日の記録と、今日より前の日の記録を捨てる。消す時点の除外の状態だけを正にする。
+func (q *Queries) ClearSenseNoteRewriteExclusions(ctx context.Context, arg ClearSenseNoteRewriteExclusionsParams) error {
+	_, err := q.db.Exec(ctx, clearSenseNoteRewriteExclusions, arg.AuthorID, arg.NoteDay, arg.Today)
+	return err
+}
+
 const deleteSenseNoteContractExclusion = `-- name: DeleteSenseNoteContractExclusion :exec
 DELETE FROM sense_note_contract_exclusions
 WHERE contract_id = $1 AND sense_note_id = $2
@@ -25,6 +46,17 @@ type DeleteSenseNoteContractExclusionParams struct {
 // チェックを付け直す。すでに付いていても何も変わらない（冪等）。
 func (q *Queries) DeleteSenseNoteContractExclusion(ctx context.Context, arg DeleteSenseNoteContractExclusionParams) error {
 	_, err := q.db.Exec(ctx, deleteSenseNoteContractExclusion, arg.ContractID, arg.SenseNoteID)
+	return err
+}
+
+const deleteSenseNoteRewriteExclusions = `-- name: DeleteSenseNoteRewriteExclusions :exec
+DELETE FROM sense_note_rewrite_exclusions
+WHERE author_id = $1
+`
+
+// 作ったあとは、その選手の記録を全部捨てる（使い終わった記録と、別の日の残りの両方）。
+func (q *Queries) DeleteSenseNoteRewriteExclusions(ctx context.Context, authorID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSenseNoteRewriteExclusions, authorID)
 	return err
 }
 
@@ -50,6 +82,27 @@ func (q *Queries) GetContractSenseNote(ctx context.Context, arg GetContractSense
 	var i GetContractSenseNoteRow
 	err := row.Scan(&i.ID, &i.Day)
 	return i, err
+}
+
+const inheritSenseNoteRewriteExclusions = `-- name: InheritSenseNoteRewriteExclusions :exec
+INSERT INTO sense_note_contract_exclusions (contract_id, sense_note_id)
+SELECT rw.contract_id, $1::uuid
+FROM sense_note_rewrite_exclusions rw
+WHERE rw.author_id = $2
+    AND rw.day = $3::date
+ON CONFLICT DO NOTHING
+`
+
+type InheritSenseNoteRewriteExclusionsParams struct {
+	NoteID   uuid.UUID `json:"note_id"`
+	AuthorID uuid.UUID `json:"author_id"`
+	Day      time.Time `json:"day"`
+}
+
+// 作ったメモに、同じ日に消したメモの除外を引き継ぐ。
+func (q *Queries) InheritSenseNoteRewriteExclusions(ctx context.Context, arg InheritSenseNoteRewriteExclusionsParams) error {
+	_, err := q.db.Exec(ctx, inheritSenseNoteRewriteExclusions, arg.NoteID, arg.AuthorID, arg.Day)
+	return err
 }
 
 const insertSenseNoteContractExclusion = `-- name: InsertSenseNoteContractExclusion :exec
@@ -134,4 +187,27 @@ func (q *Queries) ListContractSenseNotes(ctx context.Context, arg ListContractSe
 		return nil, err
 	}
 	return items, nil
+}
+
+const saveSenseNoteRewriteExclusions = `-- name: SaveSenseNoteRewriteExclusions :exec
+INSERT INTO sense_note_rewrite_exclusions (author_id, contract_id, day)
+SELECT sn.author_id, ex.contract_id, sn.day
+FROM sense_note_contract_exclusions ex
+JOIN sense_notes sn ON sn.id = ex.sense_note_id
+WHERE sn.id = $1
+    AND sn.author_id = $2
+    AND sn.day = $3::date
+ON CONFLICT DO NOTHING
+`
+
+type SaveSenseNoteRewriteExclusionsParams struct {
+	NoteID   uuid.UUID `json:"note_id"`
+	AuthorID uuid.UUID `json:"author_id"`
+	Today    time.Time `json:"today"`
+}
+
+// 消す前のメモに除外があった契約を、そのメモの日付で残す。今日の分のメモのときだけ残す（書き直せるのは今日の分だけ）。
+func (q *Queries) SaveSenseNoteRewriteExclusions(ctx context.Context, arg SaveSenseNoteRewriteExclusionsParams) error {
+	_, err := q.db.Exec(ctx, saveSenseNoteRewriteExclusions, arg.NoteID, arg.AuthorID, arg.Today)
+	return err
 }
