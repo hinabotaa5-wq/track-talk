@@ -114,3 +114,13 @@ it("紹介ページ（/referral）は戻るだけのヘッダーで、履歴が�
   expect(headerBackFallback("/referral")).toBe("/coaching");
   for (const path of ["/", "/coaching", "/competitions", "/memo", "/injury"]) expect(showsBackButton(path), path).toBe(false);
 });
+
+it("選手ページ（/player）は戻るだけのヘッダーで、履歴がないときはコーチタブへ戻る", () => {
+  expect(showsBackButton("/player")).toBe(true);
+  expect(hasBackOnlyHeader("/player")).toBe(true);
+  expect(showsHeaderAccountActions("/player")).toBe(false);
+  expect(headerBackFallback("/player")).toBe("/coaching");
+  expect(headerBackFallback("/coach")).toBe("/coaching");
+  expect(activeMainTab("/player")).toBe("coaching");
+  for (const path of ["/", "/coaching", "/competitions", "/memo", "/injury"]) expect(showsBackButton(path), path).toBe(false);
+});

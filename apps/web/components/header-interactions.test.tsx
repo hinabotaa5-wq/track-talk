@@ -170,6 +170,37 @@ describe("ヘッダーの開閉", () => {
     expect(replace).not.toHaveBeenCalledWith("/login");
   });
 
+  it("選手ページ（/player）では戻るボタンだけを出してロゴを出さない", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = "/player";
+    await act(async () => root.render(<Header />));
+    expect(container.querySelector('button[aria-label="戻る"]')).not.toBeNull();
+    expect(container.querySelector('a[aria-label="TrackTalk"]')).toBeNull();
+  });
+
+  it("選手ページ（/player）で履歴がないとき戻るボタンはコーチタブへ寄せる", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = "/player";
+    await act(async () => root.render(<Header />));
+    await click(container.querySelector('button[aria-label="戻る"]'));
+    expect(back).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith("/coaching");
+    expect(replace).not.toHaveBeenCalledWith("/");
+    expect(replace).not.toHaveBeenCalledWith("/login");
+  });
+
+  it("選手ページ（/player）で履歴があるとき戻るボタンは履歴で1つ前に戻る", async () => {
+    apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
+    pathname = "/coaching";
+    await act(async () => root.render(<Header />));
+    window.history.pushState({}, "", "/player");
+    pathname = "/player";
+    await act(async () => root.render(<Header />));
+    await click(container.querySelector('button[aria-label="戻る"]'));
+    expect(back).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalledWith("/coaching");
+  });
+
   it("紹介ページ（/referral）で履歴があるとき戻るボタンは履歴で1つ前に戻る", async () => {
     apiFetch.mockResolvedValue({ unread_count: 0, notifications: [] });
     pathname = "/coaching";
