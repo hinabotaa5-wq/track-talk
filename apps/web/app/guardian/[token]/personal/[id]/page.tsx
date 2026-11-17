@@ -11,6 +11,7 @@ import { CoachingConsultations } from "@/components/coaching-consultations";
 import { CoachAvatar } from "@/components/coach-photo";
 import { ContractDetails, contractPeriod } from "@/components/coaching-contracts";
 import { CoachingMessages } from "@/components/coaching-messages";
+import { CoachingAbsence } from "@/components/coaching-absence";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { contractStatusLabel } from "@/lib/coaching-plan";
 import type { CoachingContract } from "@/lib/types";
@@ -57,6 +58,9 @@ export default function GuardianContractPage() {
         <ContractDetails contract={contract} />
         {contract.starts_at ? <p className="text-sm text-slate-200">{L("期間: {v0}", { v0: contractPeriod(contract) })}</p> : null}
       </section>
+      {contract.status === "active" || contract.status === "ended" || contract.status === "refunded" ? (
+        <CoachingAbsence contract={contract} token={null} guardianToken={token} />
+      ) : null}
       {contract.status === "active" || contract.status === "suspended" || contract.status === "ended" || contract.status === "refunded" ? (
         <CoachingMessages contract={contract} token={null} guardianToken={token} />
       ) : null}
