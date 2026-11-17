@@ -9,7 +9,6 @@ export const en: Readonly<Record<string, string>> = {
   "この紹介IDの紹介者には、あなたの購入がすでに数えられています。空欄のまま購入できます。": "Your purchase has already been counted for this referrer. You can continue with the field blank.",
   "友達2人に紹介すると、1回無料！": "Refer two friends and get a free review!",
   "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。": "A referral code is issued when you make a purchase. When two friends purchase using that code, the person who referred them receives a free ticket.",
-  "無料チケットは動画添削1回分です。有効期限は、プレゼントされてから6か月です。": "The free ticket is good for one video review and expires 6 months after it is granted.",
   "購入すると、あなたの紹介IDが発行されます": "Your referral code is issued when you make a purchase",
   "紹介の流れ": "How it works",
   "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。": "Your 6-character referral code appears on the purchase completion screen and on your My Page.",

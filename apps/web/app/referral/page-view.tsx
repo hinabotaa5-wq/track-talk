@@ -61,8 +61,6 @@ export function ReferralGuideView() {
     <div className="mx-auto max-w-2xl space-y-8">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">{L("友達2人に紹介すると、1回無料！")}</h1>
-        <p className="text-sm leading-relaxed">{L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。")}</p>
-        <p className="text-sm leading-relaxed">{L("無料チケットは動画添削1回分です。有効期限は、プレゼントされてから6か月です。")}</p>
       </div>
 
       <section className="space-y-3">
