@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export const coachTermsVersion = "2026-11-16";
+export const coachTermsVersion = "2026-11-18";
 
 export default function CoachTermsPage() {
   return (
@@ -27,19 +27,19 @@ export default function CoachTermsPage() {
 
       <Rule title="1. Services">
         <p>
-          The Coach provides, through the TrackTalk app, online via information and communications technology: (a) one-month coaching packages — written feedback on athlete-submitted training and race videos (with no set cap on the number of videos per athlete per month, replies targeted within about 48 hours), answers to the athlete&apos;s coaching questions (including questions about training theory), and a training menu created at the start of the month and revised weekly; and (b) single video reviews in TrackTalk&apos;s fixed format, targeted within about 24 hours of receipt. All communication is asynchronous and in-app. Athletes never contact the Coach directly. The specific services, service period, and deadlines for each engagement are confirmed in an individual work order issued under these Terms (see clause 10).
+          The Coach provides, through the TrackTalk app, online via information and communications technology: (a) one-month coaching packages — written feedback on athlete-submitted training and race videos (with no set cap on the number of videos per athlete per month, replies targeted within about 48 hours), answers to the athlete&apos;s coaching questions (including questions about training theory), and a training menu created at the start of the month and revised weekly; and (b) single video reviews in TrackTalk&apos;s fixed format, targeted within about 24 hours of receipt. All communication is asynchronous and in-app. Athletes never contact the Coach directly. The specific services, service period, and deadlines for each engagement are confirmed in an individual work order issued under these Terms (see clause 10). The Coach provides only the services confirmed in an individual work order. Paragraphs (a) and (b) describe the services available under these Terms; neither paragraph obliges the Coach to provide, or TrackTalk to order, the other type of service, and a service type not stated in a work order is not part of that engagement.
         </p>
       </Rule>
 
       <Rule title="2. Fees">
         <p>
-          (a) Package: <strong>¥16,500 per athlete per month</strong> (calculated as 75% of the tax-inclusive athlete price of ¥22,000). The fee is denominated in Japanese yen and converted to USD at the Wise transfer rate on the payment date. (b) Single review: <strong>$10 per completed review</strong>. Fees are as agreed with the Coach individually and may be revised only for future months by mutual agreement.
+          (a) Package: <strong>¥16,500 per athlete per month</strong> (calculated as 75% of the tax-inclusive athlete price of ¥22,000). The fee is denominated in Japanese yen and converted to USD at the Wise transfer rate on the payment date. (b) Single review: <strong>$10 per completed review</strong>. The amounts in (a) and (b) are the standard fees. If a different fee is agreed with the Coach individually in writing (including by direct message) or is stated in an individual work order, that fee applies instead of the standard fee for that service. Fees may be revised only by mutual agreement, and any revision applies only to services ordered after the revision is agreed (for a package, to future months).
         </p>
       </Rule>
 
       <Rule title="2A. Place of performance and receipt">
         <p>
-          The Coach performs all services online from the United States. TrackTalk receives the services and deliverables in the designated workspace for each assignment within the TrackTalk app. Any in-person services in Japan require prior written agreement, as they may change the tax treatment of the related fees.
+          The Coach performs all services online from the state in the United States stated in the individual work order. TrackTalk receives the services and deliverables in the designated workspace for each assignment within the TrackTalk app. Any in-person services in Japan require prior written agreement, as they may change the tax treatment of the related fees.
         </p>
       </Rule>
 
@@ -51,13 +51,13 @@ export default function CoachTermsPage() {
 
       <Rule title="4. FX review">
         <p>
-          If the USD/JPY rate moves outside a ±15% band around ¥158.5, TrackTalk may propose a fee revision effective from the following month. No revision applies retroactively.
+          If the USD/JPY rate moves outside a ±15% band around ¥158.5, TrackTalk may propose a fee revision effective from the following month. No revision applies retroactively. A proposal under this clause does not by itself change any fee, and no agreed revision applies to a service already ordered.
         </p>
       </Rule>
 
       <Rule title="5. Refunds and offsets">
         <p>
-          If a refund to an athlete results from the Coach&apos;s material failure to perform an express work-order obligation, TrackTalk will give the Coach a written explanation and a calculation of the amount attributable to the undelivered services, with prior notice before any offset. A response-time target alone does not establish a failure. The amount so determined — capped at the Coach&apos;s fee attributable to the undelivered services — may be offset against the Coach&apos;s next month&apos;s fees; any excess carries forward as a negative balance on the same basis. Amounts the Coach disputes are excluded from offset until the dispute is resolved. A balance remaining when the Coach&apos;s engagement ends is absorbed by TrackTalk.
+          If a refund to an athlete results from the Coach&apos;s material failure to perform an express work-order obligation, TrackTalk will give the Coach a written explanation and a calculation of the amount attributable to the undelivered services, with prior notice before any offset. A response-time target alone does not establish a failure. The amount so determined — capped at the Coach&apos;s fee attributable to the undelivered services — may be offset against fees later payable to the Coach (including fees for later single reviews); any excess carries forward as a negative balance on the same basis. Amounts the Coach disputes are excluded from offset until the dispute is resolved. A balance remaining when the Coach&apos;s engagement ends is absorbed by TrackTalk.
         </p>
       </Rule>
 
@@ -76,7 +76,7 @@ export default function CoachTermsPage() {
       </Rule>
 
       <Rule title="9. Term and ending">
-        <p>Either side may end this engagement at any time for future months; months already started are completed and paid as above.</p>
+        <p>Either side may end this engagement at any time, with effect for future work orders. An engagement already confirmed in a work order — for a package, a month already started; for a single review, a review already ordered — is completed and paid as above, unless the work order states otherwise.</p>
       </Rule>
 
       <Rule title="10. Work orders and written delivery">
