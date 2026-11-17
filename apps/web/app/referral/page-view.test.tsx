@@ -16,7 +16,7 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 
 const JA_TEXTS = [
-  "友達2人に紹介すると、1回無料！",
+  "友達2人に紹介すると、1回分(500円)無料！",
   "紹介の流れ",
   "購入すると、あなたの紹介IDが発行されます",
   "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。",
@@ -44,7 +44,8 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
   await act(async () => root.render(<ReferralGuideView />));
   const text = container.textContent ?? "";
   for (const expected of JA_TEXTS) expect(text).toContain(expected);
-  expect(container.querySelector("h1")?.textContent).toBe("友達2人に紹介すると、1回無料！");
+  expect(container.querySelector("h1")?.textContent).toBe("友達2人に紹介すると、1回分(500円)無料！");
+  expect(text).not.toContain("友達2人に紹介すると、1回無料！");
   expect(text).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
   expect(text).not.toContain("無料チケットは動画添削1回分です。有効期限は、プレゼントされてから6か月です。");
   const stepTitles = [...container.querySelectorAll("ol > li")].map((li) => li.textContent ?? "");
@@ -89,6 +90,8 @@ it("英語表示では固定の英訳が出て、新規文の日本語が残ら�
   await act(async () => root.render(<ReferralGuideView />));
   const text = container.textContent ?? "";
   expect(text).toContain("How it works");
+  expect(container.querySelector("h1")?.textContent).toBe("Refer two friends and get one free review (¥500)!");
+  expect(text).not.toContain("Refer two friends and get a free review!");
   expect(text).not.toContain("A referral code is issued when you make a purchase. When two friends purchase using that code, the person who referred them receives a free ticket.");
   expect(text).not.toContain("The free ticket is good for one video review and expires 6 months after it is granted.");
   expect(text).toContain("Your friend types the code into the “Referral code” field. If they skip it, the purchase will not count as a referral. Once the purchase is complete, it counts as one referral for the person who shared the code.");

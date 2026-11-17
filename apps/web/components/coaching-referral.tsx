@@ -57,7 +57,7 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
   </div>;
 }
 
-const referralHeadline = () => L("友達2人に紹介すると、1回無料！");
+const referralHeadline = () => L("友達2人に紹介すると、1回分(500円)無料！");
 const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
 
 export function LoadedReferralCard({ token }: { token: string | null }) {

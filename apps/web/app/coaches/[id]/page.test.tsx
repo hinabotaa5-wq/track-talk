@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -372,20 +374,23 @@ it("サポート文脈ではフォーム添削の受付状態とチケットの�
   expect(sectionIDs()).toEqual(["coach-plans"]);
 });
 
-// 本体 #869：買う前に分かる情報（支払い方法の違い・回答までの目安）を動画添削節へ前倒し。
+// 本体 #869：買う前に分かる情報（回答までの目安）を動画添削節へ前倒し。
+// 本体 #909：支払い方法の違いの説明文は削除した。paymentNote は「表示されないこと」の検証用に残す。
 const paymentNote = "単発は1回ごとにカード払いです。通常チケットは6枚セットから、無料チケットは紹介でもらった分から、申込み1件に1枚使います。";
 const replyNote = "申し込みが確定してから24時間以内に回答が来ます。";
 
-it("動画添削文脈では支払い方法の説明文と24時間の文の両方を表示する", async () => {
+it("動画添削文脈では支払い方法の説明文を表示せず、24時間の文だけを表示する", async () => {
   withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
   await render();
   const section = container.querySelector('section[aria-labelledby="coach-video-review"]');
-  expect(section?.textContent).toContain(paymentNote);
+  expect(container.textContent).not.toContain(paymentNote);
   expect(section?.textContent).toContain(replyNote);
-  // 入口グリッドの直後・節の中に出す。
+  // 入口グリッドの直後・節の最後の要素が24時間の文の段落である。
   const grid = section?.querySelector('ul[aria-label="お支払い方法を選んで依頼する"]');
   expect(grid).not.toBeNull();
   expect(section?.lastElementChild?.tagName).toBe("P");
+  expect(section?.lastElementChild?.textContent).toBe(replyNote);
+  expect(grid?.nextElementSibling).toBe(section?.lastElementChild);
 });
 
 it("サポート文脈（tab=support）では説明文と24時間の文のどちらも表示しない", async () => {
@@ -400,10 +405,10 @@ it("サポート文脈（tab=support）では説明文と24時間の文のどち
   expect(container.textContent).not.toContain(replyNote);
 });
 
-it("受付停止中でも説明文と24時間の文は表示し、単発・通常チケットの入口は無効のままにする", async () => {
+it("受付停止中でも説明文は表示せず、24時間の文は表示し、単発・通常チケットの入口は無効のままにする", async () => {
   withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) }, false);
   await render();
-  expect(container.textContent).toContain(paymentNote);
+  expect(container.textContent).not.toContain(paymentNote);
   expect(container.textContent).toContain(replyNote);
   expect(container.textContent).toContain("現在は受付していません");
   expectNotAcceptingBadge("現在は受付していません");
@@ -416,7 +421,7 @@ it("受付停止中でも説明文と24時間の文は表示し、単発・通�
 it("無料チケット0枚かつ受付停止中のとき、無料チケット入口だけが /referral へのリンクとして有効である", async () => {
   withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0) }, false);
   await render();
-  expect(container.textContent).toContain(paymentNote);
+  expect(container.textContent).not.toContain(paymentNote);
   expect(container.textContent).toContain(replyNote);
   expect(entryLink("reward")).toBe("/referral");
   expect(entryDisabled("reward")).toBe(false);
@@ -427,10 +432,18 @@ it("無料チケット0枚かつ受付停止中のとき、無料チケット入
   }
 });
 
-it("未ログイン（枚数未取得）でも説明文と24時間の文を表示する", async () => {
+it("未ログイン（枚数未取得）でも説明文は表示せず、24時間の文は表示する", async () => {
   await render();
   expect(mocks.api.mock.calls).toEqual([[`/v1/coaches/${coachID}`]]);
-  expect(container.textContent).toContain(paymentNote);
+  expect(container.textContent).not.toContain(paymentNote);
   expect(container.textContent).toContain(replyNote);
   expect(entryLink("card")).toBe(reviewHref("card"));
+});
+
+it("削除した支払い方法の説明文とその英訳が、製品コードと辞書に残っていない（本体 #909）", () => {
+  expect(Object.hasOwn(en, paymentNote)).toBe(false);
+  expect(Object.values(en)).not.toContain("Card pays per request. Each request uses one ticket: normal tickets from a pack of 6, free tickets from referrals.");
+  const page = readFileSync(path.resolve(process.cwd(), "app/coaches/[id]/page.tsx"), "utf8");
+  expect(page).not.toContain(paymentNote);
+  expect(page).toContain(replyNote);
 });

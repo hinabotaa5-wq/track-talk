@@ -208,7 +208,6 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
               </li>;
             })}
           </ul>
-          <p className="text-slate-200">{L("単発は1回ごとにカード払いです。通常チケットは6枚セットから、無料チケットは紹介でもらった分から、申込み1件に1枚使います。")}</p>
           <p className="text-slate-200">{L("申し込みが確定してから24時間以内に回答が来ます。")}</p>
         </section>
         {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
