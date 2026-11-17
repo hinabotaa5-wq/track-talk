@@ -67,6 +67,10 @@ func (s *Server) reviewResponseJSON(rs db.ReviewResponse) map[string]any {
 		"clarified_at":         rs.ClarifiedAt,
 		"helpful_asked":        rs.HelpfulAskedAt != nil,
 		"demo_video_url":       nil,
+		// 海外コーチの回答の和訳（本体 #916）。withReviewTranslations が入れ、無い・古い・対象外のときは null。
+		"good_point_ja": nil,
+		"fix_points_ja": nil,
+		"drill_ja":      nil,
 	}
 	if rs.DemoVideoPublicID != nil {
 		out["demo_video_url"] = s.cloud.CoachingPlaybackURL(*rs.DemoVideoPublicID)
@@ -150,6 +154,7 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.withReviewTranslations(r.Context(), out, rr)
 	delete(out, "rating")
 	// 引き受けた時に書き留めた取引条件。引き受ける前の版のコードで受けた依頼には無い。
 	wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID})
@@ -311,8 +316,11 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour, time.Now().Add(24*time.Hour), "review_returned:"+rr.ID.String())
+	// 返却した回答3点を訳す（海外コーチのときだけ。失敗しても返却は成功のまま）。
+	s.translateReviewAfterWrite(r.Context(), rr, false, false, true)
 	out := s.coachRequestJSON(rr, true)
 	out["response"] = s.reviewResponseJSON(rs)
+	s.withReviewTranslations(r.Context(), out, rr)
 	JSON(w, http.StatusOK, out)
 }
 
@@ -386,6 +394,7 @@ func (s *Server) writeRequesterReview(w http.ResponseWriter, r *http.Request, rr
 		MapDBError(w, err)
 		return
 	}
+	s.withReviewTranslations(r.Context(), out, rr)
 	coach, err := s.reviewCoachJSON(r.Context(), out, rr)
 	if err != nil {
 		MapDBError(w, err)

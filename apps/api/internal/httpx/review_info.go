@@ -161,7 +161,10 @@ func (s *Server) requestReviewInfo(w http.ResponseWriter, r *http.Request) {
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	})
+	// 差し戻しの質問を訳す（海外コーチのときだけ。失敗しても差し戻しは成功のまま）。
+	s.translateReviewAfterWrite(r.Context(), rr, false, true, false)
 	out := s.coachRequestJSON(rr, coachSeesVideo(rr))
+	s.withReviewTranslations(r.Context(), out, rr)
 	JSON(w, http.StatusOK, out)
 }
 
@@ -266,6 +269,8 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if updated.CoachID != nil {
 		s.notifyResubmitted(r.Context(), updated)
+		// 選手の補足（直した相談文）を訳し直す（海外コーチのときだけ。失敗しても再提出は成功のまま）。
+		s.translateReviewAfterWrite(r.Context(), updated, true, false, false)
 	}
 	s.writeRequesterReview(w, r, updated)
 }

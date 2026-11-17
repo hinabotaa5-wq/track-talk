@@ -277,6 +277,11 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 		return nil
 	}
 	s.sendPendingOutbox(ctx, pushOutboxBatch)
+	// 支払いのあとにコーチが決まった依頼は、相談文を訳す（海外コーチのときだけ）。Webhook を待たせないよう裏で行い、失敗はログだけ。
+	if started.CoachID != nil {
+		id := started.ID
+		go s.translateReviewQuestionByID(context.WithoutCancel(ctx), id)
+	}
 	return nil
 }
 

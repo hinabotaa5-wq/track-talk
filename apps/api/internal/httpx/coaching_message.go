@@ -136,6 +136,10 @@ func (s *Server) coachingMessageJSON(m db.CoachingMessage, viewer uuid.UUID, vie
 		"menu":                 nil,
 		"created_at":           m.CreatedAt,
 		"review_submission_id": m.ReviewSubmissionID,
+		// 海外コーチとのやり取りの訳（本体 #916）。withCoachingMessageTranslations が入れ、無い・古い・対象外のときは null。
+		"body_en": nil,
+		"body_ja": nil,
+		"menu_ja": nil,
 	}
 	if m.VideoPublicID != nil {
 		out["video_url"] = s.cloud.CoachingPlaybackURL(*m.VideoPublicID)
@@ -214,6 +218,7 @@ func (s *Server) writeCoachingMessages(w http.ResponseWriter, r *http.Request, c
 	for _, m := range msgs {
 		out = append(out, withoutPurgedVideo(s.coachingMessageJSON(m, viewer, viewerRole), ct.VideosPurgedAt != nil))
 	}
+	s.withCoachingMessageTranslations(r.Context(), ct, msgs, out)
 	JSON(w, http.StatusOK, map[string]any{"messages": out, "view_closed": false, "view_until": chatClosesAt(ct)})
 }
 
@@ -421,7 +426,11 @@ func (s *Server) sendCoachingMessage(w http.ResponseWriter, r *http.Request, ct 
 	if sender != nil {
 		viewer = *sender
 	}
-	JSON(w, http.StatusCreated, map[string]any{"message": s.coachingMessageJSON(m, viewer, role)})
+	// 送った文とメニューを訳す（海外コーチのときだけ。失敗しても送信は成功のまま）。
+	s.translateCoachingMessageAfterWrite(r.Context(), ct, m)
+	out := s.coachingMessageJSON(m, viewer, role)
+	s.withCoachingMessageTranslations(r.Context(), ct, []db.CoachingMessage{m}, []map[string]any{out})
+	JSON(w, http.StatusCreated, map[string]any{"message": out})
 }
 
 func (s *Server) rateCoachingContract(w http.ResponseWriter, r *http.Request) {

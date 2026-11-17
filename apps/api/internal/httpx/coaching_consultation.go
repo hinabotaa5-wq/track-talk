@@ -326,6 +326,8 @@ func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
 		"clarify_body": c.ClarifyBody, "clarification": c.Clarification, "clarify_requested_at": c.ClarifyRequestedAt, "clarified_at": c.ClarifiedAt,
 		"respond_by": c.RespondBy, "answer_by": c.AnswerBy, "answered_at": c.AnsweredAt, "created_at": c.CreatedAt, "expires_at": c.ExpiresAt,
 		"purged": c.PurgedAt != nil, "hidden": c.HiddenAt != nil, "videos_purged": c.VideosPurgedAt != nil}
+	// 海外コーチとのやり取りの訳（本体 #916）。withConsultationTranslations が入れ、無い・古い・対象外のときは null。
+	setConsultationTranslationKeys(out)
 	if c.HiddenAt != nil || c.PurgedAt != nil {
 		out["question"] = ""
 		out["answer"] = ""
@@ -358,6 +360,13 @@ func (s *Server) consultationJSONFor(c db.CoachingConsultation, role string) map
 	return out
 }
 
+// consultationOut は、1件の追加質問を見る人の役割に合わせて返し、訳を足す。
+func (s *Server) consultationOut(ctx context.Context, c db.CoachingConsultation, role string) map[string]any {
+	out := s.consultationJSONFor(c, role)
+	s.withConsultationTranslations(ctx, []db.CoachingConsultation{c}, []map[string]any{out})
+	return out
+}
+
 func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 	room, role, ok := s.consultationRoomAccess(w, r)
 	if !ok {
@@ -375,6 +384,7 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := []map[string]any{}
+	kept := []db.CoachingConsultation{}
 	for _, c := range rows {
 		if role != "requester" && c.Status == "draft" {
 			continue
@@ -394,7 +404,9 @@ func (s *Server) listConsultationRoom(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		items = append(items, item)
+		kept = append(kept, c)
 	}
+	s.withConsultationTranslations(r.Context(), kept, items)
 	price, _, requiresVideo, offerErr := s.consultationOffer(r.Context(), s.q, room)
 	funding := "cash"
 	if room.review != nil && offerErr == nil {
@@ -676,13 +688,16 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 			writeCheckoutError(w, err)
 			return
 		}
-		JSON(w, 200, map[string]any{"consultation": s.consultationJSON(saved), "checkout_url": url})
+		// 送信した質問を訳す（海外コーチのときだけ。失敗しても送信は成功のまま）。下書き保存では訳さない。
+		s.translateConsultationAfterWrite(r.Context(), saved, "question")
+		JSON(w, 200, map[string]any{"consultation": s.consultationOut(r.Context(), saved, "requester"), "checkout_url": url})
 		return
 	}
 	if saved.Status == "offered" {
 		s.notifyConsultation(r.Context(), saved, true, "追加質問が届きました")
 	}
-	JSON(w, 200, map[string]any{"consultation": s.consultationJSON(saved)})
+	s.translateConsultationAfterWrite(r.Context(), saved, "question")
+	JSON(w, 200, map[string]any{"consultation": s.consultationOut(r.Context(), saved, "requester")})
 }
 func (s *Server) reserveConsultationTickets(ctx context.Context, q *db.Queries, p db.Profile, c db.CoachingConsultation) error {
 	if _, err := q.GetConsultationTicketReservation(ctx, &c.ID); err == nil {
@@ -858,7 +873,12 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	if action == "clarify" {
 		s.notifyConsultation(r.Context(), saved, true, "回答への確認質問が届きました")
 	}
-	JSON(w, 200, map[string]any{"consultation": s.consultationJSONFor(saved, role)})
+	// コーチの回答・確認文と選手の補足回答を訳す（海外コーチのときだけ。失敗しても操作は成功のまま）。
+	switch action {
+	case "answer", "clarify", "clarification":
+		s.translateConsultationAfterWrite(r.Context(), saved, action)
+	}
+	JSON(w, 200, map[string]any{"consultation": s.consultationOut(r.Context(), saved, role)})
 }
 func (s *Server) coachConsultations(w http.ResponseWriter, r *http.Request) {
 	cp, ok := s.approvedCoach(w, r)
