@@ -765,6 +765,8 @@ export type ReviewRequest = {
   coach?: ReviewCoach | null;
   // 詳細を開いたときだけ付く。支払い画面を開いただけのものは含まない。
   payment?: ReviewPayment | null;
+  // 選手本人の詳細にだけ付く。返却後の匿名の感想を送ったかどうか（本体 #911）。
+  feedback_submitted?: boolean;
   // 送った直後と、支払い画面を開き直したときだけ付く。
   checkout_url?: string;
 };
@@ -795,6 +797,12 @@ export type CoachProbationResponse = {
   clarification: string | null;
   created_at: string;
   hidden_at: string | null;
+};
+
+// コーチに見せる、選手からの匿名の感想（本体 #911）。どの依頼・選手・日付かは含まない。
+export type CoachFeedback = {
+  id: string;
+  body: string;
 };
 
 // コーチに見せる依頼。動画は引き受けたあとにだけ付く。

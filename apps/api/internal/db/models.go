@@ -1243,6 +1243,16 @@ type Report struct {
 	ByGuardian bool      `json:"by_guardian"`
 }
 
+type ReviewFeedback struct {
+	ID         uuid.UUID  `json:"id"`
+	RequestID  uuid.UUID  `json:"request_id"`
+	CoachID    uuid.UUID  `json:"coach_id"`
+	Body       string     `json:"body"`
+	CreatedAt  time.Time  `json:"created_at"`
+	VisibleAt  time.Time  `json:"visible_at"`
+	NotifiedAt *time.Time `json:"notified_at"`
+}
+
 type ReviewOffer struct {
 	ID             uuid.UUID  `json:"id"`
 	RequestID      uuid.UUID  `json:"request_id"`

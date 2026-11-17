@@ -125,7 +125,7 @@ async function renderFresh() {
   await act(async () => root.render(<CoachDashboard />));
 }
 
-it("ランチャーは9タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
+it("ランチャーは10タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
@@ -138,6 +138,7 @@ it("ランチャーは9タイルの入口だけで（カレンダーは廃止）
     "/coach/payouts",
     "/coach/profile",
     "/me/push",
+    "/coach/feedback",
   ]);
   // 中身は個別画面に切り出したので、ランチャーには出さない。
   expect(container.textContent).not.toContain("引き受ける");
@@ -195,7 +196,7 @@ it("バッジは実件数と一致し、未登録の点は条件の時だけ出�
     return Promise.reject(new Error("down"));
   });
   await renderFresh();
-  expect(tileHrefs()).toHaveLength(9);
+  expect(tileHrefs()).toHaveLength(10);
 });
 
 it("未承認時はコーチ募集の文言を表示する", async () => {
@@ -214,6 +215,7 @@ it("言語が英語の利用者にはコーチ導線を英語で出す", async (
   await act(async () => root.render(<CoachDashboard />));
   expect(container.querySelector('nav[aria-label="Coach menu"]')).not.toBeNull();
   expect(tileLabels()).toContain("Reviewing (1)");
+  expect(tileLabels()).toContain("Feedback from athletes");
   // 日本語の文言は出ない。
   expect(container.textContent).not.toContain("届いた依頼");
   expect(container.textContent).not.toContain("新しい依頼が");
@@ -238,6 +240,20 @@ it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折�
   const grid = container.querySelector("nav.grid")!;
   expect(grid.getAttribute("style") ?? "").not.toContain("--coach-tile");
   const labels = [...container.querySelectorAll("nav.grid a > span.coach-tile-label")];
-  expect(labels).toHaveLength(9);
+  expect(labels).toHaveLength(10);
   for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
+});
+
+// 選手からの匿名の感想（本体 #911）。既存タイルの後ろに1つ足し、件数バッジは付けない。
+it("「選手からの感想」タイルがあり、/coach/feedback へ遷移する", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  const tile = tileLinks().find((a) => a.getAttribute("href") === "/coach/feedback");
+  expect(tile).toBeDefined();
+  expect(tile!.getAttribute("aria-label")).toBe("選手からの感想");
+  expect(tile!.querySelector("span.coach-tile-label")?.textContent).toBe("選手からの感想");
+  expect(tile!.querySelector("span.rounded-full")).toBeNull();
+  expect(tileLinks().at(-1)).toBe(tile);
+  // 感想は取得しない（ホームの表示から届いた時期を推測させない）。
+  expect(apiFetch.mock.calls.map((c) => c[0])).not.toContain("/v1/coach/feedback");
 });

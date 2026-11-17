@@ -10,7 +10,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath } from "@/lib/coach-recruit";
 import { coachingEnabled } from "@/lib/features";
 import { formatYen } from "@/lib/format";
-import { t, type Locale } from "@/lib/i18n";
+import { L, t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import type {
   CoachApplication,
@@ -26,6 +26,7 @@ import {
   Inbox,
   Landmark,
   Layers,
+  MessageSquareText,
   MessagesSquare,
   PenLine,
   UserRound,
@@ -293,6 +294,8 @@ export function CoachDashboard() {
         <Tile locale={locale} href="/coach/payouts" label={t(locale, "coach.tile.payouts")} Icon={Wallet} dot={payoutsDot} />
         <Tile locale={locale} href="/coach/profile" label={t(locale, "coach.tile.profile")} Icon={UserRound} />
         <Tile locale={locale} href="/me/push" label={t(locale, "coach.tile.push")} Icon={BellRing} />
+        {/* 選手からの匿名の感想（本体 #911）。件数バッジは付けない（届いた時期から特定されないように）。 */}
+        <Tile locale={locale} href="/coach/feedback" label={L("選手からの感想")} Icon={MessageSquareText} />
       </CoachTiles>
 
       <footer className="space-y-1 border-t border-white/15 pt-3">
