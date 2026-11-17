@@ -160,6 +160,7 @@ func (s *Server) setCoachPhoto(w http.ResponseWriter, r *http.Request) {
 }
 
 // coachMe は自分の応募を返す。まだ応募していなければ application は null。
+// completed_review_count は本人が今までに返却した1回プランの依頼の数（本人の画面に出すだけで、他には使わない）。
 func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireProfile(w, r)
 	if !ok {
@@ -167,7 +168,7 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := s.q.GetCoachProfile(r.Context(), p.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		JSON(w, http.StatusOK, map[string]any{"application": nil})
+		JSON(w, http.StatusOK, map[string]any{"application": nil, "completed_review_count": 0})
 		return
 	}
 	if err != nil {
@@ -179,8 +180,14 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	completed, err := s.q.CountCoachReturnedReviews(r.Context(), &p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{
-		"application": s.coachProfileJSON(c),
+		"application":            s.coachProfileJSON(c),
+		"completed_review_count": completed,
 		"rating": map[string]any{
 			"count":   rating.Count,
 			"average": rating.Average,
