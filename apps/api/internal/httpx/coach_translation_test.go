@@ -375,3 +375,121 @@ func TestCoachTranslationContactLikeFieldsDroppedOnUpdateAndBackfill(t *testing.
 	}
 	assertNoContactShape(t, doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil).Body.String())
 }
+
+// approveCoachForTranslation は申請から承認までを行い、承認後の AI 呼び出し回数を返す。
+// pre は承認前（コーチ ID が決まった後）に予約台帳へ行を足すための関数。
+func approveCoachForTranslation(t *testing.T, h http.Handler, ai *fakeClaude, pre func(coach uuid.UUID)) (uuid.UUID, int) {
+	t.Helper()
+	applicant := uuid.New()
+	ta := token(t, applicant)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", ta, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	withCoachPhoto(t, applicant)
+	if pre != nil {
+		pre(applicant)
+	}
+	admin := uuid.New()
+	tadmin := token(t, admin)
+	doJSON(t, h, http.MethodGet, "/v1/me", tadmin, nil)
+	setAdmin(t, admin)
+	ai.mu.Lock()
+	before := len(ai.prompts)
+	ai.mu.Unlock()
+	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coach-applications/"+applicant.String()+"/approve", tadmin, nil); rec.Code != http.StatusOK {
+		t.Fatalf("approve %d %s", rec.Code, rec.Body.String())
+	}
+	ai.mu.Lock()
+	defer ai.mu.Unlock()
+	return applicant, len(ai.prompts) - before
+}
+
+// 堅牢化 細目1: migration 後に coach_id 列と (coach_id, attempted_at) の索引がある。
+func TestCoachTranslationAttemptsHasCoachColumnAndIndex(t *testing.T) {
+	_ = setup(t)
+	var cols, idx int
+	queryRowArgs(t, `SELECT (SELECT count(*)::int FROM information_schema.columns WHERE table_name='coach_profile_translation_attempts' AND column_name='coach_id' AND data_type='uuid' AND is_nullable='YES'),
+		(SELECT count(*)::int FROM pg_indexes WHERE tablename='coach_profile_translation_attempts' AND indexdef LIKE '%(coach_id, attempted_at)%')`, nil, &cols, &idx)
+	if cols != 1 || idx != 1 {
+		t.Fatalf("coach_id column=%d index=%d", cols, idx)
+	}
+}
+
+// 細目2: 予約すると試行の行にコーチ ID が入る。失敗した試行も行（枠）として残る（細目5）。
+func TestCoachTranslationAttemptRecordsCoachIDEvenOnFailure(t *testing.T) {
+	ai := &fakeClaude{status: http.StatusInternalServerError}
+	h, _ := setupCoachTranslation(t, ai)
+	coach, _ := approveCoachForTranslation(t, h, ai, nil)
+	var n int
+	queryRowArgs(t, `SELECT count(*)::int FROM coach_profile_translation_attempts WHERE coach_id=$1`, []any{coach}, &n)
+	if n != 1 {
+		t.Fatalf("attempt rows for coach after failed call = %d, want 1", n)
+	}
+}
+
+// 細目3・5: コーチ別の日上限（20）に達したコーチだけ止まり、他のコーチは通る。
+func TestCoachTranslationPerCoachDailyLimit(t *testing.T) {
+	ai := &fakeClaude{reply: coachTranslationReply}
+	h, _ := setupCoachTranslation(t, ai)
+	_, calls := approveCoachForTranslation(t, h, ai, func(c uuid.UUID) {
+		execSQLArgs(t, `INSERT INTO coach_profile_translation_attempts (attempted_at, coach_id) SELECT clock_timestamp() - interval '2 hours', $1 FROM generate_series(1,20)`, c)
+	})
+	if calls != 0 {
+		t.Fatalf("calls for coach at daily limit = %d, want 0", calls)
+	}
+	// 別のコーチは全体上限（現在 20 件）の範囲で通る。
+	_, calls = approveCoachForTranslation(t, h, ai, nil)
+	if calls != 1 {
+		t.Fatalf("calls for other coach = %d, want 1", calls)
+	}
+}
+
+// 細目3: コーチ別の分上限（5）。
+func TestCoachTranslationPerCoachMinuteLimit(t *testing.T) {
+	ai := &fakeClaude{reply: coachTranslationReply}
+	h, _ := setupCoachTranslation(t, ai)
+	_, calls := approveCoachForTranslation(t, h, ai, func(c uuid.UUID) {
+		execSQLArgs(t, `INSERT INTO coach_profile_translation_attempts (attempted_at, coach_id) SELECT clock_timestamp(), $1 FROM generate_series(1,5)`, c)
+	})
+	if calls != 0 {
+		t.Fatalf("calls for coach at minute limit = %d, want 0", calls)
+	}
+}
+
+// 細目4: 全体上限に達していれば、コーチ別枠が残っていても止まる。
+func TestCoachTranslationGlobalLimitStillApplies(t *testing.T) {
+	ai := &fakeClaude{reply: coachTranslationReply}
+	h, _ := setupCoachTranslation(t, ai)
+	// 日上限：他コーチ 10 人分で全体 100 件。
+	execSQLArgs(t, `INSERT INTO coach_profile_translation_attempts (attempted_at, coach_id) SELECT clock_timestamp() - interval '2 hours', gen_random_uuid() FROM generate_series(1,100)`)
+	if _, calls := approveCoachForTranslation(t, h, ai, nil); calls != 0 {
+		t.Fatalf("calls at global daily limit = %d, want 0", calls)
+	}
+	// 分上限：直近1分に別コーチ分が 10 件。
+	execSQLArgs(t, `TRUNCATE coach_profile_translation_attempts`)
+	execSQLArgs(t, `INSERT INTO coach_profile_translation_attempts (attempted_at, coach_id) SELECT clock_timestamp(), gen_random_uuid() FROM generate_series(1,10)`)
+	if _, calls := approveCoachForTranslation(t, h, ai, nil); calls != 0 {
+		t.Fatalf("calls at global minute limit = %d, want 0", calls)
+	}
+}
+
+// 細目6: coach_id が NULL の既存行は全体にだけ数え、コーチ別には入らない。
+func TestCoachTranslationNullCoachRowsCountOnlyGlobally(t *testing.T) {
+	ai := &fakeClaude{reply: coachTranslationReply}
+	h, _ := setupCoachTranslation(t, ai)
+	execSQLArgs(t, `INSERT INTO coach_profile_translation_attempts (attempted_at) SELECT clock_timestamp() - interval '2 hours' FROM generate_series(1,50)`)
+	var nulls int
+	queryRowArgs(t, `SELECT count(*)::int FROM coach_profile_translation_attempts WHERE coach_id IS NULL`, nil, &nulls)
+	if nulls != 50 {
+		t.Fatalf("null rows = %d", nulls)
+	}
+	// 50 件はコーチ別（20）を超えるが、コーチ別には入らないので通る。
+	if _, calls := approveCoachForTranslation(t, h, ai, nil); calls != 1 {
+		t.Fatalf("calls with 50 NULL rows = %d, want 1", calls)
+	}
+	// 全体では数える：NULL 行 50 + 他コーチ 50 で上限。
+	execSQLArgs(t, `INSERT INTO coach_profile_translation_attempts (attempted_at, coach_id) SELECT clock_timestamp() - interval '2 hours', gen_random_uuid() FROM generate_series(1,49)`)
+	if _, calls := approveCoachForTranslation(t, h, ai, nil); calls != 0 {
+		t.Fatalf("calls at global limit via NULL rows = %d, want 0", calls)
+	}
+}

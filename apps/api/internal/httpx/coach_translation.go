@@ -21,9 +21,12 @@ import (
 const (
 	coachTranslationDailyLimit  = 100
 	coachTranslationMinuteLimit = 10
-	coachTranslationTimeout     = 30 * time.Second
-	coachTranslationMaxRunes    = 4000
-	coachTranslationNameMax     = 100
+	// コーチ1人あたりの上限。全体の上限とは別に、同じ予約で数える。
+	coachTranslationCoachDailyLimit  = 20
+	coachTranslationCoachMinuteLimit = 5
+	coachTranslationTimeout          = 30 * time.Second
+	coachTranslationMaxRunes         = 4000
+	coachTranslationNameMax          = 100
 )
 
 var coachTranslationSchema = map[string]any{
@@ -139,7 +142,7 @@ func (s *Server) ensureCoachProfileTranslation(ctx context.Context, c db.ListPub
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return false, false, err
 	}
-	allowed, err := s.reserveCoachTranslationAttempt(ctx)
+	allowed, err := s.reserveCoachTranslationAttempt(ctx, c.ProfileID)
 	if err != nil {
 		return false, false, err
 	}
