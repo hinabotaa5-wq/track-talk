@@ -305,6 +305,8 @@ export const en: Readonly<Record<string, string>> = {
   "送るとお支払いの画面に進み、その場でお支払いが済みます。目安までに返ってこなければ全額を返金します。": "Sending takes you to payment, and you pay right away. If there's no response in time, you'll get a full refund.",
   "デモ版のため料金はかかりません。目安までに返ってこなかった依頼は期限切れになります。": "This is a demo, so there's no charge. Requests without a response in time expire.",
   "送っています": "Sending...",
+  "処理しています": "Processing",
+  "お支払い画面へ移動しています": "Taking you to the payment page",
   "送ってお支払いへ（{v0}）": "Send and pay ({v0})",
   "チケット2枚を確保して送る": "Reserve 2 tickets and send",
   "送る": "Send",

@@ -96,6 +96,8 @@ function TicketsPage() {
     if (!acquire()) return;
     setError("");
     const storageKey = `tracktalk-tickets:${session.user.id}:${productID}:${returnPath}`;
+    // 支払い画面へ移るあいだは、ストップウォッチを出したまま確定ボタンも押せないままにする（本体 #917）。
+    let leaving = false;
     try {
       const referralCheck = await checkReferralInput(referralCode, token);
       if (referralCheck !== "ok") {
@@ -115,12 +117,23 @@ function TicketsPage() {
         sessionStorage.removeItem(storageKey);
         await load();
         setCompletedReturn(ticketReturnPath(result.return_path));
-      } else if (result.checkout_url) window.location.assign(result.checkout_url);
+      } else if (result.checkout_url) {
+        leaving = true;
+        window.location.assign(result.checkout_url);
+      }
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === "ticket_checkout_expired") sessionStorage.removeItem(storageKey);
       setError(err instanceof ApiRequestError ? err.message : L("購入画面を開けませんでした。同じボタンで再試行できます。"));
-    } finally { release(); }
+    } finally { if (!leaving) release(); }
   }
+
+  // 支払い画面からブラウザの戻るで、移る前の画面がそのまま戻ってきたとき（bfcache）は、待ち表示を解いて押し直せるようにする。
+  // 同じ購入操作は request_key で同じ購入・同じ支払い画面になる。
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) release(); };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [release]);
 
   if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
   if (completedReturn) return <div className="mx-auto max-w-md space-y-5">
@@ -144,6 +157,7 @@ function TicketsPage() {
           onConfirm={() => void buy(confirming.id)}
           onBack={() => { setConfirming(null); setError(""); }}
           pending={pending}
+          pendingLabel={L("お支払い画面へ移動しています")}
           confirmDisabled={!declaration.checked}
         >
           <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
