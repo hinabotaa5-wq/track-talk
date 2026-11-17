@@ -42,14 +42,20 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
   // ゲートが閉じている間は、過去の相談がある添削だけ記録として出す（送る欄は出さない）。
   if (kind === "review" && !coachingConsultationEnabled && data.consultations.every((c) => c.status === "draft")) return null;
+  // コーチは添削の担当本人なので、動画添削のあとの追加質問の選手向け説明は出さない。
+  // 選手から質問が届くまで（相談なし・選手の下書きだけ）は枠ごと出さない。届いたあとは受諾・回答のためにカードだけを出す。
+  const coachReview = kind === "review" && data.role === "coach";
+  if (coachReview && data.consultations.every((c) => c.status === "draft")) return null;
   const open = data.consultations.some((c) => ["draft", "awaiting_payment", "offered", "in_review"].includes(c.status));
   const draft = data.consultations.find((c) => c.status === "draft" && !c.purged);
   const sendEnabled = kind === "review" ? coachingConsultationEnabled : coachingMessagingEnabled;
   const heading = kind === "review" ? L("追加質問") : L("追加相談");
   return <section className="space-y-4 rounded-2xl border border-white/20 bg-white/5 p-4" aria-label={heading}>
     <h2 className="font-bold">{heading}</h2>
+    {coachReview ? null : <>
     <p className="text-sm text-slate-200">{kind === "review" ? L("この添削について質問を1回送ると、担当コーチが1回回答します。回答のあとに追加のやりとりはできません。") : L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
     <p className="text-xs text-slate-300">{kind === "review" ? L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。") : L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
+    </>}
     {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash"} />)}
     {!sendEnabled ? <p className="text-xs text-slate-300">{kind === "review" ? L(consultationClosedNote) : L(messagingClosedNote)}</p> : null}
     {sendEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} reload={load} /> : null}

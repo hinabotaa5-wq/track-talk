@@ -206,3 +206,66 @@ it("継続プランの相談をコーチが見るときは、自分の回答・�
  expect(bubble("契約の確認").head).toContain("選手の確認");
  expect(bubble("契約の補足").head).toContain("あなたの補足");
 });
+// #918 コーチ画面（動画添削のあと）では、追加質問の選手向け説明を出さない。質問が届くまでは枠ごと出さない。
+const reviewIntro = "この添削について質問を1回送ると、担当コーチが1回回答します。";
+const reviewTerms = "コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。";
+const coachRoom: ConsultationRoom = { ...room, role: "coach", can_purchase: false, consultations: [] };
+it("A1: コーチの添削画面で追加質問がまだ無いときは、追加質問の枠を出さない", async () => {
+ await render(coachRoom);
+ expect(container.querySelector("section")).toBeNull();
+ expect(container.textContent).not.toContain("追加質問");
+ expect(container.textContent).not.toContain(reviewIntro);
+});
+it("A2: コーチの添削画面で選手の下書きしか無いときも、追加質問の枠を出さない", async () => {
+ await render({ ...coachRoom, consultations: [draft] });
+ expect(container.querySelector("section")).toBeNull();
+ expect(container.textContent).toBe("");
+});
+it("A3: 届いた追加質問は、コーチが引き受け・辞退できる（説明は出さない）", async () => {
+ await render({ ...coachRoom, consultations: [{ ...draft, status: "offered", question: "届いた質問", respond_by: "2026-11-20T00:00:00Z" }] });
+ expect(container.textContent).toContain("届いた質問");
+ expect(button("引き受ける")).toBeTruthy();
+ expect(button("辞退する")).toBeTruthy();
+ expect(container.textContent).not.toContain(reviewIntro);
+ expect(container.textContent).not.toContain(reviewTerms);
+});
+it("A4: 引き受けた追加質問は、コーチが回答を送れる（説明は出さない）", async () => {
+ await render({ ...coachRoom, consultations: [{ ...draft, status: "in_review", answer_by: "2026-11-20T00:00:00Z" }] });
+ expect(button("回答を送る")).toBeTruthy();
+ expect(container.querySelector("textarea")).not.toBeNull();
+ expect(container.textContent).not.toContain(reviewIntro);
+ expect(container.textContent).not.toContain(reviewTerms);
+});
+it("A5: 回答済みの追加質問は、質問と回答の吹き出しを見せる（説明は出さない）", async () => {
+ await render({ ...coachRoom, consultations: [{ ...draft, status: "answered", question: "質問A5", answer: "回答A5", answered_at: "2026-11-14T02:00:00Z" }] });
+ expect(bubble("質問A5").head).toContain("選手の質問");
+ expect(bubble("回答A5").head).toContain("あなたの回答");
+ expect(container.textContent).not.toContain(reviewIntro);
+ expect(container.textContent).not.toContain(reviewTerms);
+});
+it("B1: 選手の添削画面は、見出し・説明・購入フォームを従来どおり出す", async () => {
+ await render();
+ expect(container.querySelector("h2")?.textContent).toBe("追加質問");
+ expect(container.textContent).toContain(reviewIntro);
+ expect(container.textContent).toContain(reviewTerms);
+ expect(container.textContent).toContain("質問する（500円）");
+});
+it("B2: 保護者の添削画面は、見出し・説明を従来どおり出す", async () => {
+ await render({ ...room, role: "guardian", can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答", answered_at: "2026-11-14T02:00:00Z" }] }, "guardian-secret", "review");
+ expect(container.querySelector("h2")?.textContent).toBe("追加質問");
+ expect(container.textContent).toContain(reviewIntro);
+ expect(container.textContent).toContain(reviewTerms);
+});
+it("B3: 継続プランの相談をコーチが見るときは、説明を従来どおり出す", async () => {
+ await render({ ...coachRoom, consultations: [] }, undefined, "contract");
+ expect(container.querySelector("h2")?.textContent).toBe("追加相談");
+ expect(container.textContent).toContain("新しい質問1件に、コーチが1回答えます。");
+ expect(container.textContent).toContain("辞退・未回答の期限切れはチケット返却または全額返金します。");
+});
+it("B4: ゲートが閉じている間も、コーチの添削画面では過去の相談だけを出し、説明と回答欄は出さない", async () => {
+ flags.consultation = false;
+ await render({ ...coachRoom, consultations: [{ ...draft, status: "in_review" }] });
+ expect(container.textContent).toContain("追加質問の受付は準備中です");
+ expect(container.textContent).not.toContain("回答を送る");
+ expect(container.textContent).not.toContain(reviewIntro);
+});
