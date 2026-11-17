@@ -162,8 +162,9 @@ type CoachProfileTranslation struct {
 }
 
 type CoachProfileTranslationAttempt struct {
-	ID          int64     `json:"id"`
-	AttemptedAt time.Time `json:"attempted_at"`
+	ID          int64      `json:"id"`
+	AttemptedAt time.Time  `json:"attempted_at"`
+	CoachID     *uuid.UUID `json:"coach_id"`
 }
 
 type CoachRefundAdjustment struct {
