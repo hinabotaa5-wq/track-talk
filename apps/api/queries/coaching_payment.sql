@@ -35,11 +35,21 @@ WHERE ct.id = $1 AND ct.payment_required AND ct.status = 'accepted'
 RETURNING *;
 
 -- name: GetPaidCoachingPayment :one
--- 返金できる（まだ返金していない）支払い。
+-- 返金できる（まだ返金していない）支払い。始めないと決めた支払い（must_refund）は契約の代金ではないので含めない。
 SELECT * FROM coaching_payments
-WHERE contract_id = $1 AND status = 'paid'
+WHERE contract_id = $1 AND status = 'paid' AND NOT must_refund
 ORDER BY paid_at DESC
 LIMIT 1;
+
+-- name: MarkCoachingPaymentMustRefund :exec
+-- 期間を始めずに全額返金すると決めた支払い（カードの発行国で止めたものなど）。返金し終えるまで tick が拾い続ける。
+UPDATE coaching_payments SET must_refund = true, updated_at = now() WHERE id = $1 AND status = 'paid';
+
+-- name: HasUnrefundedCoachingPayment :one
+-- 支払いは済んだのに返金も期間の開始もしていない支払いがあるか。あれば、返金し終えるまで支払い画面を作り直さない。
+SELECT EXISTS (
+    SELECT 1 FROM coaching_payments WHERE contract_id = $1 AND status = 'paid'
+)::boolean;
 
 -- name: GetLatestCoachingPayment :one
 -- 画面に出す支払い。支払い画面を開いただけのものは出さない。
@@ -89,13 +99,16 @@ LIMIT 50;
 
 -- name: ListUnstartedPaidPayments :many
 -- 支払いは済んだのに期間が始まらなかったもの（期限を過ぎてから払った、二重に払った）。返金し損ねたものを拾う。
+-- 始めないと決めた支払い（must_refund）は、契約がほかの支払いで始まっていても返金し終えるまで拾う。
+-- 二重払いの判定で数える「先の支払い」には、始めないと決めた支払いを含めない（その支払いで期間は始まっていない）。
 SELECT pay.* FROM coaching_payments pay
 JOIN coaching_contracts ct ON ct.id = pay.contract_id
 WHERE pay.status = 'paid'
   AND pay.paid_at <= now() - interval '1 minute'
-  AND (ct.status NOT IN ('active', 'suspended', 'ended')
+  AND (pay.must_refund
+       OR ct.status NOT IN ('active', 'suspended', 'ended')
        OR EXISTS (SELECT 1 FROM coaching_payments o WHERE o.contract_id = pay.contract_id AND o.id <> pay.id
-                  AND o.status <> 'pending' AND o.paid_at < pay.paid_at))
+                  AND o.status <> 'pending' AND NOT o.must_refund AND o.paid_at < pay.paid_at))
 ORDER BY pay.updated_at, pay.id
 LIMIT 50;
 

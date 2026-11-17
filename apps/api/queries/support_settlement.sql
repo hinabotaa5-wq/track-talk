@@ -63,8 +63,10 @@ ORDER BY ct.updated_at
 LIMIT 100;
 
 -- name: GetSupportPaid :one
+-- 期間を始めた支払い。始めずに返金した支払い（二重払い、カードの発行国で止めたもの）は数えない。
 SELECT pay.amount_yen, pay.refunded_yen, pay.refunded_at FROM coaching_payments pay
 WHERE pay.contract_id = $1 AND pay.status IN ('paid', 'partially_refunded', 'refunded')
+  AND pay.refund_reason IS DISTINCT FROM 'not_started' AND NOT pay.must_refund
 ORDER BY pay.paid_at LIMIT 1;
 
 -- name: InsertSupportFinalEarning :exec

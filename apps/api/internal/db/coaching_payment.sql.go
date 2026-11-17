@@ -15,7 +15,7 @@ import (
 const createCoachingPayment = `-- name: CreateCoachingPayment :one
 INSERT INTO coaching_payments (id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at
+RETURNING id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at, must_refund
 `
 
 type CreateCoachingPaymentParams struct {
@@ -55,12 +55,13 @@ func (q *Queries) CreateCoachingPayment(ctx context.Context, arg CreateCoachingP
 		&i.RefundedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MustRefund,
 	)
 	return i, err
 }
 
 const getLatestCoachingPayment = `-- name: GetLatestCoachingPayment :one
-SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at FROM coaching_payments
+SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at, must_refund FROM coaching_payments
 WHERE contract_id = $1 AND status <> 'pending'
 ORDER BY refund_reason IS NOT DISTINCT FROM 'not_started', paid_at DESC
 LIMIT 1
@@ -87,18 +88,19 @@ func (q *Queries) GetLatestCoachingPayment(ctx context.Context, contractID *uuid
 		&i.RefundedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MustRefund,
 	)
 	return i, err
 }
 
 const getPaidCoachingPayment = `-- name: GetPaidCoachingPayment :one
-SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at FROM coaching_payments
-WHERE contract_id = $1 AND status = 'paid'
+SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at, must_refund FROM coaching_payments
+WHERE contract_id = $1 AND status = 'paid' AND NOT must_refund
 ORDER BY paid_at DESC
 LIMIT 1
 `
 
-// 返金できる（まだ返金していない）支払い。
+// 返金できる（まだ返金していない）支払い。始めないと決めた支払い（must_refund）は契約の代金ではないので含めない。
 func (q *Queries) GetPaidCoachingPayment(ctx context.Context, contractID *uuid.UUID) (CoachingPayment, error) {
 	row := q.db.QueryRow(ctx, getPaidCoachingPayment, contractID)
 	var i CoachingPayment
@@ -118,12 +120,13 @@ func (q *Queries) GetPaidCoachingPayment(ctx context.Context, contractID *uuid.U
 		&i.RefundedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MustRefund,
 	)
 	return i, err
 }
 
 const getReusableCoachingPayment = `-- name: GetReusableCoachingPayment :one
-SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at FROM coaching_payments
+SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at, must_refund FROM coaching_payments
 WHERE contract_id = $1 AND payer = $2 AND status = 'pending' AND session_expires_at > now() + interval '5 minutes'
 ORDER BY created_at DESC
 LIMIT 1
@@ -154,6 +157,7 @@ func (q *Queries) GetReusableCoachingPayment(ctx context.Context, arg GetReusabl
 		&i.RefundedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MustRefund,
 	)
 	return i, err
 }
@@ -166,6 +170,20 @@ SELECT EXISTS (
 
 func (q *Queries) HasGuardianContractConsent(ctx context.Context, contractID uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasGuardianContractConsent, contractID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const hasUnrefundedCoachingPayment = `-- name: HasUnrefundedCoachingPayment :one
+SELECT EXISTS (
+    SELECT 1 FROM coaching_payments WHERE contract_id = $1 AND status = 'paid'
+)::boolean
+`
+
+// 支払いは済んだのに返金も期間の開始もしていない支払いがあるか。あれば、返金し終えるまで支払い画面を作り直さない。
+func (q *Queries) HasUnrefundedCoachingPayment(ctx context.Context, contractID *uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasUnrefundedCoachingPayment, contractID)
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -268,18 +286,21 @@ func (q *Queries) ListSilentPaidContracts(ctx context.Context) ([]CoachingContra
 }
 
 const listUnstartedPaidPayments = `-- name: ListUnstartedPaidPayments :many
-SELECT pay.id, pay.contract_id, pay.payer, pay.amount_yen, pay.checkout_session_id, pay.checkout_url, pay.session_expires_at, pay.payment_intent_id, pay.status, pay.refunded_yen, pay.refund_reason, pay.paid_at, pay.refunded_at, pay.created_at, pay.updated_at FROM coaching_payments pay
+SELECT pay.id, pay.contract_id, pay.payer, pay.amount_yen, pay.checkout_session_id, pay.checkout_url, pay.session_expires_at, pay.payment_intent_id, pay.status, pay.refunded_yen, pay.refund_reason, pay.paid_at, pay.refunded_at, pay.created_at, pay.updated_at, pay.must_refund FROM coaching_payments pay
 JOIN coaching_contracts ct ON ct.id = pay.contract_id
 WHERE pay.status = 'paid'
   AND pay.paid_at <= now() - interval '1 minute'
-  AND (ct.status NOT IN ('active', 'suspended', 'ended')
+  AND (pay.must_refund
+       OR ct.status NOT IN ('active', 'suspended', 'ended')
        OR EXISTS (SELECT 1 FROM coaching_payments o WHERE o.contract_id = pay.contract_id AND o.id <> pay.id
-                  AND o.status <> 'pending' AND o.paid_at < pay.paid_at))
+                  AND o.status <> 'pending' AND NOT o.must_refund AND o.paid_at < pay.paid_at))
 ORDER BY pay.updated_at, pay.id
 LIMIT 50
 `
 
 // 支払いは済んだのに期間が始まらなかったもの（期限を過ぎてから払った、二重に払った）。返金し損ねたものを拾う。
+// 始めないと決めた支払い（must_refund）は、契約がほかの支払いで始まっていても返金し終えるまで拾う。
+// 二重払いの判定で数える「先の支払い」には、始めないと決めた支払いを含めない（その支払いで期間は始まっていない）。
 func (q *Queries) ListUnstartedPaidPayments(ctx context.Context) ([]CoachingPayment, error) {
 	rows, err := q.db.Query(ctx, listUnstartedPaidPayments)
 	if err != nil {
@@ -305,6 +326,7 @@ func (q *Queries) ListUnstartedPaidPayments(ctx context.Context) ([]CoachingPaym
 			&i.RefundedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.MustRefund,
 		); err != nil {
 			return nil, err
 		}
@@ -317,7 +339,7 @@ func (q *Queries) ListUnstartedPaidPayments(ctx context.Context) ([]CoachingPaym
 }
 
 const lockPaidCoachingPayment = `-- name: LockPaidCoachingPayment :one
-SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at FROM coaching_payments WHERE id = $1 AND status = 'paid' FOR UPDATE
+SELECT id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at, must_refund FROM coaching_payments WHERE id = $1 AND status = 'paid' FOR UPDATE
 `
 
 // 返金を Stripe に送るあいだ、まだ返金していない支払いの行をロックしておく。
@@ -341,8 +363,19 @@ func (q *Queries) LockPaidCoachingPayment(ctx context.Context, id uuid.UUID) (Co
 		&i.RefundedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MustRefund,
 	)
 	return i, err
+}
+
+const markCoachingPaymentMustRefund = `-- name: MarkCoachingPaymentMustRefund :exec
+UPDATE coaching_payments SET must_refund = true, updated_at = now() WHERE id = $1 AND status = 'paid'
+`
+
+// 期間を始めずに全額返金すると決めた支払い（カードの発行国で止めたものなど）。返金し終えるまで tick が拾い続ける。
+func (q *Queries) MarkCoachingPaymentMustRefund(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markCoachingPaymentMustRefund, id)
+	return err
 }
 
 const markCoachingPaymentPaid = `-- name: MarkCoachingPaymentPaid :one
@@ -352,7 +385,7 @@ SET status = 'paid',
     paid_at = now(),
     updated_at = now()
 WHERE checkout_session_id = $2 AND status = 'pending'
-RETURNING id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at
+RETURNING id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at, must_refund
 `
 
 type MarkCoachingPaymentPaidParams struct {
@@ -380,6 +413,7 @@ func (q *Queries) MarkCoachingPaymentPaid(ctx context.Context, arg MarkCoachingP
 		&i.RefundedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MustRefund,
 	)
 	return i, err
 }
@@ -392,7 +426,7 @@ SET refunded_yen = $1::int,
     refunded_at = now(),
     updated_at = now()
 WHERE id = $3 AND status = 'paid'
-RETURNING id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at
+RETURNING id, contract_id, payer, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, refunded_yen, refund_reason, paid_at, refunded_at, created_at, updated_at, must_refund
 `
 
 type RecordCoachingRefundParams struct {
@@ -421,6 +455,7 @@ func (q *Queries) RecordCoachingRefund(ctx context.Context, arg RecordCoachingRe
 		&i.RefundedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.MustRefund,
 	)
 	return i, err
 }
