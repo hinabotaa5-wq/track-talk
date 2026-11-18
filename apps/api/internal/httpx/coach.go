@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -94,7 +95,9 @@ func (s *Server) coachProfileJSON(c db.CoachProfile) map[string]any {
 		"reviewed_at":   c.ReviewedAt,
 		"on_duty":       c.OnDuty,
 		"daily_cap":     c.DailyCap,
-		"photo_url":     s.coachPhotoURL(c.PhotoPublicID),
+		// コーチの国（本体 #932）。運営が設定する。コーチ本人は読み取りのみ。
+		"country_code": c.CountryCode,
+		"photo_url":    s.coachPhotoURL(c.PhotoPublicID),
 		// いまの版のパーソナル指導の誓約をしたか。
 		"pledged": pledged(c), "pledged_current": pledgedCurrent(c), "pledge_version": c.PledgeVersion,
 		// 報酬の受け取り口座（Stripe）の登録が済み、受付やパーソナル指導の承諾ができるか。
@@ -551,6 +554,48 @@ func (s *Server) removeCoachPhoto(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+var coachCountryCodeRe = regexp.MustCompile(`^[A-Z]{2}$`)
+
+type coachCountryReq struct {
+	CountryCode string `json:"country_code"`
+}
+
+// setCoachCountry は、運営がコーチの国（ISO 3166-1 alpha-2）を設定する（本体 #932）。
+// 状態は問わない（承認前の海外コーチにも先に設定できる）。コーチ本人には変更手段を作らない。
+func (s *Server) setCoachCountry(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireAdmin(w, r); !ok {
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+	var req coachCountryReq
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	code := strings.ToUpper(strings.TrimSpace(req.CountryCode))
+	if !coachCountryCodeRe.MatchString(code) {
+		JSON(w, http.StatusBadRequest, errorBody{Error: errDetail{
+			Code:    "validation_error",
+			Message: "入力内容を確認してください",
+			Fields:  map[string]string{"country_code": "国コードは英字2文字（例：JP、US）で入力してください"},
+		}})
+		return
+	}
+	c, err := s.q.SetCoachCountry(r.Context(), db.SetCoachCountryParams{CountryCode: code, ProfileID: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		Error(w, http.StatusNotFound, "not_found", "コーチが見つかりません")
+		return
+	}
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"application": s.coachProfileJSON(c)})
+}
+
 func (s *Server) suspendCoach(w http.ResponseWriter, r *http.Request) {
 	s.setCoachSuspended(w, r, true)
 }
@@ -818,6 +863,9 @@ func (s *Server) publicCoachJSON(c db.ListPublicCoachesRow, plans []map[string]a
 		"years":           c.Years,
 		"sns_urls":        nonNilStrings(c.SnsUrls),
 		"hitokoto":        c.Hitokoto,
+		// 1回プランの受付状態と、一覧の国旗に使う国（本体 #932）。
+		"on_duty":      c.OnDuty,
+		"country_code": c.CountryCode,
 		// パーソナル指導のプラン。安い順。
 		"plans": nonNilPlans(plans),
 	}

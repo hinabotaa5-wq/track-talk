@@ -880,6 +880,8 @@ export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
   rating_average: number;
   rating_paused: boolean;
   photo_url: string;
+  // コーチの国（ISO 3166-1 alpha-2、本体 #932）。運営が設定する。
+  country_code: string;
 };
 
 // 依頼する前に見られるコーチ一覧の1人。★はこれまでの全部。
@@ -901,6 +903,9 @@ export type PublicCoach = {
   hitokoto: string;
   rating_count: number;
   rating_average: number;
+  // 1回プランの受付状態と、一覧の国旗に使う国（ISO 3166-1 alpha-2、本体 #932）。
+  on_duty: boolean;
+  country_code: string;
   // パーソナル指導の公開中のプラン。安い順。
   plans: CoachingPlan[];
   // 1ヶ月プランの無料相談の入口。相談を受け付けていないコーチは null。

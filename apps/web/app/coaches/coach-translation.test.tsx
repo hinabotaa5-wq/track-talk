@@ -19,7 +19,7 @@ vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import
 const coach: PublicCoach = {
   id: "coach-1", nickname: "テストコーチ", nickname_en: "Test Coach", photo_url: "", tier: "coach", events: ["100m"],
   best_record: "100m 10秒95", best_record_en: "100m 10.95", achievements: "成績1行目\n成績2行目", achievements_en: "Result one\nResult two",
-  years: 10, sns_urls: [], hitokoto: "よろしく", hitokoto_en: "Happy to help", rating_count: 0, rating_average: 0, service_types: [], plans: [],
+  years: 10, sns_urls: [], hitokoto: "よろしく", hitokoto_en: "Happy to help", rating_count: 0, rating_average: 0, service_types: [], plans: [], on_duty: true, country_code: "JP",
 };
 
 let root: Root;
@@ -38,7 +38,8 @@ it("一覧の名前とひとこと", async () => {
   apiFetch.mockResolvedValue({ coaches: [coach] });
   await act(async () => root.render(<CoachList />));
   expect(container.textContent).toContain("Test Coach");
-  expect(container.textContent).toContain("Happy to help");
+  // 一覧カードにはひとことを出さない（本体 #932）。訳文も出ない。詳細のひとことは下の項目13で確かめる。
+  expect(container.textContent).not.toContain("Happy to help");
   await act(async () => root.unmount()); root = createRoot(container);
   apiFetch.mockResolvedValue({ coaches: [{ ...coach, nickname_en: null, hitokoto_en: null }] });
   await act(async () => root.render(<CoachList />));
