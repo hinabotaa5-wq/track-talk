@@ -95,6 +95,11 @@ func assertWorkOrderDelivered(t *testing.T, h http.Handler, coach, column, id, u
 	found := 0
 	for _, n := range items {
 		if n.URL == url && n.Title == title && n.Body == body {
+			var role string
+			queryRowArgs(t, `SELECT COALESCE(coaching_role,'') FROM notifications WHERE id=$1`, []any{n.ID}, &role)
+			if role != "coach" {
+				t.Fatalf("work order coaching role: %q", role)
+			}
 			found++
 		}
 	}

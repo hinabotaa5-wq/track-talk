@@ -155,6 +155,8 @@ func TestCircleActionNotificationDeduplication(t *testing.T) {
 func TestCircleContractAndScreenReads(t *testing.T) {
 	h := setup(t)
 	coach, tc := approvedCoachWithServices(t, h, nil)
+	// Start from an acknowledged application result, before isolating contract chat notices.
+	circleGet(t, h, tc, "/v1/coach/me")
 	player := uuid.New()
 	tu := token(t, player)
 	circleGet(t, h, tu, "/v1/me")

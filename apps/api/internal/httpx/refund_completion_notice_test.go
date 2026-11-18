@@ -57,6 +57,11 @@ func assertRefundNotice(t *testing.T, h http.Handler, payer, title, url string, 
 		if note.Title != title {
 			continue
 		}
+		var role string
+		queryRowArgs(t, `SELECT COALESCE(coaching_role,'') FROM notifications WHERE id=$1`, []any{note.ID}, &role)
+		if role != "player" {
+			t.Fatalf("refund coaching role: %q", role)
+		}
 		if note.URL != url {
 			t.Errorf("notice URL %q, want %q", note.URL, url)
 		}
