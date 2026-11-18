@@ -124,6 +124,7 @@ const ja = {
   "coach.withdraw": "コーチをやめる",
   "coach.withdrawNote": "アカウントは残り、一般の利用者として使い続けられます。",
   "coach.onDuty": "受付中",
+  "coach.completedReviews": "今までの添削：{count}件",
   "coach.offDuty": "受付停止中",
   "coach.dailyCap": "1日に受ける上限",
   "coach.perDay": "{n}本",
@@ -179,7 +180,6 @@ const ja = {
   "coach.detail.sendResponse": "返答を送る",
   "coach.detail.responseSent": "返答を送りました",
   "coach.detail.infoSent": "差し戻しました",
-  "coach.detail.toCoach": "コーチ画面へ",
 } as const;
 
 export type I18nKey = keyof typeof ja;
@@ -276,6 +276,7 @@ const en: Record<I18nKey, string> = {
   "coach.withdraw": "Leave coaching",
   "coach.withdrawNote": "Your account stays and you can keep using the app as a regular user.",
   "coach.onDuty": "Accepting",
+  "coach.completedReviews": "Reviews completed so far: {count}",
   "coach.offDuty": "Paused",
   "coach.dailyCap": "Daily limit",
   "coach.perDay": "{n} / day",
@@ -331,7 +332,6 @@ const en: Record<I18nKey, string> = {
   "coach.detail.sendResponse": "Send response",
   "coach.detail.responseSent": "Response sent",
   "coach.detail.infoSent": "Sent back for clarification",
-  "coach.detail.toCoach": "Back to Coach",
 };
 
 // 文言を取る。英語にないキーは日本語を返す。{name} は vars で置き換える。

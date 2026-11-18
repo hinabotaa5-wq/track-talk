@@ -1,6 +1,16 @@
 import { L } from "@/lib/i18n";
 const jst = "Asia/Tokyo";
 
+// 吹き出し・返答カード用。端末の設定によらず日本時間で、年を省いて表示する。
+export function formatChatDateTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("ja-JP", {
+    timeZone: jst, month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date).map((part) => [part.type, part.value]));
+  return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
 export function formatDateTime(iso: string) {
   return new Intl.DateTimeFormat("ja-JP", {
     timeZone: jst,

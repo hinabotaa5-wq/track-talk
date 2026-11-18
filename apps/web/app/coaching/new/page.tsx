@@ -44,6 +44,15 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 // Stripe の鍵がない検証用の環境では、支払いなしのデモ版（招待コードを入れた人だけ）。
 
 const maxBytes = 100 * 1024 * 1024;
+// 先取りした動画の署名を使い回してよい時間。Cloudinary は発行から1時間で署名を断るので、余裕を見て50分にする（本体 #917）。
+const prefetchedSignatureMaxAgeMs = 50 * 60 * 1000;
+
+type PrefetchedSignature = { file: File; requestedAt: number; signed: Promise<CloudinarySignature> };
+
+// 先取りした署名が、この動画のもので、取りに行ってから50分以内か。
+function freshSignatureFor(current: PrefetchedSignature | null, video: File): current is PrefetchedSignature {
+  return !!current && current.file === video && Date.now() - current.requestedAt < prefetchedSignatureMaxAgeMs;
+}
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
@@ -98,6 +107,28 @@ export default function NewReviewRequestPage() {
   // 最終確認を出しているか。お金かチケットが動く申込みだけ確認を挟む（デモ版はそのまま送る）。
   const [confirming, setConfirming] = useState(false);
   const needsConfirm = cashPayment || method === "tickets";
+  // 確認画面を開いた時点で取っておいた動画の署名（本体 #917）。確定後の往復を1つ減らす。1回使ったら捨てる。
+  const prefetchedSignature = useRef<PrefetchedSignature | null>(null);
+
+  // 動画ありで確認画面を開いたら、署名を先に取っておく。同じ動画でまだ新しい先取り分があれば取り直さない。
+  // 失敗しても画面には出さない（確定後にこれまでどおり取り直す）。
+  useEffect(() => {
+    if (!confirming || !file || !token) return;
+    if (freshSignatureFor(prefetchedSignature.current, file)) return;
+    const signed = apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
+    signed.catch(() => { /* 先取りの失敗は出さない。 */ });
+    prefetchedSignature.current = { file, requestedAt: Date.now(), signed };
+  }, [confirming, file, token]);
+
+  // 先取りした署名が、この動画のもので、取得から50分以内なら使う。それ以外（失敗・期限間近・動画の選び直し）は取り直す。
+  async function signatureFor(video: File): Promise<CloudinarySignature> {
+    const current = prefetchedSignature.current;
+    prefetchedSignature.current = null;
+    if (freshSignatureFor(current, video)) {
+      try { return await current.signed; } catch { /* 取り直す。 */ }
+    }
+    return apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
+  }
 
   useEffect(() => {
     if (!token || !reviewOpen) return;
@@ -277,7 +308,7 @@ export default function NewReviewRequestPage() {
       }
       let videoPublicID: string | undefined;
       if (file) {
-        const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
+        const signed = await signatureFor(file);
         setUploadPhase("upload");
         setUpload({ loaded: 0, total: file.size, percent: 0 });
         const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
@@ -341,6 +372,7 @@ export default function NewReviewRequestPage() {
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
+            pendingLabel={cashPayment ? L("お支払い画面へ移動しています") : undefined}
           >
             {cashPayment ? <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
               onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} /> : null}

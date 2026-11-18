@@ -760,6 +760,7 @@ export type ReviewRequest = {
   withdrawal?: ReviewWithdrawal | null;
   // 詳細を開いたときだけ付く。
   response?: ReviewResponse | null;
+  response_reported?: boolean;
   rating?: ReviewRating | null;
   // 返答が届いたあとにだけ入る。
   coach?: ReviewCoach | null;

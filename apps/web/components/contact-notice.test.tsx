@@ -21,7 +21,8 @@ const press = () => act(async () => { container.querySelector("button")!.click()
 it("注意文は常に出る。勧誘の言葉は1回目だけ止めて警告し、もう一度押すと送る", async () => {
   const onSend = vi.fn();
   await act(async () => root.render(<Form text="LINE で話しましょう" onSend={onSend} />));
-  expect(container.textContent).toContain("規約で禁止されています");
+  expect(container.textContent).toContain("外部の連絡先（URL・メールアドレス・電話番号・SNSのID）は送れません。");
+  expect(container.textContent).not.toContain("規約で禁止されています");
   await press();
   expect(onSend).not.toHaveBeenCalled();
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("もう一度押すとそのまま送ります");

@@ -182,6 +182,21 @@ func (q *Queries) ClaimReviewDueReminders(ctx context.Context, hoursLeft int32) 
 	return items, nil
 }
 
+const countCoachReturnedReviews = `-- name: CountCoachReturnedReviews :one
+SELECT count(*) FROM review_requests
+WHERE coach_id = $1 AND returned_at IS NOT NULL
+`
+
+// コーチ本人が今までに返却した1回プランの依頼の数（コーチ画面の表示用）。
+// returned_at は返却時に入り、その後の追加質問（clarifying）でも消えないので、これを完了の目印にする。
+// 期限切れ・辞退・対応中・差し戻し中は returned_at が無いので数えない。表示以外には使わない。
+func (q *Queries) CountCoachReturnedReviews(ctx context.Context, coachID *uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCoachReturnedReviews, coachID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countMyReviewRequests = `-- name: CountMyReviewRequests :one
 SELECT count(*) FROM review_requests
 WHERE requester_id = $1

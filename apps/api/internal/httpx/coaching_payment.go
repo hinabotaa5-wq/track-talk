@@ -286,6 +286,10 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 	case "charge.refunded", "refund.created", "refund.updated", "refund.failed", "transfer.created", "transfer.reversed", "payout.created":
 		// Keep anomaly detection before synchronization so Dashboard refunds remain visible.
 		s.handleStripeMoneyAlert(r.Context(), ev)
+		// Connect 側の返金通知は異常検知だけに使い、本体側の通知で同期する。
+		if fromConnectKey {
+			break
+		}
 		if err := s.syncCapturedRefund(r.Context(), ev); err != nil {
 			slog.Error("stripe refund sync", "event", ev.ID, "err", err)
 			Error(w, 500, "internal_error", "返金を同期できませんでした")
