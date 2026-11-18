@@ -190,11 +190,33 @@ func TestReviewResponseReportAndProbation(t *testing.T) {
 	h := setup(t)
 	tadmin := adminToken(t, h)
 	coach, tc := onDutyCoach(t, h, tadmin)
-	_, tu := demoRequester(t, h, tadmin)
+	requester, tu := demoRequester(t, h, tadmin)
 	id := acceptedReview(t, h, tadmin, tc, tu)
+	assertReported := func(want bool) {
+		t.Helper()
+		rec := doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+id, tu, nil)
+		var detail struct {
+			Reported *bool `json:"response_reported"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil {
+			t.Fatal(err)
+		}
+		if rec.Code != http.StatusOK || detail.Reported == nil || *detail.Reported != want {
+			t.Fatalf("response_reported want %v: %d %s", want, rec.Code, rec.Body.String())
+		}
+	}
+	// 返答がない依頼もキーを返す。
+	assertReported(false)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, responseBody()); rec.Code != http.StatusOK {
 		t.Fatalf("response %d", rec.Code)
 	}
+	assertReported(false)
+	// 保護者の通報と同じく、子を reporter_id として by_guardian を立てる。
+	// 返答には保護者用の通報経路がないため、別行を直接用意して取り違えを検証する。
+	execSQLArgs(t, `INSERT INTO reports (id, reporter_id, by_guardian, target_type, target_id, reason, detail)
+		VALUES ($1, $2, true, 'review_response', $3, 'harassment', '')`, uuid.New(), requester, id)
+	assertReported(false)
+	execSQLArgs(t, `DELETE FROM reports WHERE reporter_id=$1 AND target_type='review_response' AND target_id=$2 AND by_guardian=true`, requester, id)
 
 	report := map[string]any{"target_type": "review_response", "target_id": id, "reason": "harassment", "detail": ""}
 	// 通報できるのは依頼した本人だけ。
@@ -204,6 +226,16 @@ func TestReviewResponseReportAndProbation(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/reports", tu, report); rec.Code != http.StatusCreated {
 		t.Fatalf("report %d %s", rec.Code, rec.Body.String())
 	}
+	assertReported(true)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/reports", tu, report); rec.Code != http.StatusConflict {
+		t.Fatalf("duplicate report %d %s", rec.Code, rec.Body.String())
+	}
+	var count int
+	queryRowArgs(t, `SELECT count(*) FROM reports WHERE reporter_id=$1 AND target_type='review_response' AND target_id=$2`, []any{requester, id}, &count)
+	if count != 1 {
+		t.Fatalf("report count %d, want 1", count)
+	}
+	assertReported(true)
 	rec := doJSON(t, h, http.MethodGet, "/v1/admin/reports", tadmin, nil)
 	if !strings.Contains(rec.Body.String(), `"target_type":"review_response"`) || !strings.Contains(rec.Body.String(), "1台目までの8歩") {
 		t.Fatalf("admin reports %s", rec.Body.String())

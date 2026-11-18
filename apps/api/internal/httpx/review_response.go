@@ -382,6 +382,17 @@ func (s *Server) reviewAnswered(w http.ResponseWriter, rr db.ReviewRequest) bool
 
 func (s *Server) writeRequesterReview(w http.ResponseWriter, r *http.Request, rr db.ReviewRequest) {
 	out := s.reviewRequestJSON(rr)
+	reported, err := s.q.ReportExists(r.Context(), db.ReportExistsParams{
+		ReporterID: rr.RequesterID,
+		ByGuardian: false,
+		TargetType: "review_response",
+		TargetID:   rr.ID,
+	})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out["response_reported"] = reported
 	if err := s.withResponse(r.Context(), out, rr.ID); err != nil {
 		MapDBError(w, err)
 		return
