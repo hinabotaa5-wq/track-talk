@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { ServiceConsentText } from "@/components/service-consent-text";
+import { documentConsentMetadata, rememberDocumentConsent } from "@/lib/document-consent";
 import { rememberOverseasConsent, signupConsentMetadata } from "@/lib/overseas-consent";
 import { rememberSignupSentEmail } from "@/lib/signup-sent";
 import { useCaptcha } from "@/components/auth-captcha";
@@ -77,6 +78,7 @@ export default function RegisterPage() {
     }
     rememberNextPath("/me/profile?onboarding=1", 86400);
     rememberOverseasConsent();
+    rememberDocumentConsent();
     const { data, error: err } = await supabase.auth
       .signUp({
         email: values.email,
@@ -85,7 +87,7 @@ export default function RegisterPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           captchaToken: captcha.captchaToken,
           // 確認メールを別のタブで開いても、ここでの同意をもう一度聞かずに記録できるよう、同意した版を残す。
-          data: signupConsentMetadata(),
+          data: { ...signupConsentMetadata(), ...documentConsentMetadata() },
         },
       })
       .finally(() => {
@@ -136,7 +138,7 @@ export default function RegisterPage() {
           {t(shown, "register.submit")}
         </Button>
       </form>
-      <GoogleSignInButton nextPath="/me/profile?onboarding=1" label={t(shown, "register.google")} disabled={!agreed} onStart={rememberOverseasConsent} />
+      <GoogleSignInButton nextPath="/me/profile?onboarding=1" label={t(shown, "register.google")} disabled={!agreed} onStart={() => { rememberOverseasConsent(); rememberDocumentConsent(); }} />
       <p className="text-sm">
         {t(shown, "register.hasAccount")} <Link href="/login" className="inline-block text-blue-400 transition active:scale-[0.98]">{t(shown, "register.login")}</Link>
       </p>

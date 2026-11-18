@@ -132,6 +132,12 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	body["mfa_required"] = mfaRequired
 	// いまの版の説明で、海外の委託先への提供に同意済みなら true。false の人には同意の画面を出す。
 	body["overseas_consent"] = overseasConsent
+	documentsConsent, err := s.hasDocumentConsents(r, p)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	body["documents_consent"] = documentsConsent
 	JSON(w, http.StatusOK, body)
 }
 
