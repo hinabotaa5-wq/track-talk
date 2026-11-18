@@ -107,11 +107,11 @@ func TestConsultationLegacyAndNewAttemptsShareLimit(t *testing.T) {
 	}
 	// F5: coach suspension closes an old delivered consultation one hour after delivery.
 	execSQLArgs(t, `UPDATE coaching_consultations SET status='offered',paid_at=now()-interval '1 hour',respond_by=now()+interval '47 hours',answer_by=NULL WHERE id=$1`, first.ID)
-	execSQLArgs(t, `UPDATE coach_profiles SET status='suspended' WHERE profile_id=(SELECT coach_id FROM coaching_consultations WHERE id=$1)`, first.ID)
+	execSQLArgs(t, `UPDATE coach_profiles SET status='suspended',on_duty=false WHERE profile_id=(SELECT coach_id FROM coaching_consultations WHERE id=$1)`, first.ID)
 	if r := tick(t, h, "tick-secret"); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
-	execSQLArgs(t, `UPDATE coach_profiles SET status='approved' WHERE profile_id=(SELECT coach_id FROM coaching_consultations WHERE id=$1)`, first.ID)
+	execSQLArgs(t, `UPDATE coach_profiles SET status='approved',on_duty=true WHERE profile_id=(SELECT coach_id FROM coaching_consultations WHERE id=$1)`, first.ID)
 	if s := reviewRoomState(t, h, owner, root); !s.CanPurchase {
 		t.Fatalf("rebuy after old early expiry %+v", s)
 	}
