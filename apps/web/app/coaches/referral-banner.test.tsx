@@ -30,11 +30,13 @@ vi.mock("./support-plan-list", async () => {
 const { ReferralBanner } = await import("./referral-banner");
 const { CoachesView } = await import("./page-view");
 
-// 本体 #909：見出しを「1回分(500円)無料」に変更（旧見出し・旧英訳は出ないことを検証する）。
-const HEADLINE_JA = "友達2人に紹介すると、1回分(500円)無料！";
+// 本体 #949：バナーだけ短い見出しにし、説明ページ・紹介カードの見出しは維持する。
+const HEADLINE_JA = "2人に紹介すると、1回(500円)無料！";
+const DETAIL_HEADLINE_JA = "友達2人に紹介すると、1回分(500円)無料！";
 const OLD_HEADLINE_JA = "友達2人に紹介すると、1回無料！";
 const BODY_JA = "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。";
-const HEADLINE_EN = "Refer two friends and get one free review (¥500)!";
+const HEADLINE_EN = "Refer 2 people, get 1 free (¥500)!";
+const DETAIL_HEADLINE_EN = "Refer two friends and get one free review (¥500)!";
 const OLD_HEADLINE_EN = "Refer two friends and get a free review!";
 const BODY_EN = "A referral code is issued when you make a purchase. When two friends purchase using that code, the person who referred them receives a free ticket.";
 
@@ -52,7 +54,8 @@ it("見出しだけを表示し、本文は表示しない", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const text = container.textContent ?? "";
-  expect(text).toContain(HEADLINE_JA);
+  expect(text).toBe(HEADLINE_JA);
+  expect(text).not.toContain(DETAIL_HEADLINE_JA);
   expect(text).not.toContain(OLD_HEADLINE_JA);
   expect(text).not.toContain(BODY_JA);
 });
@@ -80,7 +83,7 @@ it("現行の見出しを小さい文字で1行に省略表示する", async () 
   await act(async () => root.render(<ReferralBanner />));
   const headline = container.querySelector('a[href="/referral"] > span > span');
   expect(headline?.textContent).toBe(HEADLINE_JA);
-  expect(headline?.classList.contains("text-sm")).toBe(true);
+  expect(headline?.classList.contains("text-[13px]")).toBe(true);
   expect(headline?.classList.contains("truncate")).toBe(true);
 });
 
@@ -122,19 +125,27 @@ it("英語表示では見出しの英訳だけが出て、本文は出ない", a
   expect(text).toContain(HEADLINE_EN);
   expect(text).not.toContain(BODY_EN);
   expect(text).not.toContain(HEADLINE_JA);
+  expect(text).not.toContain(DETAIL_HEADLINE_JA);
+  expect(text).not.toContain(DETAIL_HEADLINE_EN);
   expect(text).not.toContain(BODY_JA);
   expect(text).not.toContain(OLD_HEADLINE_EN);
   expect(text).not.toContain(OLD_HEADLINE_JA);
   expect(container.querySelector('a[href="/referral"]')?.getAttribute("aria-label")).toBe(HEADLINE_EN);
 });
 
-it("変更前の見出しと旧英訳が、製品コードと辞書に残っていない（本体 #909）", () => {
+it("バナーだけ新見出しで、説明ページ・紹介カードと辞書の旧見出しは維持する（本体 #949）", () => {
   expect(Object.hasOwn(en, OLD_HEADLINE_JA)).toBe(false);
   expect(Object.values(en)).not.toContain(OLD_HEADLINE_EN);
   expect(en[HEADLINE_JA]).toBe(HEADLINE_EN);
-  for (const file of ["app/coaches/referral-banner.tsx", "app/referral/page-view.tsx", "components/coaching-referral.tsx"]) {
+  expect(en[DETAIL_HEADLINE_JA]).toBe(DETAIL_HEADLINE_EN);
+  const banner = readFileSync(path.resolve(process.cwd(), "app/coaches/referral-banner.tsx"), "utf8");
+  expect(banner).toContain(HEADLINE_JA);
+  expect(banner).not.toContain(DETAIL_HEADLINE_JA);
+  expect(banner).not.toContain(OLD_HEADLINE_JA);
+  for (const file of ["app/referral/page-view.tsx", "components/coaching-referral.tsx"]) {
     const source = readFileSync(path.resolve(process.cwd(), file), "utf8");
     expect(source).not.toContain(OLD_HEADLINE_JA);
-    expect(source).toContain(HEADLINE_JA);
+    expect(source).toContain(DETAIL_HEADLINE_JA);
+    expect(source).not.toContain(HEADLINE_JA);
   }
 });
