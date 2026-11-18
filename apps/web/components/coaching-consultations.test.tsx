@@ -363,3 +363,44 @@ it.each(["requester", "coach", "guardian"] as const)("%s の両kindの吹き出�
   await act(async () => root.unmount()); root = createRoot(container);
  }
 });
+
+// 本体 #916 B2: 追加質問は、相手の文だけ訳文メイン＋原文併記、自分の文は原文だけ。
+const overseas: Consultation = {
+ ...draft, id: "overseas", status: "answered", question: "流しは何本がいいですか", question_en: "How many strides should I do?",
+ answer: "Do 3 strides.", answer_ja: "流しを3本やりましょう。", answered_at: new Date().toISOString(),
+ clarify_body: "距離も教えてください", clarify_body_en: "Please tell me the distance too", clarify_requested_at: new Date().toISOString(),
+ clarification: "About 100m each.", clarification_ja: "1本100mくらいです。", clarified_at: new Date().toISOString(),
+};
+it("B2: 選手（ja）には、コーチの回答・補足が日本語メイン＋英語原文の併記で出て、自分の質問・確認は原文だけ", async () => {
+ await render({ ...room, consultations: [overseas] }, undefined, "contract");
+ const text = container.textContent!;
+ expect(text).toContain("流しを3本やりましょう。");
+ expect(text).toContain("1本100mくらいです。");
+ expect([...container.querySelectorAll("p[lang='en']")].map((p) => p.textContent)).toEqual(["Do 3 strides.", "About 100m each."]);
+ expect(text).toContain("流しは何本がいいですか");
+ expect(text).not.toContain("How many strides should I do?");
+ expect(container.querySelectorAll("p[lang='ja']")).toHaveLength(0);
+});
+it("B2: コーチ（en）には、選手の質問・確認が英語メイン＋日本語原文の併記で出て、自分の回答・補足は原文だけ", async () => {
+ setActiveLocale("en");
+ try {
+  await render({ ...room, role: "coach", consultations: [overseas] }, undefined, "contract");
+  const text = container.textContent!;
+  expect(text).toContain("How many strides should I do?");
+  expect(text).toContain("Please tell me the distance too");
+  expect([...container.querySelectorAll("p[lang='ja']")].map((p) => p.textContent)).toEqual(["流しは何本がいいですか", "距離も教えてください"]);
+  expect(text).toContain("Do 3 strides.");
+  expect(text).not.toContain("流しを3本やりましょう。");
+ } finally { setActiveLocale("ja"); }
+});
+it("B4: 訳の項目が null（国内コーチ）のときは、ja／en どちらでも原文だけ", async () => {
+ const domestic = { ...overseas, question_en: null, answer_ja: null, clarify_body_en: null, clarification_ja: null };
+ for (const locale of ["ja", "en"] as const) {
+  setActiveLocale(locale);
+  try {
+   await render({ ...room, role: "coach", consultations: [domestic] }, undefined, "contract");
+   expect(container.querySelectorAll("p[lang]")).toHaveLength(0);
+   expect(container.textContent).toContain("流しは何本がいいですか");
+  } finally { setActiveLocale("ja"); }
+ }
+});

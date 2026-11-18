@@ -642,6 +642,11 @@ export type CoachingMessage = {
   video_purged?: boolean;
   menu: PlanMenu | null;
   created_at: string;
+  // 海外コーチとのやり取りの訳（本体 #916）。選手・保護者の文は body_en、コーチの文は body_ja とメニューの menu_ja。
+  // 対象外・訳が無い・古いときは null。
+  body_en?: string | null;
+  body_ja?: string | null;
+  menu_ja?: PlanMenu | null;
 };
 
 // 申し込む画面に出すプランとコーチ。
@@ -719,6 +724,10 @@ export type ReviewResponse =
       clarification: string | null;
       clarified_at: string | null;
       helpful_asked: boolean;
+      // 海外コーチの回答の和訳（本体 #916）。対象外・訳が無い・古いときは null。
+      good_point_ja?: string | null;
+      fix_points_ja?: string[] | null;
+      drill_ja?: string | null;
     };
 
 export type ReviewRating = {
@@ -756,6 +765,9 @@ export type ReviewRequest = {
   videos_purged?: boolean;
   // コーチが内容確認のために差し戻したときだけ入る。
   info_request?: ReviewInfoRequest | null;
+  // 海外コーチとのやり取りの訳（本体 #916）。相談文の英訳と、差し戻しの質問の和訳。対象外・訳が無い・古いときは null。
+  question_en?: string | null;
+  info_request_ja?: string | null;
   // コーチが引受後に辞退したときだけ入る。
   withdrawal?: ReviewWithdrawal | null;
   // 詳細を開いたときだけ付く。

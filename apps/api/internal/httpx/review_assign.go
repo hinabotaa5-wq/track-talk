@@ -138,6 +138,10 @@ func (s *Server) offerReview(ctx context.Context, id uuid.UUID) (bool, error) {
 		assigned = err == nil && rr.Status == "in_review"
 		return err
 	})
+	// コーチが決まったら相談文を訳す（海外コーチのときだけ。失敗しても割り当ては成功のまま）。
+	if err == nil && assigned {
+		s.translateReviewQuestionByID(ctx, id)
+	}
 	return assigned, err
 }
 
@@ -434,6 +438,9 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"coach_reward_yen":   rr.BasePriceYen * reviewSharePercent / 100,
 		"info_request":       infoRequestJSON(rr),
 		"withdrawal":         withdrawalJSON(rr),
+		// 海外コーチとのやり取りの訳（本体 #916）。詳細の応答でだけ withReviewTranslations が入れ、それ以外は null。
+		"question_en":     nil,
+		"info_request_ja": nil,
 	}
 	out["videos_purged"] = rr.VideosPurgedAt != nil
 	if withVideo {

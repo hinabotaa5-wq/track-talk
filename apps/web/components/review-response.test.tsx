@@ -76,6 +76,28 @@ it("ひとことが無い過去の返答はひとこと欄を出さずに表示�
   expect(container.textContent).not.toContain("ひとこと");
 });
 
+// 本体 #916 B1・B4: 海外コーチの回答3点は、和訳があれば和訳を主に・英語の原文を併記する。訳が無い項目・コーチ本人の画面は原文だけ。
+const shownResponse = {
+  hidden: false as const, good_point: "Stable first 8 steps", fix_points: ["Take off half a foot earlier", "Lift the trail knee"], drill: "Mini hurdles x3",
+  hitokoto: null, demo_video_url: null, created_at: "2026-12-01T00:00:00Z", clarify_reason: null, clarify_requested_at: null, clarification: null, clarified_at: null, helpful_asked: false,
+};
+it("B1: 選手（ja）には、回答3点が日本語メイン＋英語原文の併記で出て、訳が無い項目は原文だけ", async () => {
+  await act(async () => root.render(<ReviewResponseView response={{ ...shownResponse, good_point_ja: "最初の8歩が安定しています", fix_points_ja: ["半足ぶん手前で踏み切りましょう", "抜き脚の膝を上げましょう"], drill_ja: null }} />));
+  const originals = [...container.querySelectorAll("p[lang='en']")].map((p) => p.textContent);
+  expect(container.textContent).toContain("最初の8歩が安定しています");
+  expect(container.textContent).toContain("抜き脚の膝を上げましょう");
+  expect(originals).toEqual(["Stable first 8 steps", "Take off half a foot earlier", "Lift the trail knee"]);
+  expect(container.textContent).toContain("Mini hurdles x3");
+});
+it("B4: 訳の項目が null（国内コーチ）やコーチ本人の画面では、全て原文だけ", async () => {
+  await act(async () => root.render(<ReviewResponseView response={{ ...shownResponse, good_point_ja: null, fix_points_ja: null, drill_ja: null }} />));
+  expect(container.querySelectorAll("p[lang='en']")).toHaveLength(0);
+  expect(container.textContent).toContain("Stable first 8 steps");
+  await act(async () => root.render(<ReviewResponseView viewer="coach" response={{ ...shownResponse, good_point_ja: "訳", fix_points_ja: ["訳1", "訳2"], drill_ja: "訳3" }} />));
+  expect(container.querySelectorAll("p[lang='en']")).toHaveLength(0);
+  expect(container.textContent).not.toContain("訳1");
+});
+
 it.each(["requester", "coach"] as const)("%s は項目ごとに独立したカードで、閲覧者基準の寄せ・色・日時を表示する", async (viewer) => {
   await act(async () => root.render(<ReviewResponseView viewer={viewer} response={{ ...baseResponse, fix_points: ["接地を直す", "姿勢を保つ"], demo_video_url: "https://example.com/demo.mp4" }} />));
   const cards = [...container.querySelector("section")!.children];

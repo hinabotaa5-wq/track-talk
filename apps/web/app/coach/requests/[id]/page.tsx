@@ -16,6 +16,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled } from "@/lib/features";
+import { athleteText, originalTextClass } from "@/lib/coaching-display";
 import { formatChatDateTime, formatDateTime } from "@/lib/format";
 import { t, type Locale, L } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
@@ -203,6 +204,8 @@ export default function CoachReviewRequestPage() {
   if (loading || !session || !request) return <PageLoading screen label={t(locale, "common.loading")} />;
 
   const response = request.response;
+  // 海外コーチ向けに、選手の相談文の英訳があれば英訳を主に・原文を直下に併記する（本体 #916）。
+  const question = request.question ? athleteText(request.question, request.question_en, { mine: false, locale }) : null;
 
   return (
     <div className="mx-auto max-w-md space-y-6">
@@ -233,7 +236,8 @@ export default function CoachReviewRequestPage() {
       <div className="flex justify-start">
         <div className="max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2">
           <time dateTime={request.created_at} className="text-xs text-slate-300">{formatChatDateTime(request.created_at)}</time>
-          <p className="whitespace-pre-wrap break-words text-sm">{reviewQuestionText(request)}</p>
+          <p className="whitespace-pre-wrap break-words text-sm">{question ? question.text : reviewQuestionText(request)}</p>
+          {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
         </div>
       </div>
 
