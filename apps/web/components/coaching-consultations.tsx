@@ -12,7 +12,7 @@ import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
 import { canClarify, consultationStatus, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
 import { coachingConsultationEnabled, coachingMessagingEnabled, consultationClosedNote, messagingClosedNote } from "@/lib/features";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { formatChatDateTime, formatDateTime, formatYen } from "@/lib/format";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -50,12 +50,20 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   const draft = data.consultations.find((c) => c.status === "draft" && !c.purged);
   const sendEnabled = kind === "review" ? coachingConsultationEnabled : coachingMessagingEnabled;
   const heading = kind === "review" ? L("追加質問") : L("追加相談");
+  const showReviewIntro = kind === "review" && data.role === "requester" && sendEnabled
+    && data.consultations.every((c) => c.status === "draft") && (draft || data.can_purchase && !open);
   return <section className="space-y-4 rounded-2xl border border-white/20 bg-white/5 p-4" aria-label={heading}>
     <h2 className="font-bold">{heading}</h2>
-    {coachReview ? null : <>
+    {showReviewIntro ? <div className="flex justify-start">
+      <div className="max-w-[85%] space-y-1 rounded-xl rounded-bl-sm bg-slate-500/20 px-3 py-2">
+        <p className="text-xs font-semibold text-slate-300">TrackTalk</p>
+        <p className="text-xs text-slate-300">{L("質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は48時間以内、回答は受諾後72時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。")}</p>
+      </div>
+    </div> : null}
+    {kind === "contract" || data.role === "guardian" ? <>
     <p className="text-sm text-slate-200">{kind === "review" ? L("この添削について質問を1回送ると、担当コーチが1回回答します。回答のあとに追加のやりとりはできません。") : L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
     <p className="text-xs text-slate-300">{kind === "review" ? L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。") : L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
-    </>}
+    </> : null}
     {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash"} />)}
     {!sendEnabled ? <p className="text-xs text-slate-300">{kind === "review" ? L(consultationClosedNote) : L(messagingClosedNote)}</p> : null}
     {sendEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} reload={load} /> : null}
@@ -109,7 +117,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo,
     <ContactNotice />
     {guard.warning}
     <Textarea aria-label={L(kind === "review" ? "追加質問の質問" : "追加相談の質問")} value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder={L("新しく相談したいこと")} />
-    <label className="block text-xs text-slate-200">{L("動画（30秒・100MB以内")}{requiresVideo ? L("、必須") : L("、任意")}{L("）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm" /></label>
+    <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs text-slate-200">{L("動画（30秒・100MB以内")}{requiresVideo ? L("、必須") : L("、任意")}{L("）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">{L("保存済みの動画を添付します。")}<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">{L("外す")}</button></p> : null}
     <p className="text-xs text-slate-300">{L("購入前に下書きを7日間保存します。送信後は内容を変更できません。{v0}", { v0: kind === "review" ? L("18歳未満の方は、購入する前に保護者の許可を得てください。") : L("18歳未満の方のパーソナル指導の相談は、保護者が支払います。") })}</p>
     {kind === "review" ? <ReviewPayNotice /> : null}
@@ -134,11 +142,12 @@ export function ConsultationTermsNote({ kind }: { kind: "review" | "contract" })
 // 見た目だけのチャット風吹き出し。動画添削のあとの追加質問（review）とサポートプランの追加相談（contract）で
 // 表示部品を共有し、デザインが二重定義でずれないようにする。実質（回数・期限・一方通行）は変えない。
 // 閲覧者本人の発言は右（bg-blue-500/25・rounded-br-sm）、相手の発言は左（bg-white/10・rounded-bl-sm）。
-// 選手（requester）は質問・確認が右、コーチ（coach）は回答・補足が右。保護者（guardian）は話者でないため質問・確認を右、回答・補足を左のまま。見出しは「ラベル · 時刻」。
-function ChatBubble({ side, label, at, children }: { side: "right" | "left"; label: string; at?: string | null; children: ReactNode }) {
+// 選手（requester）は質問・確認が右、コーチ（coach）は回答・補足が右。保護者（guardian）は質問・確認を右、回答・補足を左のまま。
+// 話者ラベルは出さず、吹き出し内の先頭に年なしの日本時間だけを置く。
+function ChatBubble({ side, at, children }: { side: "right" | "left"; at?: string | null; children: ReactNode }) {
   return <div className={side === "right" ? "flex justify-end" : "flex justify-start"}>
     <div className={side === "right" ? "max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2" : "max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2"}>
-      <p className="text-xs text-slate-300">{label}{at ? ` · ${formatDateTime(at)}` : ""}</p>
+      {at ? <time dateTime={at} className="block text-xs text-slate-300">{formatChatDateTime(at)}</time> : null}
       {children}
     </div>
   </div>;
@@ -176,28 +185,26 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   // サポートプランの追加相談も同じ吹き出しで見せる（質問・回答・確認・補足）。実質（確認は回答から7日以内に1回無料、部屋に複数の相談が並ぶ形）は変えない。
   const chat = kind === "review";
   const statusText = chat && c.status === "answered" ? L("回答済み・この追加質問は終了しました") : consultationStatus[c.status];
-  const questionLabel = role === "requester" ? L("あなたの質問") : L("選手の質問");
-  const answerLabel = role === "coach" ? L("あなたの回答") : L("コーチの回答");
   // コーチが見るときだけ左右を入れ替え、自分の回答・補足を右・青にする。
   const askerSide = role === "coach" ? "left" : "right";
   const coachSide = role === "coach" ? "right" : "left";
   return <article className="space-y-3 border-t border-white/20 pt-3">
     <p className="text-sm font-semibold">{statusText} · {formatYen(c.price_yen)}</p>
     {c.hidden || c.purged ? <p className="text-sm text-slate-300">{c.hidden ? L("運営が確認のため非表示にしています") : L("保存期間が終了しました")}</p> : <>
-      <ChatBubble side={askerSide} label={questionLabel} at={c.created_at}>
+      <ChatBubble side={askerSide} at={c.created_at}>
         <p className="whitespace-pre-wrap text-sm">{c.question}</p>
         {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
       </ChatBubble>
-      {c.answer ? <ChatBubble side={coachSide} label={answerLabel} at={c.answered_at}>
+      {c.answer ? <ChatBubble side={coachSide} at={c.answered_at}>
         <p className="whitespace-pre-wrap text-sm">{c.answer}</p>
         {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
       </ChatBubble> : null}
       {c.videos_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間を過ぎたため削除しました（文章は引き続き見られます）。")}</p> : null}
       {kind === "contract" ? <>
-        {c.clarify_body ? <ChatBubble side={askerSide} label={role === "requester" ? L("あなたの確認") : L("選手の確認")} at={c.clarify_requested_at}>
+        {c.clarify_body ? <ChatBubble side={askerSide} at={c.clarify_requested_at}>
           <p className="whitespace-pre-wrap text-sm">{c.clarify_body}</p>
         </ChatBubble> : null}
-        {c.clarification ? <ChatBubble side={coachSide} label={role === "coach" ? L("あなたの補足") : L("コーチの補足")} at={c.clarified_at}>
+        {c.clarification ? <ChatBubble side={coachSide} at={c.clarified_at}>
           <p className="whitespace-pre-wrap text-sm">{c.clarification}</p>
         </ChatBubble> : null}
       </> : <>
@@ -211,7 +218,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
         <ContactNotice />
         {guard.warning}
         <Textarea aria-label={reply ? L("コーチの回答") : clarify ? L("回答への確認質問") : L("コーチの補足")} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} disabled={pending} />
-        {reply ? <label className="block text-xs">{L("実践動画（30秒・100MB以内、任意）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label> : null}
+        {reply ? <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs">{L("実践動画（30秒・100MB以内、任意）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label> : null}
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? L("回答を送る") : clarify ? L("回答について確認する（1回無料）") : L("補足を送る")}</Button>
       </div> : null}
       {c.status === "awaiting_payment" && role === c.payer ? <>

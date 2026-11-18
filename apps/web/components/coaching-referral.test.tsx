@@ -95,3 +95,30 @@ it("有効な紹介IDには取り消し線も薄い色も付けず、コピー�
   expect(copyButton()).toBeDefined();
   expect(container.textContent).not.toContain(endedNotice);
 });
+
+it("compact は見出し・ID・コピー・状態だけでコピー結果も表示する", async () => {
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  mocks.api.mockResolvedValue({ referral: { code: "ABC123", active: true, friend_count: 1, granted_at: null, expires_at: null } });
+  await act(async () => root.render(<LoadedReferralCard token="test" variant="compact" />));
+  expect(container.querySelector("h2")?.textContent).toBe("友達2人に紹介すると、1回分(500円)無料！");
+  expect(container.querySelector("h2")?.classList).toContain("text-sm");
+  expect(container.querySelector("section")?.classList).toContain("p-3");
+  expect(container.textContent).toContain("あなたの紹介ID ABC123");
+  expect(container.textContent).toContain("あと1人で無料チケット");
+  expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。");
+  await act(async () => copyButton()!.click());
+  expect(writeText).toHaveBeenCalledWith("ABC123");
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("コピーしました");
+});
+
+it.each(["full", "compact"] as const)("%s の終了IDは取り消し線・グレー・コピーなしで、付与詳細はfullだけに出る", async (variant) => {
+  mocks.api.mockResolvedValue({ referral: { code: "ABC123", active: false, friend_count: 2, granted_at: "2026-11-14T09:00:00Z", expires_at: "2027-05-14T09:00:00Z" } });
+  await act(async () => root.render(<LoadedReferralCard token="test" variant={variant} />));
+  for (const c of endedClasses) expect(container.querySelector("strong")?.classList).toContain(c);
+  expect(copyButton()).toBeUndefined();
+  expect(container.textContent).toContain("無料チケットをプレゼントしました");
+  for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "特典チケット：", endedNotice]) {
+    expect(container.textContent?.includes(text)).toBe(variant === "full");
+  }
+});
