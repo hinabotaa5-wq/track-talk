@@ -13,6 +13,7 @@ import { SenseNoteComposer } from "./sense-notes";
 
 const apiFetch = vi.fn();
 let pathname = "/";
+let profile: { nickname: string; event: string } | null = null;
 const replace = vi.fn();
 const back = vi.fn();
 vi.mock("next/navigation", () => ({ usePathname: () => pathname, useRouter: () => ({ replace, back }) }));
@@ -25,7 +26,7 @@ vi.mock("next/link", () => ({
   useLinkStatus: () => linkStatus,
 }));
 vi.mock("next/dynamic", () => ({ default: () => () => <p>メニューの内容</p> }));
-vi.mock("./auth-provider", () => ({ useAuth: () => ({ token: "test-token", session: { user: { id: "user-1" } }, profile: null }) }));
+vi.mock("./auth-provider", () => ({ useAuth: () => ({ token: "test-token", session: { user: { id: "user-1" } }, profile }) }));
 vi.mock("./leave-guard", () => ({
   useLeaveGuard: () => ({ confirmLeave: () => false }),
   useGuardedLinkClick: () => guardedClick,
@@ -43,6 +44,7 @@ beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   apiFetch.mockReset();
   pathname = "/";
+  profile = null;
   replace.mockReset();
   back.mockReset();
   linkStatus.pending = false;
@@ -296,4 +298,25 @@ it("感覚メモの日付は日本時間の今日に固定し、保存日はAPI�
 it("保存済みの画面でも連続日数の一文だけを表示する", async () => {
   await act(async () => root.render(<SenseNoteComposer token="test-token" writtenToday streak={6} onCreated={vi.fn()} />));
   expect(container.textContent).toBe("6日続けて書けてる。また明日も書こう！");
+});
+
+// #965: Header の実際の描画で、購読なしの search と認証復元が
+// /coaching のヘッダー非表示を引き起こすかを切り分ける。
+it.each([false, true])("プロフィール設定画面からコーチ一覧へ移ると search・プロフィール未設定=%s でもヘッダーを表示する", async (incomplete) => {
+  apiFetch.mockResolvedValue({ unread_count: 0 });
+  const originalURL = window.location.href;
+  pathname = "/me/profile";
+  window.history.replaceState(null, "", "/me/profile?onboarding=1");
+  profile = incomplete ? { nickname: "", event: "" } : null;
+  await act(async () => root.render(<Header />));
+  expect(container.querySelector("header")).toBeNull();
+  // URL のクエリが残った場合でも、パスが /coaching なら非表示条件にならない。
+  pathname = "/coaching";
+  window.history.replaceState(null, "", "/coaching?onboarding=1");
+  await act(async () => root.render(<Header />));
+  expect(container.querySelector('header a[aria-label="TrackTalk"]')).not.toBeNull();
+  profile = { nickname: "選手", event: "100m" };
+  await act(async () => root.render(<Header />));
+  expect(container.querySelector('header a[aria-label="マイページ"]')).not.toBeNull();
+  window.history.replaceState(null, "", originalURL);
 });
