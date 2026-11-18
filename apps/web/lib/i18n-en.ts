@@ -1957,7 +1957,7 @@ export const en: Readonly<Record<string, string>> = {
   "コーチの提案": "Coach's proposal",
   "内容の補足": "Additional details",
   "聞きたいことへの回答": "Answers to your questions",
-  "運営手数料{fee_percent}%を引いた、あなたの受け取り: {v1}。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。": "Your earnings after the {fee_percent}% service fee: {v1}. Earnings are finalized at the end of the contract, prorated by days elapsed, and provisionally paid monthly for days through each month-end.",
+  "運営手数料{fee_percent}%を引いた、あなたの受け取り: {v1}。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。お支払いは、前の月の末日までの分を翌月15日にまとめて行います。": "Your earnings after the {fee_percent}% service fee: {v1}. Earnings are finalized at the end of the contract, prorated by days elapsed, and provisionally paid monthly for days through each month-end. Payments are made on the 15th of the following month, covering amounts through the end of the previous month.",
   "操作できませんでした": "Couldn't complete the action",
   "目標の大会まで、練習や調整を継続してサポートします。まず無料で相談し、大会の日や内容をふまえて、コーチが期間・内容・価格を提案します。": "Ongoing support for training and tuning up to your target meet. Start with a free consultation, then the coach proposes the period, content, and price based on your meet date and needs.",
   "1ヶ月の間、練習や調整を継続してサポートします。まず無料で相談し、目標や内容をふまえて、コーチが内容・価格を提案します。動画への返答は期間中は回数の制限なく受けられ、メニューは最初に作成し期間中は必要に応じて見直します。": "Ongoing support for training and tuning for one month. Start with a free consultation, then the coach proposes the content and price based on your goals and needs. Video replies are unlimited during the period, and the coach creates the training menu first and revises it as needed during the period.",
