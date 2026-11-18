@@ -13,6 +13,7 @@ import { NotificationBell } from "./notification-bell";
 import { TodayMeetBalloon } from "./today-meet-balloon";
 import { useCurrentMainTab, headerBackFallback, isCoachChildPage, hasBackOnlyHeader, hidesHeader, mainTabHref, mainTabs, showsBackButton, showsHeaderAccountActions } from "./bottom-nav";
 import { useGuardedLinkClick, useLeaveGuard } from "./leave-guard";
+import { useHeaderBackDestination } from "./header-back-override";
 import { trackHeaderHistory } from "@/lib/header-history";
 import { mainTabLabel, t } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
@@ -36,6 +37,7 @@ export function Header() {
   const showHeaderAccountActions = showsHeaderAccountActions(pathname, search);
   const backOnly = hasBackOnlyHeader(pathname, search);
   const { confirmLeave } = useLeaveGuard();
+  const backDestination = useHeaderBackDestination(pathname);
   const guardedClick = useGuardedLinkClick();
 
   const history = useRef<ReturnType<typeof trackHeaderHistory> | null>(null);
@@ -58,7 +60,9 @@ export function Header() {
 
   function goBack() {
     const go = () => {
-      if (pathname === "/coach/apply") router.replace("/coach");
+      if (/^\/coaching\/requests\/[^/]+\/feedback$/.test(pathname)) router.replace("/coaching");
+      else if (backDestination) router.push(backDestination);
+      else if (pathname === "/coach/apply") router.replace("/coach");
       else if (pathname === "/coach/about") router.replace("/coach/apply");
       else if (isCoachChildPage(pathname)) router.replace("/coach");
       // 返却済みの依頼詳細など、コーチの子画面の履歴エントリへは戻らず、フォールバック（コーチ画面→コーチタブ）へ進む。
