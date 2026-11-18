@@ -11,11 +11,12 @@ import { Button } from "@/components/ui/button";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 import { coachText } from "@/lib/coaching-display";
-import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
+import { ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatChatDateTime, formatDateTime, formatYen } from "@/lib/format";
+import { coachingCoachListEnabled } from "@/lib/features";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
@@ -328,9 +329,16 @@ function ReviewRequestView() {
     <div className="mx-auto max-w-md space-y-5">
       {completedPayment && request.payment?.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} variant="compact" /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">{L("1回プラン")}</h1>
-        <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-2xl font-bold">{L("1回プラン")}</h1>
+          <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
+        </div>
+        {request.coach?.id && coachingCoachListEnabled ? (
+          <Link href={`/coaches/${encodeURIComponent(request.coach.id)}`} className="inline-flex min-h-9 items-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-blue-300 transition active:scale-[0.98]">
+            {L("このコーチのプロフィールを見る")}
+          </Link>
+        ) : null}
       </div>
 
       <div className="space-y-1 text-center text-xs text-slate-400">
@@ -391,7 +399,6 @@ function ReviewRequestView() {
 
       {request.response ? (
         <>
-          {request.coach ? <ReviewCoachCard coach={request.coach} /> : null}
           <ReviewResponseView response={request.response} viewer="requester" />
           <ResponseActions request={request} token={token} onChange={setRequest} />
           {request.status === "returned" || request.status === "clarifying" ? (
