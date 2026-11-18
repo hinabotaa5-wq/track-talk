@@ -404,6 +404,7 @@ func (s *Server) listPostsFiltered(w http.ResponseWriter, r *http.Request, sort 
 			items = append(items, item)
 		}
 	}
+	s.attachPostTranslations(r.Context(), items)
 	if err := s.attachRecruitmentCovers(r.Context(), items); err != nil {
 		MapDBError(w, err)
 		return
@@ -513,6 +514,9 @@ func (s *Server) getPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	item := withMine(r, s.present(postFromGet(row, liked)))
+	translatedItems := []postDTO{item}
+	s.attachPostTranslations(r.Context(), translatedItems)
+	item = translatedItems[0]
 	item, err := s.attachRecruitment(r.Context(), item)
 	if err != nil {
 		MapDBError(w, err)
@@ -782,12 +786,15 @@ func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
 		s.writeCreatePostError(w, r, err, params)
 		return
 	}
+	s.generatePostTranslation(r.Context(), row.ID, params.Kind, params.Title, params.Body)
 	full, err := s.q.GetPost(r.Context(), row.ID)
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusCreated, withMine(r, s.present(postFromGet(full, false))))
+	items := []postDTO{withMine(r, s.present(postFromGet(full, false)))}
+	s.attachPostTranslations(r.Context(), items)
+	JSON(w, http.StatusCreated, items[0])
 }
 
 func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
@@ -843,12 +850,15 @@ func (s *Server) updatePost(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.generatePostTranslation(r.Context(), id, existing.Kind, params.Title, params.Body)
 	full, err := s.q.GetPost(r.Context(), id)
 	if err != nil {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, withMine(r, s.present(postFromGet(full, false))))
+	items := []postDTO{withMine(r, s.present(postFromGet(full, false)))}
+	s.attachPostTranslations(r.Context(), items)
+	JSON(w, http.StatusOK, items[0])
 }
 
 func (s *Server) deletePost(w http.ResponseWriter, r *http.Request) {
@@ -912,6 +922,7 @@ func (s *Server) listSaves(w http.ResponseWriter, r *http.Request) {
 		item.SavedByMe = true
 		items = append(items, item)
 	}
+	s.attachPostTranslations(r.Context(), items)
 	if err := s.attachRecruitmentCovers(r.Context(), items); err != nil {
 		MapDBError(w, err)
 		return

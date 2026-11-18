@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FeedCard } from "./feed-card";
 import type { Post } from "@/lib/types";
 
@@ -184,4 +184,31 @@ it.each(["text", "video"] as const)("%s：画像付き投稿の詳細文は画�
   expect(html).not.toContain("非表示のタイトル");
   expect(html.match(/改行のある詳細文/g)).toHaveLength(1);
   expect(html.indexOf("改行のある詳細文")).toBeLessThan(html.indexOf("</a>"));
+});
+
+import { setActiveLocale } from "@/lib/i18n";
+afterEach(() => setActiveLocale("ja"));
+it.each([
+  ["en", "English title", "English body", "English body"],
+  ["en", null, null, "日本語本文"],
+  ["ja", "English title", "English body", "日本語本文"],
+  ["en", "English title", null, "日本語本文"],
+  ["en", null, "English body", "English body"],
+] as const)("video caption %s %s %s", (locale, title_en, excerpt_en, expected) => {
+  setActiveLocale(locale);
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", title: "日本語タイトル", excerpt: "日本語本文", title_en, excerpt_en } }));
+  expect(html).toContain(expected);
+});
+it("uses the translated title when a video has no description", () => {
+  setActiveLocale("en");
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind: "video", title_en: "English title" } }));
+  expect(html).toContain("English title");
+  expect(html).not.toContain("自分の投稿");
+});
+it.each(["text", "youtube", "instagram", "x", "recruitment", "practice", "injury", "meet"] as const)("ignores translation fields for %s", (kind) => {
+  setActiveLocale("en");
+  const html = renderToStaticMarkup(createElement(FeedCard, { post: { ...post, kind, title_en: "English title", body_en: "English body", excerpt_en: "English excerpt" } }));
+  expect(html).not.toContain("English title");
+  expect(html).not.toContain("English body");
+  expect(html).not.toContain("English excerpt");
 });
