@@ -407,6 +407,10 @@ func (s *Server) writeRequesterReview(w http.ResponseWriter, r *http.Request, rr
 		MapDBError(w, err)
 		return
 	}
+	if err := s.attachFeedbackSubmitted(r.Context(), out, rr.ID); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, out)
 }
 

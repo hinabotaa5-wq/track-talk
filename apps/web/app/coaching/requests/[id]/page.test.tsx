@@ -102,6 +102,9 @@ function baseRequest(override: RequestFixture = {}) {
   return request;
 }
 
+const feedbackLabel = "この添削はどうでしたか（任意）";
+const feedbackNotice = "感想は匿名で、7日後にコーチへ届きます。どの添削への感想かはコーチには分かりません。";
+
 function mockConsultationsEmpty(path: string): unknown {
   if (path.endsWith("/consultations")) {
     return { consultations: [], role: "requester", funding: "cash", price_yen: 500, can_purchase: true, requires_video: false };
@@ -153,7 +156,8 @@ it("返却後の質問には有料の追加質問だけを表示する", async (
     expect(container.textContent).toContain("腕振り");
     expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
     expect(container.textContent).toContain("質問する（500円）");
-    expect(container.querySelectorAll("textarea")).toHaveLength(1);
+    // 返却後の匿名の感想（本体 #911）の欄は別枠なので、それ以外の入力欄が追加質問の1つだけであることを見る。
+    expect(container.querySelectorAll(`textarea:not([aria-label="${feedbackLabel}"])`)).toHaveLength(1);
     expect(container.textContent).not.toContain("確認質問を送る（無料）");
   } finally {
     await teardown(root, container);
@@ -696,6 +700,123 @@ it("「依頼の一覧へ」は枠付きのボタン形で、行き先と文言�
     expect(link.getAttribute("href")).toBe("/me/coaching/requests");
   } finally {
     await teardown(root, container);
+  }
+});
+
+// 返却後に任意で書ける匿名の感想（本体 #911）。
+function mockFeedbackRequest(extra: Record<string, unknown> = {}) {
+  apiFetch.mockImplementation(async (path: string, init?: { method?: string; body?: string }) => {
+    const consultations = mockConsultationsEmpty(path);
+    if (consultations !== undefined) return consultations;
+    if (path === "/v1/coaching/requests/review-1/feedback" && init?.method === "POST") {
+      return { feedback_submitted: true, visible_at: new Date(Date.now() + 7 * 86400_000).toISOString() };
+    }
+    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+    return baseRequest({ extra });
+  });
+}
+
+function feedbackTextarea(container: HTMLDivElement) {
+  return container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${feedbackLabel}"]`);
+}
+
+function buttonByText(container: HTMLDivElement, text: string) {
+  return Array.from(container.querySelectorAll("button")).find((b) => b.textContent === text) ?? null;
+}
+
+async function typeInto(textarea: HTMLTextAreaElement, value: string) {
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    setter?.call(textarea, value);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+it("B1: 返却済みで未送信なら、感想フォームと匿名・7日後の注意書きを出す", async () => {
+  mockFeedbackRequest({ feedback_submitted: false });
+  const { container, root } = await renderPage();
+  try {
+    expect(container.textContent).toContain(feedbackLabel);
+    const textarea = feedbackTextarea(container);
+    expect(textarea).not.toBeNull();
+    expect(textarea?.maxLength).toBe(500);
+    expect(container.textContent).toContain(feedbackNotice);
+    expect(buttonByText(container, "感想を送る")).not.toBeNull();
+    // 未送信でも追加質問は使える（ブロックしない）。
+    expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("B2: 送信するとフォームが消えて「感想を送りました」になる", async () => {
+  mockFeedbackRequest({ feedback_submitted: false });
+  const { container, root } = await renderPage();
+  try {
+    const textarea = feedbackTextarea(container);
+    if (!textarea) throw new Error("感想の欄がありません");
+    const button = buttonByText(container, "感想を送る");
+    expect(button?.disabled).toBe(true);
+    await typeInto(textarea, "  分かりやすかったです  ");
+    expect(button?.disabled).toBe(false);
+    await click(button!);
+    expect(apiFetch).toHaveBeenCalledWith("/v1/coaching/requests/review-1/feedback", {
+      method: "POST",
+      token: "token",
+      body: JSON.stringify({ body: "分かりやすかったです" }),
+    });
+    expect(feedbackTextarea(container)).toBeNull();
+    expect(buttonByText(container, "感想を送る")).toBeNull();
+    expect(container.textContent).toContain("感想を送りました");
+    expect(container.textContent).not.toContain(feedbackNotice);
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("B3: clarifying でもフォームを出す", async () => {
+  mockFeedbackRequest({ status: "clarifying", feedback_submitted: false });
+  const { container, root } = await renderPage();
+  try {
+    expect(feedbackTextarea(container)).not.toBeNull();
+    expect(container.textContent).toContain(feedbackNotice);
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+for (const status of ["awaiting_payment", "queued", "offered", "in_review", "needs_info", "expired"]) {
+  it(`B3: ${status} ではフォームを出さない`, async () => {
+    mockFeedbackRequest({ status, feedback_submitted: false, due_at: new Date(Date.now() + 3600_000).toISOString() });
+    const { container, root } = await renderPage();
+    try {
+      expect(container.textContent).toContain("スタートの姿勢について");
+      expect(feedbackTextarea(container)).toBeNull();
+      expect(container.textContent).not.toContain(feedbackLabel);
+      expect(container.textContent).not.toContain("感想を送りました");
+    } finally {
+      await teardown(root, container);
+    }
+  });
+}
+
+it("B4: 送信済みならフォームを出さず「感想を送りました」だけを出す", async () => {
+  mockFeedbackRequest({ feedback_submitted: true });
+  const { container, root } = await renderPage();
+  try {
+    expect(feedbackTextarea(container)).toBeNull();
+    expect(container.textContent).not.toContain(feedbackLabel);
+    expect(container.textContent).toContain("感想を送りました");
+    // 送信済みでも追加質問は使える。
+    expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("感想の新しい文言には英訳がある", () => {
+  for (const key of [feedbackLabel, feedbackNotice, "感想を送る", "感想を送りました"]) {
+    expect(en[key]).toBeTruthy();
   }
 });
 

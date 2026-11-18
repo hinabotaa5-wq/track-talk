@@ -397,6 +397,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coaching/requests/{id}/resubmit", s.resubmitReviewRequest)
 				r.Post("/coaching/requests/{id}/rating", s.rateReview)
 				r.Post("/coaching/requests/{id}/helpful", s.answerHelpful)
+				// 返却後に任意で書ける匿名の感想（本体 #911）。コーチには7日後に本文だけ見せる。
+				r.Post("/coaching/requests/{id}/feedback", s.submitReviewFeedback)
 				// コーチ側（プロフィール・報酬・プラン・契約・添削の返却）
 				// 顔写真（PUT /coach/me/photo）は応募の審査に使うので、閉じない方に置いてある。
 				r.Patch("/coach/me", s.updateCoachDuty)
@@ -416,6 +418,7 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coach/contracts/{id}/decline", s.declineCoachingContract)
 				r.Get("/coach/requests", s.listCoachRequests)
 				r.Get("/coach/requests/{id}", s.getCoachReviewRequest)
+				r.Get("/coach/feedback", s.listCoachFeedback)
 				r.Post("/coaching/requests/{id}/response", s.submitReviewResponse)
 				// 返却前の「内容確認のための差し戻し」（1依頼1回）。コーチから依頼者への質問なので、メッセージ機能と一緒に開ける。
 				r.With(s.requireMessaging).Post("/coach/requests/{id}/info-request", s.requestReviewInfo)
