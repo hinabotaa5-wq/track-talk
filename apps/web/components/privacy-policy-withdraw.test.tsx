@@ -27,3 +27,9 @@ it("第7条の国外提供への同意案内に、退会手続きを完了でき
   expect(article).toContain('href="/contact"');
   expect(article).toContain("マイページ「お問い合わせ」からご連絡ください。運営者が個別に対応します。");
 });
+
+it("第10条に取引条件の明示と精算記録を独立した保持対象として記す", () => {
+  const html = renderToStaticMarkup(<PrivacyPolicy />);
+  const section = html.slice(html.indexOf("保管と退会"), html.indexOf("開示、訂正、削除などの請求"));
+  expect(section).toContain("取引条件の明示（継続プランの契約ごとに示した取引条件の記録）と精算記録は、取引に関する記録として退会後も保管します。");
+});
