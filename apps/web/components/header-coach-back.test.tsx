@@ -186,3 +186,19 @@ for (const [name, entryPoints] of [
     }
   });
 }
+
+it("D1/D2: 感想ページは履歴や送信状態によらずコーチ一覧へ replace する", async () => {
+  replace.mockReset(); back.mockReset();
+  const container = document.createElement("div"); document.body.append(container); const root = createRoot(container);
+  window.history.pushState({}, "", "/coaching/requests/example");
+  pathname = "/coaching/requests/example/feedback";
+  window.history.pushState({}, "", pathname);
+  try {
+    await act(async () => root.render(<Header />));
+    for (let i = 0; i < 2; i++) {
+      await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="戻る"]')!.click());
+      expect(replace).toHaveBeenLastCalledWith("/coaching");
+    }
+    expect(back).not.toHaveBeenCalled();
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
