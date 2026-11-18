@@ -33,7 +33,7 @@ const chip = (on: boolean) =>
 // 返答が届いたあとの操作: 7日後の「役に立ちましたか」、通報。（星評価は廃止）
 function ResponseActions({ request, token, onChange }: { request: ReviewRequest; token: string | null; onChange: (r: ReviewRequest) => void }) {
   const [error, setError] = useState("");
-  const [reported, setReported] = useState(false);
+  const [reported, setReported] = useState(request.response_reported ?? false);
   const { pending, acquire, release } = useActionLock();
   const confirmDialog = useConfirm();
   const response = request.response;

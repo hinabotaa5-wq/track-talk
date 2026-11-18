@@ -5,6 +5,7 @@ import { expect, it, vi } from "vitest";
 import { LeaveGuardProvider } from "@/components/leave-guard";
 import { en } from "@/lib/i18n-en";
 import { reviewVideosPurgedNote } from "@/lib/review";
+import { ApiRequestError } from "@/lib/api";
 import ReviewRequestPage from "./page";
 
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -293,6 +294,55 @@ it("通報の導線は残る", async () => {
   try {
     expect(container.querySelector("button")?.textContent).not.toBeNull();
     expect(container.textContent).toContain("この返答を通報する");
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it("通報済みの返答は開き直しても最初から通報済み表示になる", async () => {
+  for (let i = 0; i < 2; i++) {
+    const { container, root } = await renderWith({ extra: { response_reported: true } });
+    try {
+      expect([...container.querySelectorAll("button")].some((b) => b.textContent === "この返答を通報する")).toBe(false);
+      expect(container.textContent).toContain("通報しました。運営が確認します。");
+    } finally {
+      await teardown(root, container);
+    }
+  }
+});
+
+it("未通報フラグが false でも通報ボタンを表示する", async () => {
+  const { container, root } = await renderWith({ extra: { response_reported: false } });
+  try {
+    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "この返答を通報する")).toBe(true);
+    expect(container.textContent).not.toContain("通報しました。運営が確認します。");
+  } finally {
+    await teardown(root, container);
+  }
+});
+
+it.each(["success", "conflict"])("通報の結果が %s ならその画面内でも通報済み表示に切り替える", async (result) => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/reports") {
+      if (result === "conflict") throw new ApiRequestError(409, "already reported");
+      return {};
+    }
+    const consultations = mockConsultationsEmpty(path);
+    if (consultations !== undefined) return consultations;
+    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+    return baseRequest({ extra: { response_reported: false } });
+  });
+  const { container, root } = await renderPage();
+  try {
+    const button = [...container.querySelectorAll("button")].find((b) => b.textContent === "この返答を通報する")!;
+    await click(button);
+    expect(apiFetch).toHaveBeenCalledWith("/v1/reports", expect.objectContaining({
+      method: "POST",
+      token: "token",
+      body: JSON.stringify({ target_type: "review_response", target_id: "review-1", reason: "other", detail: "" }),
+    }));
+    expect(container.textContent).not.toContain("この返答を通報する");
+    expect(container.textContent).toContain("通報しました。運営が確認します。");
   } finally {
     await teardown(root, container);
   }
