@@ -19,7 +19,7 @@ it("海外コーチ向けの英語の紹介ページ：確定原稿の金額・�
   // 海外の単発には有料フォローアップを付けない（#718 運営者決定 2026-11-14）。Coach Terms 第1条・第2条と一致させる。
   expect(text).toContain("A single review has no paid follow-up add-on; an athlete who wants to keep asking questions moves to the one-month package.");
   expect(text).not.toContain("is available as an add-on");
-  expect(text).toContain("aiming for about 48 hours per reply");
+  expect(text).toContain("aiming for about 36 hours per reply");
   expect(text).toContain("revise it each week");
   expect(text).toContain("paid by the 15th of the following month (during the pilot we aim to send it around the 7th)");
   expect(text).toContain("There is no minimum payout — everything you earn is paid out each month, and we cover the Wise transfer fees.");

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { canClarify, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
 import { formatDateTime } from "@/lib/format";
 import { CoachingConsultations } from "./coaching-consultations";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
+import { en } from "@/lib/i18n-en";
 const apiFetch = vi.fn();
 const flags = vi.hoisted(() => ({ messaging: true, consultation: true }));
 vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get coachingMessagingEnabled() { return flags.messaging; }, get coachingConsultationEnabled() { return flags.consultation; } }));
@@ -224,7 +226,23 @@ it("回答済みの追加質問を選手が見るときは、自分の質問を�
 });
 // #918 コーチ画面（動画添削のあと）では、追加質問の選手向け説明を出さない。質問が届くまでは枠ごと出さない。
 const reviewIntro = "この添削について質問を1回送ると、担当コーチが1回回答します。";
-const reviewTerms = "コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。";
+const reviewTerms = "コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れは全額返金します。";
+it("追加質問・追加相談の期限は日本語と英語の両方で受諾24時間・回答12時間", async () => {
+ installEnglish(en);
+ try {
+  for (const kind of ["review", "contract"] as const) {
+   setActiveLocale("ja");
+   await render(room, undefined, kind);
+   expect(container.textContent).toContain("受諾は24時間以内、受諾後の回答は12時間以内");
+   expect(container.textContent).not.toMatch(/48時間|72時間/);
+   setActiveLocale("en");
+   await render(room, undefined, kind);
+   expect(container.textContent).toContain("within 24 hours");
+   expect(container.textContent).toContain("within 12 hours");
+   expect(container.textContent).not.toMatch(/48 hours|72 hours/);
+  }
+ } finally { setActiveLocale("ja"); }
+});
 const coachRoom: ConsultationRoom = { ...room, role: "coach", can_purchase: false, consultations: [] };
 it("A1: コーチの添削画面で追加質問がまだ無いときは、追加質問の枠を出さない", async () => {
  await render(coachRoom);

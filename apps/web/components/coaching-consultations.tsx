@@ -54,7 +54,7 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     <h2 className="font-bold">{heading}</h2>
     {coachReview ? null : <>
     <p className="text-sm text-slate-200">{kind === "review" ? L("この添削について質問を1回送ると、担当コーチが1回回答します。回答のあとに追加のやりとりはできません。") : L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
-    <p className="text-xs text-slate-300">{kind === "review" ? L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。") : L("コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
+    <p className="text-xs text-slate-300">{kind === "review" ? L("コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。") : L("コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
     </>}
     {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash"} />)}
     {!sendEnabled ? <p className="text-xs text-slate-300">{kind === "review" ? L(consultationClosedNote) : L(messagingClosedNote)}</p> : null}
