@@ -86,7 +86,7 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 	if !correctExpiry {
 		t.Fatal("wrong reward expiry")
 	}
-	notices, _ := listNotifications(t, h, owner)
+	notices := coachingNotifications(t, h, owner)
 	count := 0
 	for _, n := range notices {
 		if strings.Contains(n.Title, "紹介特典") {

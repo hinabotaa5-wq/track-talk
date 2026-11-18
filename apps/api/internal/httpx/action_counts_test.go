@@ -4,12 +4,324 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/jackc/pgx/v5"
 )
+
+// Stored coaching notices still exist, but none of their IDs may appear in the bell.
+// Existing delivery/push tests use this instead of treating the bell as a list of every notice.
+func coachingNotifications(t *testing.T, h http.Handler, tok string) []noteItem {
+	t.Helper()
+	conn, err := pgx.Connect(context.Background(), testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	rows, err := conn.Query(context.Background(), `SELECT id::text, kind, COALESCE(title,''), COALESCE(body,''), COALESCE(url,''), read_at IS NOT NULL
+		FROM notifications WHERE recipient_id=$1 AND coaching_role IS NOT NULL`, tokenSubject(t, tok))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var notices []noteItem
+	for rows.Next() {
+		var n noteItem
+		if err := rows.Scan(&n.ID, &n.Kind, &n.Title, &n.Body, &n.URL, &n.Read); err != nil {
+			t.Fatal(err)
+		}
+		notices = append(notices, n)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	rows.Close()
+	bell, _ := listNotifications(t, h, tok)
+	for _, n := range notices {
+		for _, b := range bell {
+			if b.ID == n.ID {
+				t.Fatalf("coaching notice %s leaked into bell", n.ID)
+			}
+		}
+	}
+	return notices
+}
+
+func circleNotice(t *testing.T, to uuid.UUID, kind, role, url string, request *uuid.UUID) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	actionSeed(t, `INSERT INTO notifications(id, recipient_id, kind, coaching_role, url, review_request_id, title)
+		VALUES($1,$2,$3,NULLIF($4,''),NULLIF($5,''),$6,'notice')`, id, to, kind, role, url, request)
+	return id
+}
+
+func circleReview(t *testing.T, requester, coach uuid.UUID, status string) uuid.UUID {
+	t.Helper()
+	seedActionReview(t, requester, coach, status)
+	var id uuid.UUID
+	queryRowArgs(t, `SELECT id FROM review_requests WHERE requester_id=$1 AND coach_id=$2 AND status=$3 ORDER BY created_at DESC LIMIT 1`, []any{requester, coach, status}, &id)
+	return id
+}
+
+func circleGet(t *testing.T, h http.Handler, tok, path string) {
+	t.Helper()
+	rec := doJSON(t, h, http.MethodGet, path, tok, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET %s: %d %s", path, rec.Code, rec.Body.String())
+	}
+}
+
+func circleUnread(t *testing.T, id uuid.UUID, want bool) {
+	t.Helper()
+	var unread bool
+	queryRowArgs(t, `SELECT read_at IS NULL FROM notifications WHERE id=$1`, []any{id}, &unread)
+	if unread != want {
+		t.Fatalf("notice %s unread=%v want %v", id, unread, want)
+	}
+}
+
+// A1-A3, B5/B10, C11/C12: the bell never clears coaching rows; opening an owned detail does.
+func TestCircleReturnedReviewBellAndReadIsolation(t *testing.T) {
+	h := setup(t)
+	player, coach := uuid.New(), uuid.New()
+	tu, outsider := token(t, player), token(t, uuid.New())
+	id := circleReview(t, player, coach, "returned")
+	n := circleNotice(t, player, "review_returned", "player", "", &id)
+	otherID := circleReview(t, player, coach, "returned")
+	other := circleNotice(t, player, "review_returned", "player", "/coaching/requests/"+otherID.String(), nil)
+	bell := circleNotice(t, player, "message", "", "/admin", nil)
+	items, unread := listNotifications(t, h, tu)
+	if len(items) != 1 || unread != 1 || items[0].ID != bell.String() {
+		t.Fatalf("bell %+v unread=%d", items, unread)
+	}
+	wantActionCounts(t, h, tu, 2, 0)
+	wantActionCounts(t, h, outsider, 0, 0)
+	if r := doJSON(t, h, "POST", "/v1/me/notifications/read", tu, nil); r.Code != 204 {
+		t.Fatal(r.Body.String())
+	}
+	circleUnread(t, n, true)
+	circleUnread(t, other, true)
+	circleUnread(t, bell, false)
+	wantActionCounts(t, h, tu, 2, 0)
+	if r := doJSON(t, h, "GET", "/v1/coaching/requests/"+id.String(), outsider, nil); r.Code != 404 {
+		t.Fatal(r.Code)
+	}
+	circleUnread(t, n, true)
+	// An administrator cannot mark a player's notice by opening the administration screen.
+	_ = doJSON(t, h, "GET", "/v1/admin/coaching/requests/"+id.String(), adminToken(t, h), nil)
+	circleUnread(t, n, true)
+	circleGet(t, h, tu, "/v1/coaching/requests/"+id.String())
+	circleUnread(t, n, false)
+	circleUnread(t, other, true)
+	wantActionCounts(t, h, tu, 1, 0)
+}
+
+// B6-B7/B9: actions retain their original meaning and suppress only their matching unread notices.
+func TestCircleActionNotificationDeduplication(t *testing.T) {
+	h := setup(t)
+	player, coach := uuid.New(), uuid.New()
+	tu, tc := token(t, player), token(t, coach)
+	id := circleReview(t, player, coach, "queued")
+	n := circleNotice(t, coach, "review_offer", "coach", "", &id)
+	wantActionCounts(t, h, tc, 0, 1)
+	actionSeed(t, `UPDATE review_requests SET status='in_review' WHERE id=$1`, id)
+	wantActionCounts(t, h, tc, 0, 1)
+	circleUnread(t, n, true)
+	info := circleReview(t, player, coach, "needs_info")
+	circleNotice(t, player, "review_info_request", "player", "", &info)
+	wantActionCounts(t, h, tu, 1, 0)
+	actionSeed(t, `UPDATE review_requests SET status='queued', info_request=NULL, info_requested_at=NULL, info_from_status=NULL, resubmit_by=NULL WHERE id=$1`, info)
+	// Re-submission's response builder is a mutation, so it does not itself mark notices read.
+	// Explicitly finish reading before checking that changing the action removed the remaining count.
+	circleGet(t, h, tu, "/v1/coaching/requests/"+info.String())
+	wantActionCounts(t, h, tu, 0, 0)
+	seedActionContract(t, player, coach, "applied")
+	seedActionSupport(t, player, coach, "requested")
+	circleNotice(t, coach, "message", "coach", "/coach/contracts", nil)
+	circleNotice(t, coach, "message", "coach", "/coach/support-consults", nil)
+	wantActionCounts(t, h, tc, 0, 3)
+	// Work-order links have a fragment but refer to the same dependency already counted in (a).
+	circleNotice(t, coach, "message", "coach", "/coach/requests/"+id.String()+"#work-order", nil)
+	wantActionCounts(t, h, tc, 0, 3)
+}
+
+// B8/C11: active contract chat counts once per recipient/role and clears only for the viewer.
+func TestCircleContractAndScreenReads(t *testing.T) {
+	h := setup(t)
+	coach, tc := approvedCoachWithServices(t, h, nil)
+	player := uuid.New()
+	tu := token(t, player)
+	circleGet(t, h, tu, "/v1/me")
+	seedActionContract(t, player, coach, "active")
+	var id uuid.UUID
+	queryRowArgs(t, `SELECT id FROM coaching_contracts WHERE requester_id=$1`, []any{player}, &id)
+	url := "/coaching/personal/" + id.String()
+	pn := circleNotice(t, player, "message", "player", url, nil)
+	cn := circleNotice(t, coach, "message", "coach", url, nil)
+	wantActionCounts(t, h, tu, 1, 0)
+	wantActionCounts(t, h, tc, 0, 1)
+	circleGet(t, h, tu, "/v1/coaching/contracts/"+id.String())
+	circleUnread(t, pn, false)
+	circleUnread(t, cn, true)
+	circleGet(t, h, tc, "/v1/coaching/contracts/"+id.String())
+	wantActionCounts(t, h, tc, 0, 0)
+	actionSeed(t, `UPDATE coaching_contracts SET status='accepted', starts_at=NULL, ends_at=NULL, start_by=now()+interval '1 day' WHERE id=$1`, id)
+	circleNotice(t, player, "message", "player", url, nil)
+	wantActionCounts(t, h, tu, 1, 0)
+	// Dashboard and ticket screens clear only their own exact destinations and role.
+	for _, screen := range []struct {
+		tok             string
+		to              uuid.UUID
+		role, url, path string
+	}{
+		{tu, player, "player", "/me/coaching", "/v1/me/coaching"},
+		{tu, player, "player", "/me/coaching/tickets", "/v1/me/coaching/tickets"},
+		{tc, coach, "coach", "/coach", "/v1/coach/me"},
+		{tc, coach, "coach", "/coach/apply", "/v1/coach/me"},
+	} {
+		t.Run(screen.url, func(t *testing.T) {
+			n := circleNotice(t, screen.to, "message", screen.role, screen.url, nil)
+			unrelated := circleNotice(t, screen.to, "message", screen.role, "/unrelated", nil)
+			ordinary := circleNotice(t, screen.to, "message", "", "/admin", nil)
+			circleGet(t, h, screen.tok, screen.path)
+			circleUnread(t, n, false)
+			circleUnread(t, unrelated, true)
+			circleUnread(t, ordinary, true)
+		})
+	}
+}
+
+// C11: UPDATE failure is best effort and does not turn a successfully returned GET into an error.
+func TestCircleReadFailureDoesNotFailGET(t *testing.T) {
+	h := setup(t)
+	player := uuid.New()
+	tu := token(t, player)
+	n := circleNotice(t, player, "message", "player", "/me/coaching", nil)
+	remove := injectNotificationFailure(t, "notifications", "UPDATE")
+	circleGet(t, h, tu, "/v1/me/coaching")
+	circleUnread(t, n, true)
+	remove()
+	circleGet(t, h, tu, "/v1/me/coaching")
+	circleUnread(t, n, false)
+}
+
+// E15/A4: apply the actual migration to pre-existing rows, including misleading announcement URLs.
+// DDL is contained in a transaction and rolled back, so the shared migrated test schema is preserved.
+func TestCircleMigrationBackfillAndDown(t *testing.T) {
+	h := setup(t)
+	_ = h
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, testDSN(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(ctx)
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := tx.Exec(ctx, sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`SET LOCAL session_replication_role=replica`)
+	exec(`ALTER TABLE notifications DROP COLUMN coaching_role`)
+	player, coach := uuid.New(), uuid.New()
+	// Contract participation determines the role even when IDs and URL text were all that old rows held.
+	id := uuid.New()
+	exec(`INSERT INTO coaching_contracts(id,plan_id,coach_id,requester_id,plan_kind,plan_title,duration_days,price_yen,event,goal,current_record,message,minor,respond_by,status)
+		VALUES($1,gen_random_uuid(),$2,$3,'period','plan',30,10000,'100m','goal','12','hello',false,now()+interval '1 day','applied')`, id, coach, player)
+	for _, tc := range []struct {
+		kind, url, title, role string
+		to                     uuid.UUID
+		announcement           bool
+	}{
+		{"review_returned", "", "", "player", player, false},
+		{"review_offer", "", "", "coach", coach, false},
+		{"review_offer_reminder", "", "", "coach", coach, false},
+		{"review_resubmitted", "", "", "coach", coach, false},
+		{"review_resubmitted_after_accept", "", "", "coach", coach, false},
+		{"review_nomination_ended", "", "", "coach", coach, false},
+		{"review_clarify", "", "", "coach", coach, false},
+		{"message", "/coach", "", "coach", coach, false},
+		{"message", "/coach/apply", "", "coach", coach, false},
+		{"message", "/coaching/requests/" + uuid.NewString(), "", "player", player, false},
+		{"message", "/coaching/support-consults/" + uuid.NewString(), "", "player", player, false},
+		{"message", "/me/coaching", "", "player", player, false},
+		{"message", "/me/coaching/tickets", "", "player", player, false},
+		{"message", "/me", "紹介特典：test", "player", player, false},
+		{"message", "/coaching/personal/" + id.String(), "", "player", player, false},
+		{"message", "/coaching/personal/" + id.String(), "", "coach", coach, false},
+		{"message", "/coaching/personal/" + uuid.NewString(), "", "", player, false},
+		{"message", "/coaching/personal/not-a-uuid", "", "", player, false},
+		{"message", "/admin", "", "", player, false},
+		{"message", "/me", "monthly", "", player, false},
+		{"message", "/coach/contracts", "announcement", "", coach, true},
+		{"review_offer", "/coach", "announcement", "", coach, true},
+	} {
+		n := uuid.New()
+		var ann *uuid.UUID
+		if tc.announcement {
+			a := uuid.New()
+			ann = &a
+		}
+		exec(`INSERT INTO notifications(id,recipient_id,kind,url,title,announcement_id) VALUES($1,$2,$3,$4,$5,$6)`, n, tc.to, tc.kind, tc.url, tc.title, ann)
+		// Remember the expected role independently of the migration's SQL.
+		exec(`CREATE TEMP TABLE IF NOT EXISTS expected_roles(id uuid PRIMARY KEY, role text) ON COMMIT DROP`)
+		exec(`INSERT INTO expected_roles VALUES($1,$2)`, n, tc.role)
+	}
+	up, err := os.ReadFile(filepath.Join("..", "..", "migrations", "000185_notifications_coaching_role.up.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(string(up))
+	var bad int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM notifications n JOIN expected_roles e USING(id) WHERE coalesce(n.coaching_role,'')<>e.role`).Scan(&bad); err != nil || bad != 0 {
+		t.Fatalf("backfill mismatches=%d err=%v", bad, err)
+	}
+	q := db.New(tx)
+	bell, err := q.CountMyNotifications(ctx, player)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bell != 4 {
+		t.Fatalf("player bell after backfill=%d want 4", bell)
+	}
+	before, err := q.CountUnreadNotifications(ctx, coach)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before != 2 {
+		t.Fatalf("announcements should stay in bell: %d", before)
+	}
+	down, err := os.ReadFile(filepath.Join("..", "..", "migrations", "000185_notifications_coaching_role.down.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(string(down))
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='notifications' AND column_name='coaching_role')`).Scan(&exists); err != nil || exists {
+		t.Fatalf("down: exists=%v err=%v", exists, err)
+	}
+	var all int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM notifications WHERE recipient_id=$1`, player).Scan(&all); err != nil || all <= int(bell) {
+		t.Fatalf("down restores all bell rows=%d err=%v", all, err)
+	}
+	counts, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "deploy", "cloud-run", "payment-counts", "counts.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(counts), "EXPECTED_MIGRATION = 181") {
+		t.Fatal("migration count is not 181")
+	}
+}
 
 // コーチタブの円ボタンのバッジ用の件数（本体 #891）。GET /v1/me/coaching/action-counts。
 // 他テーブルへの外部キーは使わず件数の条件だけを確かめたいので、行は外部キー検査を外した接続で直接入れる。

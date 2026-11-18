@@ -548,6 +548,8 @@ func (s *Server) getReviewRequest(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	w, read := s.coachingReadOnSuccess(w, r, p.ID, "player", &id, "/coaching/requests/"+id.String())
+	defer read()
 	s.writeRequesterReview(w, r, rr)
 }
 

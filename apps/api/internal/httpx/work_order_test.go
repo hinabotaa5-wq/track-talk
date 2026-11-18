@@ -91,7 +91,7 @@ func assertWorkOrderDelivered(t *testing.T, h http.Handler, coach, column, id, u
 	if count != 1 || gotURL != url || channel != "in_app" || title != wantTitle || body != "" {
 		t.Fatalf("delivery %d %q %q %q %q", count, title, body, gotURL, channel)
 	}
-	items, _ := listNotifications(t, h, coach)
+	items := coachingNotifications(t, h, coach)
 	found := 0
 	for _, n := range items {
 		if n.URL == url && n.Title == title && n.Body == body {

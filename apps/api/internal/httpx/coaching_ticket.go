@@ -166,6 +166,8 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		reason = ticketSalesClosedMessage
 	}
 	// 残高があれば販売休止中も利用できる。支払い済みチケットをデモ用にはしない。
+	w, read := s.coachingReadOnSuccess(w, r, p.ID, "player", nil, "/me/coaching/tickets")
+	defer read()
 	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "balance_by_kind": byKind, "purchases": purchases, "ledger": ledgerOut,
 		"can_purchase": s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
 		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
@@ -573,9 +575,9 @@ func reissueExpiredRewardLot(ctx context.Context, q *db.Queries, lot db.Coaching
 	}
 	title := "紹介特典：期限切れの無料チケットを出し直しました"
 	body := "運営者・コーチの都合で終わった1回プランで使った分を出し直しました。新しい特典チケット：" + referralRewardTerms
-	url := "/me"
+	url, role := "/me/coaching/tickets", "player"
 	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
-		ID: uuid.New(), RecipientID: *lot.OwnerID, Title: &title, Body: &body, Url: &url,
+		ID: uuid.New(), RecipientID: *lot.OwnerID, Title: &title, Body: &body, Url: &url, CoachingRole: &role,
 	})
 }
 

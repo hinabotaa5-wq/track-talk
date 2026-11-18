@@ -48,9 +48,10 @@ func recordCoachingReferral(ctx context.Context, q *db.Queries, buyer, ticketID,
 	if wanted, err := notificationWanted(ctx, q, id, notifyCoaching, true); err != nil || !wanted {
 		return err
 	}
-	title, body, url := "紹介特典：無料チケットを1枚プレゼントしました", referralRewardTerms, "/me"
+	title, body, url := "紹介特典：無料チケットを1枚プレゼントしました", referralRewardTerms, "/me/coaching/tickets"
+	role := "player"
 	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
-		ID: uuid.New(), RecipientID: id, Title: &title, Body: &body, Url: &url,
+		ID: uuid.New(), RecipientID: id, Title: &title, Body: &body, Url: &url, CoachingRole: &role,
 	})
 }
 

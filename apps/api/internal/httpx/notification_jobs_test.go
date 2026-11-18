@@ -229,7 +229,7 @@ func TestCoachRejectionNotificationRecoversIndependentlyOfIdentity(t *testing.T)
 	reject()
 	reject()
 	retryAllNotificationJobs(t, h)
-	notes, _ := listNotifications(t, h, applicantToken)
+	notes := coachingNotifications(t, h, applicantToken)
 	if pushes.Load() != 1 || len(notes) != 1 || notes[0].Kind != "message" {
 		t.Fatalf("pushes = %d, bell count = %d", pushes.Load(), len(notes))
 	}

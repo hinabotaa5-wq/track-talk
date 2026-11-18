@@ -133,8 +133,14 @@ func TestReviewResponseFlow(t *testing.T) {
 	if !strings.Contains(body, `"best_record":"100m 10秒95（2025年）"`) || !strings.Contains(body, `"achievements":"インターハイ 100m 準決勝"`) {
 		t.Fatalf("coach profile %s", body)
 	}
-	if !strings.Contains(doJSON(t, h, http.MethodGet, "/v1/me/notifications", tu, nil).Body.String(), `"kind":"review_returned"`) {
-		t.Fatal("no returned notification")
+	foundReturned := false
+	for _, note := range coachingNotifications(t, h, tu) {
+		if note.Kind == "review_returned" {
+			foundReturned = true
+		}
+	}
+	if !foundReturned {
+		t.Fatal("no returned coaching notification")
 	}
 
 	// ★は1〜5でつけ直せる。

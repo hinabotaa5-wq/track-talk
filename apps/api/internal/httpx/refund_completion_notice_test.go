@@ -51,7 +51,7 @@ func subscribeRefundNoticeTest(t *testing.T, h http.Handler, payer, endpoint str
 
 func assertRefundNotice(t *testing.T, h http.Handler, payer, title, url string, pushes *atomic.Int32, want int) {
 	t.Helper()
-	notes, _ := listNotifications(t, h, payer)
+	notes := coachingNotifications(t, h, payer)
 	count := 0
 	for _, note := range notes {
 		if note.Title != title {

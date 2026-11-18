@@ -15,7 +15,7 @@ func arrivalBellCounts(t *testing.T, h http.Handler, coachToken string, coach uu
 	t.Helper()
 	queryRowArgs(t, `SELECT count(*) FROM notifications WHERE review_request_id=$1 AND kind='review_offer' AND recipient_id=$2`,
 		[]any{requestID, coach}, &offer)
-	items, _ := listNotifications(t, h, coachToken)
+	items := coachingNotifications(t, h, coachToken)
 	for _, n := range items {
 		if n.Title == "1回プランの依頼が届きました" {
 			workOrder++

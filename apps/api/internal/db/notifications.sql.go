@@ -12,12 +12,31 @@ import (
 	"github.com/google/uuid"
 )
 
+const coachingContractNotificationRole = `-- name: CoachingContractNotificationRole :one
+SELECT CASE WHEN coach_id = $1::uuid THEN 'coach'
+            WHEN requester_id = $1::uuid THEN 'player' ELSE '' END::text AS role
+FROM coaching_contracts WHERE id = $2::uuid
+`
+
+type CoachingContractNotificationRoleParams struct {
+	RecipientID uuid.UUID `json:"recipient_id"`
+	ContractID  uuid.UUID `json:"contract_id"`
+}
+
+func (q *Queries) CoachingContractNotificationRole(ctx context.Context, arg CoachingContractNotificationRoleParams) (string, error) {
+	row := q.db.QueryRow(ctx, coachingContractNotificationRole, arg.RecipientID, arg.ContractID)
+	var role string
+	err := row.Scan(&role)
+	return role, err
+}
+
 const countMyNotifications = `-- name: CountMyNotifications :one
 SELECT count(*)
 FROM notifications n
 LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = $1
+  AND n.coaching_role IS NULL
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (
@@ -39,6 +58,7 @@ FROM notifications n
 LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = $1
+  AND n.coaching_role IS NULL
   AND n.read_at IS NULL
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
@@ -110,25 +130,27 @@ func (q *Queries) GetNotificationSetting(ctx context.Context, arg GetNotificatio
 const insertMessageNotification = `-- name: InsertMessageNotification :exec
 WITH bumped AS (
     UPDATE notifications
-    SET body = $4, created_at = now()
+    SET body = $4, created_at = now(), coaching_role = $6::text
     WHERE recipient_id = $2
       AND kind = 'message'
+      AND announcement_id IS NULL
       AND title = $3
       AND url = $5
       AND read_at IS NULL
     RETURNING id
 )
-INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-SELECT $1, $2, 'message', $3, $4, $5
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, coaching_role)
+SELECT $1, $2, 'message', $3, $4, $5, $6::text
 WHERE NOT EXISTS (SELECT 1 FROM bumped)
 `
 
 type InsertMessageNotificationParams struct {
-	ID          uuid.UUID `json:"id"`
-	RecipientID uuid.UUID `json:"recipient_id"`
-	Title       *string   `json:"title"`
-	Body        *string   `json:"body"`
-	Url         *string   `json:"url"`
+	ID           uuid.UUID `json:"id"`
+	RecipientID  uuid.UUID `json:"recipient_id"`
+	Title        *string   `json:"title"`
+	Body         *string   `json:"body"`
+	Url          *string   `json:"url"`
+	CoachingRole *string   `json:"coaching_role"`
 }
 
 // 投稿や依頼にひもづかない知らせ。同じ場所への同じ見出しの未読があれば、新しく足さずにそれを最新にする。
@@ -139,6 +161,7 @@ func (q *Queries) InsertMessageNotification(ctx context.Context, arg InsertMessa
 		arg.Title,
 		arg.Body,
 		arg.Url,
+		arg.CoachingRole,
 	)
 	return err
 }
@@ -224,8 +247,11 @@ func (q *Queries) InsertRecruitmentPostNotifications(ctx context.Context, arg In
 }
 
 const insertReviewNotification = `-- name: InsertReviewNotification :exec
-INSERT INTO notifications (id, recipient_id, kind, review_request_id, url)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO notifications (id, recipient_id, kind, review_request_id, url, coaching_role)
+VALUES ($1, $2, $3, $4, $5, CASE
+    WHEN $3 IN ('review_offer', 'review_offer_reminder', 'review_resubmitted',
+        'review_resubmitted_after_accept', 'review_nomination_ended', 'review_clarify') THEN 'coach'
+    ELSE 'player' END)
 `
 
 type InsertReviewNotificationParams struct {
@@ -263,6 +289,7 @@ FROM notifications n
 LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = $1
+  AND n.coaching_role IS NULL
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (
@@ -395,11 +422,41 @@ const markAllNotificationsRead = `-- name: MarkAllNotificationsRead :exec
 UPDATE notifications
 SET read_at = now()
 WHERE recipient_id = $1
+  AND coaching_role IS NULL
   AND read_at IS NULL
 `
 
 func (q *Queries) MarkAllNotificationsRead(ctx context.Context, recipientID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, markAllNotificationsRead, recipientID)
+	return err
+}
+
+const markCoachingNotificationsRead = `-- name: MarkCoachingNotificationsRead :exec
+UPDATE notifications SET read_at = now()
+WHERE recipient_id = $1::uuid
+  AND coaching_role = $2::text
+  AND read_at IS NULL
+  AND (split_part(url, '#', 1) = ANY($3::text[])
+       OR (url = '/me' AND title LIKE '紹介特典：%' AND '/me/coaching/tickets' = ANY($3::text[]))
+       OR ($4::uuid IS NOT NULL
+           AND review_request_id = $4::uuid))
+`
+
+type MarkCoachingNotificationsReadParams struct {
+	RecipientID     uuid.UUID  `json:"recipient_id"`
+	CoachingRole    string     `json:"coaching_role"`
+	Urls            []string   `json:"urls"`
+	ReviewRequestID *uuid.UUID `json:"review_request_id"`
+}
+
+// Only the authenticated recipient's matching role and screen; ordinary bell rows are untouched.
+func (q *Queries) MarkCoachingNotificationsRead(ctx context.Context, arg MarkCoachingNotificationsReadParams) error {
+	_, err := q.db.Exec(ctx, markCoachingNotificationsRead,
+		arg.RecipientID,
+		arg.CoachingRole,
+		arg.Urls,
+		arg.ReviewRequestID,
+	)
 	return err
 }
 
