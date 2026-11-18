@@ -3,7 +3,7 @@
 // 文言を足したら、ここにも英語を足す（node --experimental-strip-types scripts/i18n-missing.mjs で漏れを一覧できる）。
 export const en: Readonly<Record<string, string>> = {
   "外部の連絡先（URL・メールアドレス・電話番号・SNSのID）は送れません。": "You cannot send outside contact details (URLs, email addresses, phone numbers, or social media IDs).",
-  "質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は48時間以内、回答は受諾後72時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。": "One question and one answer only. No further exchanges are possible. The coach accepts within 48 hours and answers within 72 hours of accepting. Declines and expiries are refunded in full. The exchange is kept for one year after it ends.",
+  "質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。": "One question and one answer only. No further exchanges are possible. The coach accepts within 24 hours and answers within 12 hours of accepting. Declines and expiries are refunded in full. The exchange is kept for one year after it ends.",
   "紹介特典": "Referral reward",
   "元の画面に戻る": "Return to the previous page",
   "紹介ID": "Referral code",
@@ -1230,10 +1230,10 @@ export const en: Readonly<Record<string, string>> = {
   "現在はありません": "None right now",
   "追加相談を読み込めませんでした": "Couldn't load follow-up consultations",
   "追加質問を読み込めませんでした": "Couldn't load additional questions",
-  "コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。": "The coach accepts within 48 hours and answers within 72 hours of acceptance. Declined or unanswered expirations are fully refunded. Records are kept for one year after the exchange.",
+  "コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。": "The coach accepts within 24 hours and answers within 12 hours of acceptance. Declined or unanswered expirations are fully refunded. Records are kept for one year after the exchange.",
   "この添削について質問を1回送ると、担当コーチが1回回答します。回答のあとに追加のやりとりはできません。": "Send one question about this review and the coach will answer once. No further back-and-forth after the answer.",
   "新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。": "The coach answers one new question once. One free clarification within 7 days. The conversation stays in this room.",
-  "コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。": "Coaches accept within 48 hours and answer within 72 hours after accepting. If declined or unanswered by the deadline, tickets are returned or you get a full refund. Conversations are kept for 1 year after they end.",
+  "コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。": "Coaches accept within 24 hours and answer within 12 hours after accepting. If declined or unanswered by the deadline, tickets are returned or you get a full refund. Conversations are kept for 1 year after they end.",
   "動画は100MB以内にしてください": "Please keep the video under 100MB",
   "送信できませんでした": "Couldn't send",
   "{v0} / 質問1件と回答1件": "{v0} / one question and one answer",

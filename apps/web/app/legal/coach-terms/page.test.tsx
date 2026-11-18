@@ -14,7 +14,7 @@ it("海外コーチの業務委託条件：決定済みの金額・支払・相�
   expect(html).toContain("75% of the tax-inclusive athlete price of ¥22,000");
   expect(html).toContain("$10 per completed review");
   expect(html).not.toContain("$12 per completed review");
-  expect(html).toContain("with no set cap on the number of videos per athlete per month, replies targeted within about 48 hours");
+  expect(html).toContain("with no set cap on the number of videos per athlete per month, replies targeted within about 36 hours");
   expect(html).not.toContain("up to about 28 videos");
   expect(html).toContain("15th of the following month");
   expect(html).toContain("TrackTalk bears the Wise transfer fees");

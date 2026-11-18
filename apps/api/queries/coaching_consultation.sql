@@ -42,7 +42,7 @@ AND (c.status IN ('offered','in_review') OR (c.status='answered' AND c.clarify_r
 ORDER BY c.created_at LIMIT 100;
 
 -- name: SubmitTicketConsultation :one
-UPDATE coaching_consultations SET status='offered',respond_by=now()+interval '48 hours',updated_at=now()
+UPDATE coaching_consultations SET status='offered',respond_by=now()+interval '24 hours',updated_at=now()
 WHERE id=$1 AND status='draft' AND expires_at>now() RETURNING *;
 
 -- name: StartCashConsultationPayment :one
@@ -60,11 +60,11 @@ WHERE id=$1 AND (checkout_session_id IS NULL OR checkout_session_id=$2);
 -- name: MarkConsultationPaid :one
 UPDATE coaching_consultations SET payment_state='paid',payment_intent_id=$2,paid_at=now(),checkout_session_id=COALESCE(checkout_session_id,$3),
 status=CASE WHEN status='awaiting_payment' AND expires_at>now() THEN 'offered' ELSE 'expired' END,
-respond_by=now()+interval '48 hours',closed_at=CASE WHEN status='awaiting_payment' AND expires_at>now() THEN NULL ELSE now() END,updated_at=now()
+respond_by=now()+interval '24 hours',closed_at=CASE WHEN status='awaiting_payment' AND expires_at>now() THEN NULL ELSE now() END,updated_at=now()
 WHERE id=$1 AND payment_state='unpaid' RETURNING *;
 
 -- name: AcceptConsultation :one
-UPDATE coaching_consultations SET status='in_review',answer_by=now()+interval '72 hours',updated_at=now()
+UPDATE coaching_consultations SET status='in_review',answer_by=now()+interval '12 hours',updated_at=now()
 WHERE id=$1 AND coach_id=$2 AND status='offered' AND respond_by>now() RETURNING *;
 
 -- name: CloseConsultation :one
