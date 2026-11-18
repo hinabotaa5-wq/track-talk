@@ -83,7 +83,7 @@ it("現行の見出しを小さい文字で1行に省略表示する", async () 
   await act(async () => root.render(<ReferralBanner />));
   const headline = container.querySelector('a[href="/referral"] > span > span');
   expect(headline?.textContent).toBe(HEADLINE_JA);
-  expect(headline?.classList.contains("text-sm")).toBe(true);
+  expect(headline?.classList.contains("text-[13px]")).toBe(true);
   expect(headline?.classList.contains("truncate")).toBe(true);
 });
 
