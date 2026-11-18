@@ -3,8 +3,11 @@ INSERT INTO notifications (id, recipient_id, kind, post_id, comment_id, applicat
 VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: InsertReviewNotification :exec
-INSERT INTO notifications (id, recipient_id, kind, review_request_id, url)
-VALUES ($1, $2, $3, $4, $5);
+INSERT INTO notifications (id, recipient_id, kind, review_request_id, url, coaching_role)
+VALUES ($1, $2, $3, $4, $5, CASE
+    WHEN $3 IN ('review_offer', 'review_offer_reminder', 'review_resubmitted',
+        'review_resubmitted_after_accept', 'review_nomination_ended', 'review_clarify') THEN 'coach'
+    ELSE 'player' END);
 
 -- name: InsertRecruitmentPostNotifications :exec
 INSERT INTO notifications (id, recipient_id, kind, post_id)
@@ -20,16 +23,17 @@ WHERE profiles.id <> sqlc.arg('author_id')
 -- 投稿や依頼にひもづかない知らせ。同じ場所への同じ見出しの未読があれば、新しく足さずにそれを最新にする。
 WITH bumped AS (
     UPDATE notifications
-    SET body = sqlc.arg('body'), created_at = now()
+    SET body = sqlc.arg('body'), created_at = now(), coaching_role = sqlc.narg('coaching_role')::text
     WHERE recipient_id = sqlc.arg('recipient_id')
       AND kind = 'message'
+      AND announcement_id IS NULL
       AND title = sqlc.arg('title')
       AND url = sqlc.arg('url')
       AND read_at IS NULL
     RETURNING id
 )
-INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-SELECT sqlc.arg('id'), sqlc.arg('recipient_id'), 'message', sqlc.arg('title'), sqlc.arg('body'), sqlc.arg('url')
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, coaching_role)
+SELECT sqlc.arg('id'), sqlc.arg('recipient_id'), 'message', sqlc.arg('title'), sqlc.arg('body'), sqlc.arg('url'), sqlc.narg('coaching_role')::text
 WHERE NOT EXISTS (SELECT 1 FROM bumped);
 
 -- name: InsertMonthlyReminderNotifications :exec
@@ -87,6 +91,7 @@ FROM notifications n
 LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = sqlc.arg('recipient_id')
+  AND n.coaching_role IS NULL
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (
@@ -102,6 +107,7 @@ FROM notifications n
 LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = sqlc.arg('recipient_id')
+  AND n.coaching_role IS NULL
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
   AND (
@@ -115,6 +121,7 @@ FROM notifications n
 LEFT JOIN posts p ON p.id = n.post_id
 LEFT JOIN comments c ON c.id = n.comment_id
 WHERE n.recipient_id = sqlc.arg('recipient_id')
+  AND n.coaching_role IS NULL
   AND n.read_at IS NULL
   AND p.deleted_at IS NULL
   AND p.hidden_at IS NULL
@@ -133,7 +140,24 @@ WHERE id = sqlc.arg('id')
 UPDATE notifications
 SET read_at = now()
 WHERE recipient_id = $1
+  AND coaching_role IS NULL
   AND read_at IS NULL;
+
+-- name: CoachingContractNotificationRole :one
+SELECT CASE WHEN coach_id = sqlc.arg('recipient_id')::uuid THEN 'coach'
+            WHEN requester_id = sqlc.arg('recipient_id')::uuid THEN 'player' ELSE '' END::text AS role
+FROM coaching_contracts WHERE id = sqlc.arg('contract_id')::uuid;
+
+-- name: MarkCoachingNotificationsRead :exec
+-- Only the authenticated recipient's matching role and screen; ordinary bell rows are untouched.
+UPDATE notifications SET read_at = now()
+WHERE recipient_id = sqlc.arg('recipient_id')::uuid
+  AND coaching_role = sqlc.arg('coaching_role')::text
+  AND read_at IS NULL
+  AND (split_part(url, '#', 1) = ANY(sqlc.arg('urls')::text[])
+       OR (url = '/me' AND title LIKE '紹介特典：%' AND '/me/coaching/tickets' = ANY(sqlc.arg('urls')::text[]))
+       OR (sqlc.narg('review_request_id')::uuid IS NOT NULL
+           AND review_request_id = sqlc.narg('review_request_id')::uuid));
 
 -- name: DeleteOldNotificationsFor :exec
 -- その人の古い通知を消す。読んだものは届いてから90日、読んでいないものは180日で消す(プライバシーポリシー第10条)。

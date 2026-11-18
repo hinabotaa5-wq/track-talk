@@ -54,7 +54,7 @@ func reissuedRewardLot(t *testing.T, owner uuid.UUID, oldLot string) string {
 
 func countReissueNotices(t *testing.T, h http.Handler, tok string) int {
 	t.Helper()
-	notices, _ := listNotifications(t, h, tok)
+	notices := coachingNotifications(t, h, tok)
 	n := 0
 	for _, notice := range notices {
 		if notice.Title == reissueNoticeTitle {

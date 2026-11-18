@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -137,16 +138,100 @@ func (s *Server) notify(ctx context.Context, to uuid.UUID, category string, msg 
 			url = "/"
 		}
 		if err := s.q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
-			ID:          uuid.New(),
-			RecipientID: to,
-			Title:       &msg.Title,
-			Body:        &msg.Body,
-			Url:         &url,
+			ID:           uuid.New(),
+			RecipientID:  to,
+			Title:        &msg.Title,
+			Body:         &msg.Body,
+			Url:          &url,
+			CoachingRole: s.coachingNotificationRole(ctx, to, url),
 		}); err != nil {
 			slog.Warn("message notification", "err", err)
 		}
 	}
 	s.pushQuietly(ctx, to, category, msg, ttl)
+}
+
+// coachingNotificationDestination uses path boundaries so unrelated messages stay in the bell.
+// A contract destination needs a recipient lookup; malformed or unknown contracts stay in the bell.
+func coachingNotificationDestination(url string) (string, uuid.UUID) {
+	url, _, _ = strings.Cut(url, "#")
+	switch {
+	case url == "/coach" || strings.HasPrefix(url, "/coach/"):
+		return "coach", uuid.Nil
+	case url == "/me/coaching" || strings.HasPrefix(url, "/me/coaching/") ||
+		strings.HasPrefix(url, "/coaching/requests/") || strings.HasPrefix(url, "/coaching/support-consults/"):
+		return "player", uuid.Nil
+	case strings.HasPrefix(url, "/coaching/personal/"):
+		id, err := uuid.Parse(strings.TrimPrefix(url, "/coaching/personal/"))
+		if err == nil {
+			return "", id
+		}
+	}
+	return "", uuid.Nil
+}
+
+func (s *Server) coachingNotificationRole(ctx context.Context, recipient uuid.UUID, url string) *string {
+	role, contract := coachingNotificationDestination(url)
+	if role != "" {
+		return &role
+	}
+	if contract != uuid.Nil {
+		role, err := s.q.CoachingContractNotificationRole(ctx, db.CoachingContractNotificationRoleParams{ContractID: contract, RecipientID: recipient})
+		if err == nil && role != "" {
+			return &role
+		}
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			slog.Warn("coaching notification role", "err", err)
+		}
+	}
+	return nil
+}
+
+// Read only after a successful screen response. A read failure cannot change the response.
+func (s *Server) readCoachingNotifications(ctx context.Context, recipient uuid.UUID, role string, review *uuid.UUID, urls ...string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+	defer cancel()
+	if err := s.q.MarkCoachingNotificationsRead(ctx, db.MarkCoachingNotificationsReadParams{
+		RecipientID: recipient, CoachingRole: role, ReviewRequestID: review, Urls: urls,
+	}); err != nil {
+		slog.Warn("read coaching notifications", "err", err)
+	}
+}
+
+// Some GETs share a response builder with mutations; track only this GET's successful write.
+type coachingScreenResponse struct {
+	http.ResponseWriter
+	status int
+	failed bool
+}
+
+func (w *coachingScreenResponse) WriteHeader(status int) {
+	if w.status == 0 {
+		w.status = status
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *coachingScreenResponse) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	n, err := w.ResponseWriter.Write(b)
+	w.failed = w.failed || err != nil || n != len(b)
+	return n, err
+}
+
+func (w *coachingScreenResponse) successful() bool {
+	return w.status == http.StatusOK && !w.failed
+}
+
+func (s *Server) coachingReadOnSuccess(w http.ResponseWriter, r *http.Request, recipient uuid.UUID, role string, review *uuid.UUID, urls ...string) (http.ResponseWriter, func()) {
+	response := &coachingScreenResponse{ResponseWriter: w}
+	return response, func() {
+		if response.successful() {
+			s.readCoachingNotifications(r.Context(), recipient, role, review, urls...)
+		}
+	}
 }
 
 // postPush は、コミットのあとに送る、投稿にひもづく知らせのプッシュ。

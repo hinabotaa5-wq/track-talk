@@ -51,11 +51,16 @@ func subscribeRefundNoticeTest(t *testing.T, h http.Handler, payer, endpoint str
 
 func assertRefundNotice(t *testing.T, h http.Handler, payer, title, url string, pushes *atomic.Int32, want int) {
 	t.Helper()
-	notes, _ := listNotifications(t, h, payer)
+	notes := coachingNotifications(t, h, payer)
 	count := 0
 	for _, note := range notes {
 		if note.Title != title {
 			continue
+		}
+		var role string
+		queryRowArgs(t, `SELECT COALESCE(coaching_role,'') FROM notifications WHERE id=$1`, []any{note.ID}, &role)
+		if role != "player" {
+			t.Fatalf("refund coaching role: %q", role)
 		}
 		if note.URL != url {
 			t.Errorf("notice URL %q, want %q", note.URL, url)

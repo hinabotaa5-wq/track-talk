@@ -169,6 +169,8 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	w, read := s.coachingReadOnSuccess(w, r, p.ID, "coach", &id, "/coach/requests/"+id.String())
+	defer read()
 	JSON(w, http.StatusOK, out)
 }
 

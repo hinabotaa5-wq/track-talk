@@ -280,7 +280,7 @@ func (s *Server) createCoachingContract(w http.ResponseWriter, r *http.Request) 
 	}
 	s.notify(r.Context(), ct.CoachID, notifyCoaching, push.Message{
 		Title: "パーソナル指導の申し込みが届きました",
-		URL:   "/coach",
+		URL:   "/coach/contracts",
 		Tag:   "contract-" + ct.ID.String(),
 	}, 24*time.Hour)
 	JSON(w, http.StatusCreated, map[string]any{"contract": s.contractJSON(ct)})
@@ -444,6 +444,12 @@ func (s *Server) getCoachingContract(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	notificationRole := "player"
+	if row.CoachID == me.ID {
+		notificationRole = "coach"
+	}
+	w, read := s.coachingReadOnSuccess(w, r, me.ID, notificationRole, nil, "/coaching/personal/"+id.String())
+	defer read()
 	JSON(w, http.StatusOK, map[string]any{"contract": c})
 }
 

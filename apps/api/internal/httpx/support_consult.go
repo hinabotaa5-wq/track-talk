@@ -572,6 +572,11 @@ func (s *Server) getSupportConsult(w http.ResponseWriter, r *http.Request) {
 	if c.CoachID == me.ID {
 		out["role"] = "coach"
 	}
+	if c.AthleteID == me.ID {
+		var read func()
+		w, read = s.coachingReadOnSuccess(w, r, me.ID, "player", nil, "/coaching/support-consults/"+c.ID.String())
+		defer read()
+	}
 	JSON(w, http.StatusOK, map[string]any{"consult": out})
 }
 

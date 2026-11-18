@@ -28,8 +28,8 @@ DELETE FROM refund_completion_notices WHERE id = $1;
 UPDATE refund_completion_notices SET next_attempt_at = now() + interval '1 minute' WHERE id = $1;
 
 -- name: InsertRefundCompletionBell :execrows
-INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-VALUES ($1, $2, 'message', $3, $4, $5)
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, coaching_role)
+VALUES ($1, $2, 'message', $3, $4, $5, 'player')
 ON CONFLICT (id) DO NOTHING;
 
 -- name: ConfirmPendingReviewRefundNotice :one

@@ -99,6 +99,8 @@ func (s *Server) coachingMe(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	w, read := s.coachingReadOnSuccess(w, r, p.ID, "player", nil, "/me/coaching")
+	defer read()
 	s.writeCoachingMe(w, r, p)
 }
 

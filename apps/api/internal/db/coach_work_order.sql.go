@@ -184,8 +184,8 @@ func (q *Queries) GetWorkOrderDelivery(ctx context.Context, workOrderID uuid.UUI
 }
 
 const insertWorkOrderNotification = `-- name: InsertWorkOrderNotification :exec
-INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-VALUES ($1, $2, 'message', $3, $4, $5)
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, coaching_role)
+VALUES ($1, $2, 'message', $3, $4, $5, 'coach')
 `
 
 type InsertWorkOrderNotificationParams struct {

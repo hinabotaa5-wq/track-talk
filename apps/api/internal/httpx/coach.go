@@ -169,6 +169,8 @@ func (s *Server) coachMe(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	w, read := s.coachingReadOnSuccess(w, r, p.ID, "coach", nil, "/coach", "/coach/apply")
+	defer read()
 	c, err := s.q.GetCoachProfile(r.Context(), p.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		JSON(w, http.StatusOK, map[string]any{"application": nil, "completed_review_count": 0})

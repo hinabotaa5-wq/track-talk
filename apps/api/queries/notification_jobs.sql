@@ -28,5 +28,5 @@ WHERE profile_id = $1 AND reviewed_at = $2 AND status = 'rejected'
 FOR UPDATE;
 
 -- name: InsertRejectionNotification :exec
-INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-VALUES ($1, $2, 'message', $3, $4, $5);
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, coaching_role)
+VALUES ($1, $2, 'message', $3, $4, $5, 'coach');

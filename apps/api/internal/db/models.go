@@ -1035,6 +1035,7 @@ type Notification struct {
 	Body            *string    `json:"body"`
 	Url             *string    `json:"url"`
 	AnnouncementID  *uuid.UUID `json:"announcement_id"`
+	CoachingRole    *string    `json:"coaching_role"`
 }
 
 type NotificationJob struct {
