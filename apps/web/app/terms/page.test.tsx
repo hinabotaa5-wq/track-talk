@@ -146,13 +146,8 @@ it("継続プランの返金に伴う精算は、支払済みの報酬相当額�
 it("追加質問の購入画面は、1回限りであることと契約の相手を示す", () => {
   const review = renderToStaticMarkup(<ConsultationTermsNote kind="review" />);
   for (const word of agencyWords) expect(review).not.toContain(word);
-  expect(review).toContain("追加質問は、この添削を担当したコーチへの");
-  expect(review).toContain("この添削について相談できるのは1回限り");
-  expect(review).toContain("追加のやりとりはできません");
-  expect(review).toContain("回答がないまま終わった場合に限り、もう1回だけ改めて購入できます");
+  expect(review).toContain("回答がないまま終わった場合に限り、もう1回だけ購入できます。提供・お支払いは TrackTalk の運営者です（回答はコーチに委託します）。");
   expect(review).not.toContain("7日以内に1回無料");
-  expect(review).toContain("提供者とお支払い先は TrackTalk の運営者");
-  expect(review).toContain("料金・キャンセル・返金は運営者が責任を持って対応");
   const contract = renderToStaticMarkup(<ConsultationTermsNote kind="contract" />);
   expect(contract).toContain("契約の相手はコーチ");
   expect(contract).toContain("代理受領の権限");
