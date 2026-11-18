@@ -99,6 +99,7 @@ func (s *Server) listHomePosts(w http.ResponseWriter, r *http.Request, kind *str
 		item.SavedByMe = saved[row.ID]
 		items = append(items, item)
 	}
+	s.attachPostTranslations(r.Context(), items)
 	if err := s.attachRecruitmentCovers(r.Context(), items); err != nil {
 		MapDBError(w, err)
 		return

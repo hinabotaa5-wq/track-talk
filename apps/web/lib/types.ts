@@ -47,6 +47,9 @@ export type Competition = {
 };
 
 export type Post = {
+  title_en?: string | null;
+  body_en?: string | null;
+  excerpt_en?: string | null;
   id: string;
   title: string;
   author_name?: string;

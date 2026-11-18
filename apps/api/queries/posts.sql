@@ -732,3 +732,16 @@ WHERE s.user_id = sqlc.arg('user_id')
   )
 ORDER BY s.created_at DESC, p.id DESC
 LIMIT sqlc.arg('limit_n');
+
+-- name: GetPostTranslation :one
+SELECT * FROM post_translations WHERE post_id = $1;
+
+-- name: ListPostTranslations :many
+SELECT * FROM post_translations WHERE post_id = ANY($1::uuid[]);
+
+-- name: UpsertPostTranslation :one
+INSERT INTO post_translations (post_id, source_hash, title_en, body_en)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (post_id) DO UPDATE SET source_hash = EXCLUDED.source_hash,
+    title_en = EXCLUDED.title_en, body_en = EXCLUDED.body_en, updated_at = now()
+RETURNING *;

@@ -3,7 +3,7 @@ import { Article } from "@/components/legal-prose";
 import { OverseasConsentNotice } from "@/components/overseas-consent-notice";
 import { JapaneseOfficialNote } from "@/components/japanese-official-note";
 
-const privacyUpdated = "2026年11月17日";
+const privacyUpdated = "2026年11月18日";
 
 export function PrivacyPolicy({ titleId }: { titleId?: string }) {
   return (
@@ -147,6 +147,7 @@ export function PrivacyPolicy({ titleId }: { titleId?: string }) {
           <li>Anthropic（Claude API。米国。米国）: 感覚メモのふりかえりの作成。利用者が「6個の感覚をまとめる」を押したときだけ、まだまとめていない感覚メモを保存した順に6個選び、本文と種目、日付と曜日を送ります。元の6個の感覚もまとめと一緒に保存するため、感覚メモを個別に削除した後も、まとめには作成時の内容が残ります。ニックネームやメールアドレスなど、あなたを特定する情報は送りません。送った内容は、AI の学習には使われません</li>
           <li>Anthropic（Claude API。米国。米国）: 海外コーチとのやりとりの翻訳（第3条）。送った内容は、AI の学習には使われません。海外コーチとのやりとりを始めるまで使いません</li>
           <li>Anthropic（Claude API。米国。米国）: コーチのプロフィールの英語表示のための翻訳。コーチが承認されたときと、承認後にプロフィールを変更したときに、名前・ひとこと・成績や指導経験・記録を送ります。送った内容は、AI の学習には使われません</li>
+          <li>Anthropic（Claude API。米国。米国）: フィードの動画投稿の英語表示のための翻訳。動画投稿が作成・編集されたときに、タイトルと本文を送ります。送った内容は、AI の学習には使われません</li>
           <li>Wise Payments Japan（日本）: 海外コーチへの委託費の送金。海外コーチとのやりとりを始めるまで使いません</li>
         </ul>
         <p>

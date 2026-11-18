@@ -15,9 +15,13 @@ type meta struct {
 }
 
 type postDTO struct {
-	ID    uuid.UUID `json:"id"`
-	Title string    `json:"title"`
-	Body  string    `json:"body,omitempty"`
+	ID         uuid.UUID `json:"id"`
+	Title      string    `json:"title"`
+	TitleEn    *string   `json:"title_en"`
+	BodyEn     *string   `json:"body_en"`
+	ExcerptEn  *string   `json:"excerpt_en"`
+	sourceBody string
+	Body       string `json:"body,omitempty"`
 	// Excerpt は一覧カードに出す詳細の冒頭。一覧では本文を返さないので、カードに詳細を出す投稿に付ける。
 	Excerpt    string  `json:"excerpt,omitempty"`
 	AuthorName *string `json:"author_name,omitempty"`
@@ -147,6 +151,7 @@ func postFromList(row db.ListPostsNewRow, liked bool, list bool) postDTO {
 	p := postDTO{
 		ID:           row.ID,
 		Title:        row.Title,
+		sourceBody:   row.Body,
 		authorID:     row.AuthorID,
 		LikeCount:    row.LikeCount,
 		CommentCount: row.CommentCount,

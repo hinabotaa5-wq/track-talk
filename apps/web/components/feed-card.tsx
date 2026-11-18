@@ -1,3 +1,4 @@
+import { postDisplayText } from "@/lib/post-display";
 import { L } from "@/lib/i18n";
 import { useState } from "react";
 import Link from "next/link";
@@ -51,8 +52,10 @@ function KindBadge({ children }: { children: string }) {
 
 export function FeedCard({ post, returnTo, priority }: { post: Post; returnTo?: "me"; priority?: boolean }) {
   const [landscapeSrc, setLandscapeSrc] = useState("");
-  const title = feedTitle(post.title);
-  const description = feedTitle(post.body ?? "") || feedTitle(post.excerpt ?? "") || title;
+  const title = feedTitle(post.kind === "video" ? postDisplayText(post.title, post.title_en) ?? "" : post.title);
+  const body = post.kind === "video" ? postDisplayText(post.body, post.body_en) : post.body;
+  const excerpt = post.kind === "video" ? postDisplayText(post.excerpt, post.excerpt_en) : post.excerpt;
+  const description = feedTitle(body ?? "") || feedTitle(excerpt ?? "") || title;
   const thumbnail = post.thumbnail_url || (post.kind === "youtube" && post.youtube_video_id
     ? `https://i.ytimg.com/vi/${post.youtube_video_id}/hqdefault.jpg` : "");
   const href = returnTo === "me" ? `/posts/${post.id}?from=me` : `/posts/${post.id}`;

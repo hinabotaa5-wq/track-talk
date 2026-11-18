@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { PostDetail } from "./post-detail";
 import type { Comment, Post } from "@/lib/types";
 let room = "";
@@ -36,4 +36,28 @@ it("チャットの長い連続文字を折り返し、小さい文字で全文�
   expect(bubble.className).toContain("[overflow-wrap:anywhere]");
   expect(bubble.className).not.toMatch(/truncate|line-clamp/);
   room = "";
+});
+
+import { setActiveLocale } from "@/lib/i18n";
+afterEach(() => setActiveLocale("ja"));
+it.each(["en", "ja"] as const)("video detail uses the corresponding language %s", (locale) => {
+  room = "";
+  setActiveLocale(locale);
+  const container = render({ ...post, title_en: "English title", body_en: "English body" });
+  expect(container.querySelector("h1")?.textContent).toBe(locale === "en" ? "English title" : post.title);
+  expect(container.querySelector(".post-description")?.textContent).toBe(locale === "en" ? "English body" : post.body);
+});
+it.each(["text", "youtube", "instagram", "x", "recruitment"] as const)("detail ignores translations on %s", (kind) => {
+  room = "";
+  setActiveLocale("en");
+  const container = render({ ...post, kind, title_en: "English title", body_en: "English body", youtube_video_id: "abcdefghijk", instagram_type: "reel", instagram_shortcode: "C1a2B3c4D5e" });
+  expect(container.textContent).not.toContain("English title");
+  expect(container.textContent).not.toContain("English body");
+});
+it("falls back for missing video detail translations", () => {
+  room = "";
+  setActiveLocale("en");
+  const container = render({ ...post, title_en: "", body_en: null });
+  expect(container.querySelector("h1")?.textContent).toBe(post.title);
+  expect(container.querySelector(".post-description")?.textContent).toBe(post.body);
 });

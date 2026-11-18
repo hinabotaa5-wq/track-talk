@@ -69,6 +69,7 @@ func (s *Server) listSavedPostsCursor(w http.ResponseWriter, r *http.Request) {
 		item.SavedByMe = true
 		items = append(items, item)
 	}
+	s.attachPostTranslations(r.Context(), items)
 	if err := s.attachRecruitmentCovers(r.Context(), items); err != nil {
 		MapDBError(w, err)
 		return

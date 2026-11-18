@@ -108,6 +108,7 @@ type Config struct {
 	MailDevLog bool
 	// CoachProfileTranslationEnabled が false の間は、コーチプロフィールの英語訳を作らない（本体 #824）。
 	CoachProfileTranslationEnabled bool
+	PostTranslationEnabled         bool
 	// SenseSummaryEnabled が false の間は、感覚メモの1週間のまとめ（AI）の API を 404 にする。
 	// 感覚メモを Claude(Anthropic)に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
 	SenseSummaryEnabled bool
@@ -187,6 +188,7 @@ func Load() (Config, error) {
 		SMTPPassword:                   os.Getenv("SMTP_PASSWORD"),
 		MailDevLog:                     enabled(os.Getenv("MAIL_DEV_LOG")),
 		CoachProfileTranslationEnabled: enabled(os.Getenv("COACH_PROFILE_TRANSLATION_ENABLED")),
+		PostTranslationEnabled:         enabled(os.Getenv("POST_TRANSLATION_ENABLED")),
 		SenseSummaryEnabled:            enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
 		StaffMFARequired:               enabled(os.Getenv("STAFF_MFA_REQUIRED")),
 		LocalMediaBaseURL:              strings.TrimRight(os.Getenv("LOCAL_MEDIA_BASE_URL"), "/"),

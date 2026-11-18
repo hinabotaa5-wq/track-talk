@@ -1069,6 +1069,20 @@ type PostSafe struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type PostTranslation struct {
+	PostID     uuid.UUID `json:"post_id"`
+	SourceHash string    `json:"source_hash"`
+	TitleEn    string    `json:"title_en"`
+	BodyEn     string    `json:"body_en"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type PostTranslationAttempt struct {
+	ID          int64     `json:"id"`
+	AttemptedAt time.Time `json:"attempted_at"`
+}
+
 type PracticeApplication struct {
 	ID        uuid.UUID `json:"id"`
 	PostID    uuid.UUID `json:"post_id"`

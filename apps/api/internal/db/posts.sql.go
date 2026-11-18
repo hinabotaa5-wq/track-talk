@@ -481,6 +481,24 @@ func (q *Queries) GetPostMedia(ctx context.Context, id uuid.UUID) (GetPostMediaR
 	return i, err
 }
 
+const getPostTranslation = `-- name: GetPostTranslation :one
+SELECT post_id, source_hash, title_en, body_en, created_at, updated_at FROM post_translations WHERE post_id = $1
+`
+
+func (q *Queries) GetPostTranslation(ctx context.Context, postID uuid.UUID) (PostTranslation, error) {
+	row := q.db.QueryRow(ctx, getPostTranslation, postID)
+	var i PostTranslation
+	err := row.Scan(
+		&i.PostID,
+		&i.SourceHash,
+		&i.TitleEn,
+		&i.BodyEn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const hidePost = `-- name: HidePost :execrows
 UPDATE posts
 SET hidden_at = now(), updated_at = now()
@@ -911,6 +929,37 @@ func (q *Queries) ListMediaInUse(ctx context.Context, publicIds []string) ([]str
 			return nil, err
 		}
 		items = append(items, public_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPostTranslations = `-- name: ListPostTranslations :many
+SELECT post_id, source_hash, title_en, body_en, created_at, updated_at FROM post_translations WHERE post_id = ANY($1::uuid[])
+`
+
+func (q *Queries) ListPostTranslations(ctx context.Context, dollar_1 []uuid.UUID) ([]PostTranslation, error) {
+	rows, err := q.db.Query(ctx, listPostTranslations, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PostTranslation
+	for rows.Next() {
+		var i PostTranslation
+		if err := rows.Scan(
+			&i.PostID,
+			&i.SourceHash,
+			&i.TitleEn,
+			&i.BodyEn,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -1685,6 +1734,40 @@ func (q *Queries) UpdatePost(ctx context.Context, arg UpdatePostParams) (UpdateP
 		&i.Body,
 		&i.LikeCount,
 		&i.CommentCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertPostTranslation = `-- name: UpsertPostTranslation :one
+INSERT INTO post_translations (post_id, source_hash, title_en, body_en)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (post_id) DO UPDATE SET source_hash = EXCLUDED.source_hash,
+    title_en = EXCLUDED.title_en, body_en = EXCLUDED.body_en, updated_at = now()
+RETURNING post_id, source_hash, title_en, body_en, created_at, updated_at
+`
+
+type UpsertPostTranslationParams struct {
+	PostID     uuid.UUID `json:"post_id"`
+	SourceHash string    `json:"source_hash"`
+	TitleEn    string    `json:"title_en"`
+	BodyEn     string    `json:"body_en"`
+}
+
+func (q *Queries) UpsertPostTranslation(ctx context.Context, arg UpsertPostTranslationParams) (PostTranslation, error) {
+	row := q.db.QueryRow(ctx, upsertPostTranslation,
+		arg.PostID,
+		arg.SourceHash,
+		arg.TitleEn,
+		arg.BodyEn,
+	)
+	var i PostTranslation
+	err := row.Scan(
+		&i.PostID,
+		&i.SourceHash,
+		&i.TitleEn,
+		&i.BodyEn,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -1,4 +1,5 @@
 "use client";
+import { postDisplayText } from "@/lib/post-display";
 import { L } from "@/lib/i18n";
 
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -486,6 +487,8 @@ export function PostDetail({
     );
   }
 
+  const displayTitle = post.kind === "video" ? postDisplayText(post.title, post.title_en) ?? "" : post.title;
+  const displayBody = post.kind === "video" ? postDisplayText(post.body, post.body_en) : post.body;
   const threads = buildCommentThreads(comments);
   const openedThread = threads.find((t) => t.top?.id === openThreadId);
   const activeThread = openedThread?.top ? { top: openedThread.top, replies: openedThread.replies } : null;
@@ -500,8 +503,8 @@ export function PostDetail({
       {post.kind === "meet" && hasFeedTitle(post.title) ? (
         <h1 className="text-2xl font-bold leading-snug [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
       ) : null}
-      {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : post.body ? (
-        <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-lg font-bold leading-relaxed text-slate-100">{post.body}</p>
+      {post.kind === "meet" ? <MeetRoomContent key={post.id} postId={post.id} body={post.body ?? ""} /> : displayBody ? (
+        <p className="post-description whitespace-pre-wrap [overflow-wrap:anywhere] text-lg font-bold leading-relaxed text-slate-100">{displayBody}</p>
       ) : null}
       {post.kind === "practice" ? (
         <h1 className="sr-only">{post.practice?.event_label || L("練習相手募集")}</h1>
@@ -555,8 +558,8 @@ export function PostDetail({
           priority
         />
       ) : null}
-      {post.kind === "practice" || post.kind === "meet" || !hasFeedTitle(post.title) ? null : (
-        <h1 className="text-base font-normal leading-relaxed [overflow-wrap:anywhere]">{feedTitle(post.title)}</h1>
+      {post.kind === "practice" || post.kind === "meet" || !hasFeedTitle(displayTitle) ? null : (
+        <h1 className="text-base font-normal leading-relaxed [overflow-wrap:anywhere]">{feedTitle(displayTitle)}</h1>
       )}
       {post.kind === "meet" ? <MeetThreadNowRunning postId={post.id} /> : null}
       {post.source_title ? (
@@ -621,7 +624,7 @@ export function PostDetail({
       )}
       <section className={`min-w-0 space-y-3 ${activeThread ? "" : "mt-6 lg:sticky lg:top-4 lg:mt-0"}`}>
         {activeThread ? (
-          <h2 className="mx-auto max-w-prose whitespace-pre-wrap text-center [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{feedTitle(post.body ?? "") || feedTitle(post.title) || L("コメント")}</h2>
+          <h2 className="mx-auto max-w-prose whitespace-pre-wrap text-center [overflow-wrap:anywhere] text-base font-semibold leading-relaxed text-slate-100">{feedTitle(displayBody ?? "") || feedTitle(displayTitle) || L("コメント")}</h2>
         ) : (
           <h2 className="text-xl font-semibold">{L("コメント")}</h2>
         )}
