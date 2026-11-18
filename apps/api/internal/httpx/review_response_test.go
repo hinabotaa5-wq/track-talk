@@ -1,6 +1,7 @@
 package httpx_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/config"
+	"github.com/hinata/track-talk/apps/api/internal/db"
 )
 
 // acceptedReview は、コーチが引き受けて添削中になった依頼を1つ作る。
@@ -211,12 +213,23 @@ func TestReviewResponseReportAndProbation(t *testing.T) {
 		t.Fatalf("response %d", rec.Code)
 	}
 	assertReported(false)
-	// 保護者の通報と同じく、子を reporter_id として by_guardian を立てる。
-	// 返答には保護者用の通報経路がないため、別行を直接用意して取り違えを検証する。
+	// 保護者の通報は DB 制約でも message/consultation に限られる。
+	// 実際に許可される種別で、同じ reporter/target の本人・保護者を区別する。
 	execSQLArgs(t, `INSERT INTO reports (id, reporter_id, by_guardian, target_type, target_id, reason, detail)
-		VALUES ($1, $2, true, 'review_response', $3, 'harassment', '')`, uuid.New(), requester, id)
+		VALUES ($1, $2, true, 'coaching_message', $3, 'harassment', '')`, uuid.New(), requester, id)
+	q := db.New(openPool(t))
+	for _, guardian := range []bool{false, true} {
+		exists, err := q.ReportExists(context.Background(), db.ReportExistsParams{
+			ReporterID: requester,
+			ByGuardian: guardian,
+			TargetType: "coaching_message",
+			TargetID:   uuid.MustParse(id),
+		})
+		if err != nil || exists != guardian {
+			t.Fatalf("guardian=%v ReportExists=%v err=%v", guardian, exists, err)
+		}
+	}
 	assertReported(false)
-	execSQLArgs(t, `DELETE FROM reports WHERE reporter_id=$1 AND target_type='review_response' AND target_id=$2 AND by_guardian=true`, requester, id)
 
 	report := map[string]any{"target_type": "review_response", "target_id": id, "reason": "harassment", "detail": ""}
 	// 通報できるのは依頼した本人だけ。
