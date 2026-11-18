@@ -3,8 +3,10 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { canClarify, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
-import { formatDateTime } from "@/lib/format";
+import { formatChatDateTime } from "@/lib/format";
 import { CoachingConsultations } from "./coaching-consultations";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
+import { en } from "@/lib/i18n-en";
 const apiFetch = vi.fn();
 const flags = vi.hoisted(() => ({ messaging: true, consultation: true }));
 vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get coachingMessagingEnabled() { return flags.messaging; }, get coachingConsultationEnabled() { return flags.consultation; } }));
@@ -120,7 +122,7 @@ it("届出が済むまでは、継続プランの新しい質問・確認・回�
 it("フォーム添削のあとの相談は一方通行で、回答への確認・補足の欄を出さず、過去の確認・補足は表示だけする", async () => {
  const c = { ...draft, status: "answered" as const, answer: "コーチの回答", answered_at: new Date().toISOString(), clarify_body: "以前の確認", clarification: "以前の補足" };
  await render({ ...room, can_purchase: false, block_reason: "この添削の追加質問は回答済みです。", consultations: [c, { ...draft, id: "c2", status: "answered" as const, answer: "別の回答", answered_at: new Date().toISOString() }] });
- expect(container.textContent).toContain("この添削について質問を1回送ると、担当コーチが1回回答します");
+ expect(container.textContent).not.toContain("この添削について質問を1回送ると、担当コーチが1回回答します");
  expect(container.textContent).not.toContain("会話はこの部屋に残ります");
  expect(container.textContent).toContain("回答への確認：以前の確認");
  expect(container.textContent).toContain("補足：以前の補足");
@@ -136,7 +138,7 @@ it("回答済みの追加質問はチャット風の吹き出しと終了状態�
  };
  await render({ ...room, can_purchase: false, block_reason: "この添削の追加質問は回答済みです。追加質問は1つの添削につき1回までです", consultations: [c] });
  expect(container.textContent).toContain("回答済み・この追加質問は終了しました");
- expect(container.textContent).toContain("あなたの質問");
+ expect(container.textContent).not.toContain("あなたの質問");
  expect(container.textContent).toContain("コーチの回答");
  expect(container.querySelector("video")).not.toBeNull();
  expect(container.querySelector("textarea")).toBeNull();
@@ -146,7 +148,7 @@ it("回答待ちの追加質問は質問の吹き出しを示し、追撃の入�
  const c = { ...draft, status: "in_review" as const, question: "質問文", answer_by: "2026-11-17T02:00:00Z" };
  await render({ ...room, can_purchase: true, consultations: [c] });
  expect(container.textContent).toContain("回答待ち");
- expect(container.textContent).toContain("あなたの質問");
+ expect(container.textContent).not.toContain("あなたの質問");
  expect(container.querySelector("textarea")).toBeNull();
 });
 it("フォーム添削のあとの相談には、コーチの補足の欄も出さない", async () => {
@@ -180,51 +182,69 @@ function bubble(text: string) {
  const p = [...container.querySelectorAll("p")].find((x) => x.textContent === text);
  const row = p?.closest("div.flex");
  if (!row) throw new Error(`missing bubble ${text}`);
- return { side: row.classList.contains("justify-end") ? "right" : row.classList.contains("justify-start") ? "left" : "none", head: row.querySelector("p.text-xs")?.textContent ?? "" };
+ return { side: row.classList.contains("justify-end") ? "right" : row.classList.contains("justify-start") ? "left" : "none", head: row.querySelector("time")?.textContent ?? "" };
 }
-it("継続プランの相談は、質問・確認を右、回答・補足を左の吹き出しで、ラベルと時刻つきで見せる", async () => {
+it("継続プランの相談は、質問・確認を右、回答・補足を左の吹き出しで、ラベルなし・年なし日時で見せる", async () => {
  await render({ ...room, funding: "cash", consultations: [contractThread] }, undefined, "contract");
- expect(bubble("契約の質問")).toEqual({ side: "right", head: `あなたの質問 · ${formatDateTime(contractThread.created_at)}` });
- expect(bubble("契約の回答")).toEqual({ side: "left", head: `コーチの回答 · ${formatDateTime(contractThread.answered_at)}` });
- expect(bubble("契約の確認")).toEqual({ side: "right", head: `あなたの確認 · ${formatDateTime(contractThread.clarify_requested_at)}` });
- expect(bubble("契約の補足")).toEqual({ side: "left", head: `コーチの補足 · ${formatDateTime(contractThread.clarified_at)}` });
+ expect(bubble("契約の質問")).toEqual({ side: "right", head: formatChatDateTime(contractThread.created_at) });
+ expect(bubble("契約の回答")).toEqual({ side: "left", head: formatChatDateTime(contractThread.answered_at) });
+ expect(bubble("契約の確認")).toEqual({ side: "right", head: formatChatDateTime(contractThread.clarify_requested_at) });
+ expect(bubble("契約の補足")).toEqual({ side: "left", head: formatChatDateTime(contractThread.clarified_at) });
  expect(container.textContent).not.toContain("回答への確認：");
  expect(container.textContent).not.toContain("補足：契約の補足");
 });
-it("継続プランの相談を保護者が見るときは、選手とコーチのラベルで吹き出しを見せる", async () => {
+it("継続プランの相談を保護者が見るときは、話者ラベルなしで吹き出しを見せる", async () => {
  await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [contractThread] }, "guardian-secret");
- expect(bubble("契約の質問")).toMatchObject({ side: "right", head: expect.stringContaining("選手の質問") });
- expect(bubble("契約の回答")).toMatchObject({ side: "left", head: expect.stringContaining("コーチの回答") });
- expect(bubble("契約の確認")).toMatchObject({ side: "right", head: expect.stringContaining("選手の確認") });
- expect(bubble("契約の補足")).toMatchObject({ side: "left", head: expect.stringContaining("コーチの補足") });
+ expect(bubble("契約の質問")).toMatchObject({ side: "right", head: formatChatDateTime(contractThread.created_at) });
+ expect(bubble("契約の回答")).toMatchObject({ side: "left", head: formatChatDateTime(contractThread.answered_at) });
+ expect(bubble("契約の確認")).toMatchObject({ side: "right", head: formatChatDateTime(contractThread.clarify_requested_at) });
+ expect(bubble("契約の補足")).toMatchObject({ side: "left", head: formatChatDateTime(contractThread.clarified_at) });
  expect(container.textContent).not.toContain("あなたの");
 });
-it("継続プランの相談をコーチが見るときは、自分の回答・補足を「あなたの」で右、選手の質問・確認を左に見せる", async () => {
+it("継続プランの相談をコーチが見るときは、自分の回答・補足をラベルなしで右、選手の質問・確認を左に見せる", async () => {
  await render({ ...room, role: "coach", funding: "cash", can_purchase: false, consultations: [contractThread] }, undefined, "contract");
- expect(bubble("契約の質問")).toMatchObject({ side: "left", head: expect.stringContaining("選手の質問") });
- expect(bubble("契約の回答")).toMatchObject({ side: "right", head: expect.stringContaining("あなたの回答") });
- expect(bubble("契約の確認")).toMatchObject({ side: "left", head: expect.stringContaining("選手の確認") });
- expect(bubble("契約の補足")).toMatchObject({ side: "right", head: expect.stringContaining("あなたの補足") });
+ expect(bubble("契約の質問")).toMatchObject({ side: "left", head: formatChatDateTime(contractThread.created_at) });
+ expect(bubble("契約の回答")).toMatchObject({ side: "right", head: formatChatDateTime(contractThread.answered_at) });
+ expect(bubble("契約の確認")).toMatchObject({ side: "left", head: formatChatDateTime(contractThread.clarify_requested_at) });
+ expect(bubble("契約の補足")).toMatchObject({ side: "right", head: formatChatDateTime(contractThread.clarified_at) });
 });
 const reviewQuestion = { ...draft, question: "添削の質問", created_at: "2026-11-01T01:00:00Z" };
 const reviewAnswered = { ...reviewQuestion, status: "answered" as const, answer: "添削の回答", answered_at: "2026-11-02T02:00:00Z" };
 it("受諾待ちの追加質問をコーチが見るときは、選手の質問を左の吹き出しで見せる", async () => {
  await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...reviewQuestion, status: "offered" as const }] });
- expect(bubble("添削の質問")).toEqual({ side: "left", head: `選手の質問 · ${formatDateTime(reviewQuestion.created_at)}` });
+ expect(bubble("添削の質問")).toEqual({ side: "left", head: formatChatDateTime(reviewQuestion.created_at) });
 });
 it("回答済みの追加質問をコーチが見るときは、選手の質問を左、自分の回答を右の吹き出しで見せる", async () => {
  await render({ ...room, role: "coach", can_purchase: false, consultations: [reviewAnswered] });
- expect(bubble("添削の質問")).toMatchObject({ side: "left", head: expect.stringContaining("選手の質問") });
- expect(bubble("添削の回答")).toEqual({ side: "right", head: `あなたの回答 · ${formatDateTime(reviewAnswered.answered_at)}` });
+ expect(bubble("添削の質問")).toMatchObject({ side: "left", head: formatChatDateTime(reviewQuestion.created_at) });
+ expect(bubble("添削の回答")).toEqual({ side: "right", head: formatChatDateTime(reviewAnswered.answered_at) });
 });
 it("回答済みの追加質問を選手が見るときは、自分の質問を右、コーチの回答を左の吹き出しのまま見せる", async () => {
  await render({ ...room, can_purchase: false, consultations: [reviewAnswered] });
- expect(bubble("添削の質問")).toMatchObject({ side: "right", head: expect.stringContaining("あなたの質問") });
- expect(bubble("添削の回答")).toMatchObject({ side: "left", head: expect.stringContaining("コーチの回答") });
+ expect(bubble("添削の質問")).toMatchObject({ side: "right", head: formatChatDateTime(reviewQuestion.created_at) });
+ expect(bubble("添削の回答")).toMatchObject({ side: "left", head: formatChatDateTime(reviewAnswered.answered_at) });
 });
 // #918 コーチ画面（動画添削のあと）では、追加質問の選手向け説明を出さない。質問が届くまでは枠ごと出さない。
 const reviewIntro = "この添削について質問を1回送ると、担当コーチが1回回答します。";
-const reviewTerms = "コーチの受諾は48時間以内、受諾後の回答は72時間以内。辞退・未回答の期限切れは全額返金します。";
+const reviewTerms = "コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れは全額返金します。";
+it("追加質問・追加相談の期限は日本語と英語の両方で受諾24時間・回答12時間", async () => {
+ installEnglish(en);
+ try {
+  for (const kind of ["review", "contract"] as const) {
+   setActiveLocale("ja");
+   await render(room, undefined, kind);
+   // #930 以降、追加質問（review）の選手向け説明は TrackTalk のシステム吹き出しの簡潔文になった。
+   expect(container.textContent).toContain(kind === "review" ? "受諾は24時間以内、回答は受諾後12時間以内" : "受諾は24時間以内、受諾後の回答は12時間以内");
+   expect(container.textContent).not.toMatch(/48時間|72時間/);
+   setActiveLocale("en");
+   await render(room, undefined, kind);
+   expect(container.textContent).toContain("within 24 hours");
+   expect(container.textContent).toContain("within 12 hours");
+   expect(container.textContent).not.toMatch(/48 hours|72 hours/);
+  }
+ } finally { setActiveLocale("ja"); }
+});
+const systemIntro = "質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。";
 const coachRoom: ConsultationRoom = { ...room, role: "coach", can_purchase: false, consultations: [] };
 it("A1: コーチの添削画面で追加質問がまだ無いときは、追加質問の枠を出さない", async () => {
  await render(coachRoom);
@@ -254,16 +274,17 @@ it("A4: 引き受けた追加質問は、コーチが回答を送れる（説明
 });
 it("A5: 回答済みの追加質問は、質問と回答の吹き出しを見せる（説明は出さない）", async () => {
  await render({ ...coachRoom, consultations: [{ ...draft, status: "answered", question: "質問A5", answer: "回答A5", answered_at: "2026-11-14T02:00:00Z" }] });
- expect(bubble("質問A5").head).toContain("選手の質問");
- expect(bubble("回答A5").head).toContain("あなたの回答");
+ expect(bubble("質問A5").head).toBe(formatChatDateTime(draft.created_at));
+ expect(bubble("回答A5").head).toBe("11/14 11:00");
  expect(container.textContent).not.toContain(reviewIntro);
  expect(container.textContent).not.toContain(reviewTerms);
 });
-it("B1: 選手の添削画面は、見出し・説明・購入フォームを従来どおり出す", async () => {
+it("B1: 選手の添削画面は、見出し・システム説明・購入フォームを出す", async () => {
  await render();
  expect(container.querySelector("h2")?.textContent).toBe("追加質問");
- expect(container.textContent).toContain(reviewIntro);
- expect(container.textContent).toContain(reviewTerms);
+ expect(container.textContent).not.toContain(reviewIntro);
+ expect(container.textContent).not.toContain(reviewTerms);
+ expect(container.textContent).toContain("質問・回答は各1回まで。");
  expect(container.textContent).toContain("質問する（500円）");
 });
 it("B2: 保護者の添削画面は、見出し・説明を従来どおり出す", async () => {
@@ -284,4 +305,102 @@ it("B4: ゲートが閉じている間も、コーチの添削画面では過去
  expect(container.textContent).toContain("追加質問の受付は準備中です");
  expect(container.textContent).not.toContain("回答を送る");
  expect(container.textContent).not.toContain(reviewIntro);
+});
+
+it.each([{ consultations: [] }, { consultations: [draft] }])("送信前の選手にはTrackTalk名義のグレーの簡潔な説明を出す（%j）", async ({ consultations }) => {
+ await render({ ...room, consultations });
+ const name = [...container.querySelectorAll("p")].find((p) => p.textContent === "TrackTalk")!;
+ expect(name).toBeTruthy();
+ expect(name.parentElement?.classList).toContain("bg-slate-500/20");
+ expect(name.parentElement?.parentElement?.classList).toContain("justify-start");
+ expect(name.nextElementSibling?.textContent).toBe(systemIntro);
+ expect(container.textContent).not.toContain(reviewIntro);
+ expect(container.textContent).not.toContain(reviewTerms);
+ expect(container.querySelector("textarea")).not.toBeNull();
+});
+
+it.each(["awaiting_payment", "offered", "in_review", "answered", "declined", "expired", "cancelled"] as const)("送信後（%s）はシステム説明を出さない", async (status) => {
+ await render({ ...room, consultations: [{ ...draft, status }] });
+ expect(container.textContent).not.toContain(systemIntro);
+ expect(container.textContent).not.toContain(reviewIntro);
+ expect([...container.querySelectorAll("p")].some((p) => p.textContent === "TrackTalk")).toBe(false);
+});
+
+it("購入不可で下書きもない場合はシステム説明を出さない", async () => {
+ await render({ ...room, consultations: [], can_purchase: false, block_reason: "購入できません" });
+ expect(container.textContent).not.toContain(systemIntro);
+ expect(container.textContent).toContain("購入できません");
+});
+
+it.each(["review", "contract"] as const)("%s の両フォームに短い注意書き・枠とボタン付きのファイル入力を出す", async (kind) => {
+ const assertFile = () => {
+  const file = container.querySelector('input[type="file"]')!;
+  expect(file.getAttribute("accept")).toBe("video/*");
+  expect(file.closest("label")?.classList).toContain("border");
+  expect(file.closest("label")?.classList).toContain("border-white/25");
+  expect(file.classList).toContain("file:rounded-full");
+  expect(container.textContent).toContain("外部の連絡先（URL・メールアドレス・電話番号・SNSのID）は送れません。");
+  expect(container.textContent).not.toContain("規約で禁止されています");
+ };
+ await render(room, undefined, kind);
+ assertFile();
+ await act(async () => root.unmount()); root = createRoot(container);
+ await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "in_review" }] }, undefined, kind);
+ assertFile();
+ expect(container.textContent).not.toContain(systemIntro);
+});
+
+it.each(["requester", "coach", "guardian"] as const)("%s の両kindの吹き出しは話者ラベルなし・年なし日時で、通報を維持する", async (role) => {
+ for (const kind of ["review", "contract"] as const) {
+  await render({ ...room, role, can_purchase: false, consultations: [contractThread] }, role === "guardian" ? "guardian-secret" : undefined, kind);
+  const times = [...container.querySelectorAll("article time")];
+  expect(times).toHaveLength(kind === "contract" ? 4 : 2);
+  expect(times.map((t) => t.textContent)).toEqual(kind === "contract" ? ["11/1 10:00", "11/2 11:00", "11/3 12:00", "11/4 13:00"] : ["11/1 10:00", "11/2 11:00"]);
+  expect(container.querySelector("article")?.textContent).not.toContain("2026");
+  for (const label of ["あなたの質問", "選手の質問", "あなたの回答", "あなたの確認", "選手の確認", "あなたの補足"]) expect(container.textContent).not.toContain(label);
+  expect([...container.querySelectorAll("button")].some((b) => b.textContent === (kind === "review" ? "この追加質問を通報する" : "この追加相談を通報する"))).toBe(true);
+  expect(container.textContent).not.toContain(systemIntro);
+  await act(async () => root.unmount()); root = createRoot(container);
+ }
+});
+
+// 本体 #916 B2: 追加質問は、相手の文だけ訳文メイン＋原文併記、自分の文は原文だけ。
+const overseas: Consultation = {
+ ...draft, id: "overseas", status: "answered", question: "流しは何本がいいですか", question_en: "How many strides should I do?",
+ answer: "Do 3 strides.", answer_ja: "流しを3本やりましょう。", answered_at: new Date().toISOString(),
+ clarify_body: "距離も教えてください", clarify_body_en: "Please tell me the distance too", clarify_requested_at: new Date().toISOString(),
+ clarification: "About 100m each.", clarification_ja: "1本100mくらいです。", clarified_at: new Date().toISOString(),
+};
+it("B2: 選手（ja）には、コーチの回答・補足が日本語メイン＋英語原文の併記で出て、自分の質問・確認は原文だけ", async () => {
+ await render({ ...room, consultations: [overseas] }, undefined, "contract");
+ const text = container.textContent!;
+ expect(text).toContain("流しを3本やりましょう。");
+ expect(text).toContain("1本100mくらいです。");
+ expect([...container.querySelectorAll("p[lang='en']")].map((p) => p.textContent)).toEqual(["Do 3 strides.", "About 100m each."]);
+ expect(text).toContain("流しは何本がいいですか");
+ expect(text).not.toContain("How many strides should I do?");
+ expect(container.querySelectorAll("p[lang='ja']")).toHaveLength(0);
+});
+it("B2: コーチ（en）には、選手の質問・確認が英語メイン＋日本語原文の併記で出て、自分の回答・補足は原文だけ", async () => {
+ setActiveLocale("en");
+ try {
+  await render({ ...room, role: "coach", consultations: [overseas] }, undefined, "contract");
+  const text = container.textContent!;
+  expect(text).toContain("How many strides should I do?");
+  expect(text).toContain("Please tell me the distance too");
+  expect([...container.querySelectorAll("p[lang='ja']")].map((p) => p.textContent)).toEqual(["流しは何本がいいですか", "距離も教えてください"]);
+  expect(text).toContain("Do 3 strides.");
+  expect(text).not.toContain("流しを3本やりましょう。");
+ } finally { setActiveLocale("ja"); }
+});
+it("B4: 訳の項目が null（国内コーチ）のときは、ja／en どちらでも原文だけ", async () => {
+ const domestic = { ...overseas, question_en: null, answer_ja: null, clarify_body_en: null, clarification_ja: null };
+ for (const locale of ["ja", "en"] as const) {
+  setActiveLocale(locale);
+  try {
+   await render({ ...room, role: "coach", consultations: [domestic] }, undefined, "contract");
+   expect(container.querySelectorAll("p[lang]")).toHaveLength(0);
+   expect(container.textContent).toContain("流しは何本がいいですか");
+  } finally { setActiveLocale("ja"); }
+ }
 });

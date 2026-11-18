@@ -93,6 +93,9 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"withdrawal":    withdrawalJSON(rr),
 		// スレッドの終わりから7日を過ぎて、動画ファイル（依頼の動画とコーチの見本動画）を消したか（本体 #506）。
 		"videos_purged": rr.VideosPurgedAt != nil,
+		// 海外コーチとのやり取りの訳（本体 #916）。詳細の応答でだけ withReviewTranslations が入れ、それ以外は null。
+		"question_en":     nil,
+		"info_request_ja": nil,
 	}
 }
 
@@ -469,7 +472,13 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.sendPendingOutbox(r.Context(), pushOutboxBatch)
-	JSON(w, http.StatusCreated, s.reviewRequestJSON(rr))
+	// 指名でコーチが決まった依頼は、ここで相談文を訳す（海外コーチのときだけ。失敗しても依頼は成功のまま）。
+	if rr.CoachID != nil {
+		s.translateReviewAfterWrite(r.Context(), rr, true, false, false)
+	}
+	out := s.reviewRequestJSON(rr)
+	s.withReviewTranslations(r.Context(), out, rr)
+	JSON(w, http.StatusCreated, out)
 }
 
 func (s *Server) listMyReviewRequests(w http.ResponseWriter, r *http.Request) {

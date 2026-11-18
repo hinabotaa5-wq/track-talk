@@ -8,6 +8,8 @@ export type Consultation = {
   payer: "requester" | "guardian";
   question: string; answer: string; video_public_id: string | null; video_url: string | null; answer_video_url: string | null;
   clarify_body: string | null; clarification: string | null; clarify_requested_at: string | null; clarified_at: string | null;
+  // 海外コーチとのやり取りの訳（本体 #916）。選手の質問・確認は英訳、コーチの回答・補足は和訳。対象外・訳が無い・古いときは null。
+  question_en?: string | null; answer_ja?: string | null; clarify_body_en?: string | null; clarification_ja?: string | null;
   answered_at: string | null; respond_by: string | null; answer_by: string | null; expires_at: string; created_at: string; purged: boolean; hidden: boolean;
   // 保存期間（添削の相談は終わりから7日、契約の相談は30日）を過ぎて動画ファイルを消した。
   videos_purged?: boolean;

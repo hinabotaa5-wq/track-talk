@@ -138,6 +138,10 @@ func (s *Server) offerReview(ctx context.Context, id uuid.UUID) (bool, error) {
 		assigned = err == nil && rr.Status == "in_review"
 		return err
 	})
+	// コーチが決まったら相談文を訳す（海外コーチのときだけ。失敗しても割り当ては成功のまま）。
+	if err == nil && assigned {
+		s.translateReviewQuestionByID(ctx, id)
+	}
 	return assigned, err
 }
 
@@ -222,6 +226,8 @@ type coachingTickResult struct {
 	Requeued      int `json:"requeued"`
 	Offered       int `json:"offered"`
 	HelpfulAsk    int `json:"helpful_ask"`
+	// 表示開始（送信から7日）を過ぎ、担当コーチに知らせた匿名の感想（本体 #911）。
+	FeedbackNotified int `json:"feedback_notified"`
 	// パーソナル指導: 返事のないまま期限が過ぎた申し込みと、期間が終わったもの。
 	ContractsExpired       int `json:"contracts_expired"`
 	SupportConsultsExpired int `json:"support_consults_expired"`
@@ -262,6 +268,9 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	// 送れなかった Push を送り直す（本体 #421 F04）。期限切れの待ちは送らない。
 	out.PushResent = s.sendPendingOutbox(ctx, pushOutboxBatch)
 	if out.HelpfulAsk, err = s.askHelpful(ctx); err != nil {
+		return out, err
+	}
+	if out.FeedbackNotified, err = s.notifyVisibleFeedbacks(ctx); err != nil {
 		return out, err
 	}
 	if out.ContractsExpired, out.ContractsEnded, err = s.closeCoachingContracts(ctx); err != nil {
@@ -429,6 +438,9 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"coach_reward_yen":   rr.BasePriceYen * reviewSharePercent / 100,
 		"info_request":       infoRequestJSON(rr),
 		"withdrawal":         withdrawalJSON(rr),
+		// 海外コーチとのやり取りの訳（本体 #916）。詳細の応答でだけ withReviewTranslations が入れ、それ以外は null。
+		"question_en":     nil,
+		"info_request_ja": nil,
 	}
 	out["videos_purged"] = rr.VideosPurgedAt != nil
 	if withVideo {

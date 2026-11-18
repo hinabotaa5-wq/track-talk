@@ -53,6 +53,40 @@ it("ログイン済みでは見出し『選手』と5つのタイルが順番ど
   expect(navigation.replace).not.toHaveBeenCalled();
 });
 
+it("タイルはコーチ画面と同じ .coach-tiles > nav の構造で、3列の正方形で並べる（#940）", async () => {
+  await render();
+  const wrapper = container.querySelector(".coach-tiles");
+  expect(wrapper).not.toBeNull();
+  expect(wrapper!.className).toBe("coach-tiles");
+  const nav = wrapper!.firstElementChild!;
+  expect(nav.tagName).toBe("NAV");
+  expect(wrapper!.children).toHaveLength(1);
+  expect(nav.className).toBe("grid gap-2");
+  expect(nav.className).not.toContain("grid-cols-3");
+  expect(nav.getAttribute("aria-label")).toBe("選手");
+  const links = [...nav.children];
+  expect(links).toHaveLength(5);
+  for (const tile of links) {
+    expect(tile.tagName).toBe("A");
+    expect(tile.className).toContain("aspect-square");
+  }
+  // 縦配分（CoachTiles の ResizeObserver）は持ち込まないので、インラインの変数指定も無い。
+  expect(nav.getAttribute("style")).toBeNull();
+  expect(wrapper!.getAttribute("style")).toBeNull();
+});
+
+it("タイルのラベルはコーチ側と同じ coach-tile-label を持ち、折り返さず、タイルに固定の大きさは無い（#940）", async () => {
+  await render();
+  const labels = [...container.querySelectorAll(".coach-tiles > nav > a > span.coach-tile-label")];
+  expect(labels).toHaveLength(5);
+  for (const label of labels) {
+    expect(label.className).toBe("coach-tile-label whitespace-nowrap text-[11px] font-semibold leading-tight");
+  }
+  for (const tile of tiles()) {
+    expect(tile.className.split(/\s+/).filter((c) => /^(w|h|min-w|min-h|max-w|max-h)-/.test(c))).toEqual([]);
+  }
+});
+
 it("タイルにバッジ・ドットは出ない", async () => {
   await render();
   for (const tile of tiles()) {

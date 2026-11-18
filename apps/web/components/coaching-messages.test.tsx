@@ -195,3 +195,31 @@ it("終わったら見られず、ダウンロードもできない。通報・�
   expect(container.textContent).toContain("動画は保存期間（契約の終わりから30日）を過ぎたため削除しました");
   expect(container.querySelector('textarea[aria-label="メッセージ"]')).toBeNull();
 });
+
+// 本体 #916 B3: 相手の文は訳文メイン＋原文併記、自分の文は原文だけ。メニューは日本語メイン＋原文併記で、日ごとの並びは原文どおり。
+const overseasCoachMsg = {
+  ...coachMsg, id: "m10", body: "Here is week 1.", body_ja: "1週目のメニューです。",
+  menu: { title: "Week 1", days: [{ day: "Mon", content: "Strides x5" }, { day: "Wed", content: "Rest" }] },
+  menu_ja: { title: "1週目", days: [{ day: "月", content: "流し5本" }, { day: "水", content: "休み" }] },
+};
+it("B3: 選手（ja）には、コーチの文とメニューが日本語メイン＋英語原文の併記で出る", async () => {
+  apiFetch.mockResolvedValue({ messages: [overseasCoachMsg, { ...mineMsg, body_en: "My own text" }], view_closed: false, view_until: null });
+  await render(base);
+  const text = container.textContent!;
+  expect(text).toContain("1週目のメニューです。");
+  expect(text).toContain("流し5本");
+  const originals = [...container.querySelectorAll("[lang='en']")].map((e) => e.textContent);
+  expect(originals[0]).toBe("Here is week 1.");
+  expect(originals[1]).toContain("Mon: Strides x5");
+  expect(originals[1]!.indexOf("Mon")).toBeLessThan(originals[1]!.indexOf("Wed"));
+  // 自分の文は英訳があっても原文だけ。
+  expect(text).toContain("自分の文");
+  expect(text).not.toContain("My own text");
+});
+it("B3・B4: 訳が null（国内コーチ）のときは原文だけで、併記しない", async () => {
+  apiFetch.mockResolvedValue({ messages: [{ ...coachMsg, body_ja: null, menu_ja: null }, { ...reqMsg, body_en: null }], view_closed: false, view_until: null });
+  await render(base);
+  expect(container.querySelectorAll("[lang='en'], [lang='ja']")).toHaveLength(0);
+  expect(container.textContent).toContain("よろしく");
+  expect(container.textContent).toContain("お願いします");
+});

@@ -29,7 +29,7 @@ it("公開文面に開発中の注記や販売を終えた追加相談を表示�
   expect(html).toContain("1回プランの追加質問 1回 500円（税込）");
   expect(html).toContain("返却された1回プラン1件につき1回まで購入でき、都度払いのみで、チケットは使えません。");
   expect(html).toContain("1回プランの追加質問は、申込みの時に1回分の代金を決済します。");
-  expect(html).toContain("受諾は支払いから48時間以内、回答は受諾から72時間以内です。");
+  expect(html).toContain("受諾は支払いから24時間以内、回答は受諾から12時間以内です。");
   expect(html).toContain("コーチの辞退・未回答の期限切れの場合は全額返金し");
   // 支払方法の欄は今使える方法だけ（PayPay は載せず、対応予定の案内も入れない）。
   expect(html).toContain("<p>クレジットカード（Apple Pay・Google Pay を含む）。1回ごとのお支払いです。</p>");

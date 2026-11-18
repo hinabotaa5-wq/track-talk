@@ -12,6 +12,15 @@ RETURNING id, reporter_id, target_type, target_id, reason, detail, status, creat
 -- name: CountReports :one
 SELECT count(*) FROM reports;
 
+-- name: ReportExists :one
+SELECT EXISTS(
+    SELECT 1 FROM reports
+    WHERE reporter_id = sqlc.arg(reporter_id)
+      AND by_guardian = sqlc.arg(by_guardian)
+      AND target_type = sqlc.arg(target_type)
+      AND target_id = sqlc.arg(target_id)
+)::boolean;
+
 -- name: ListAdminReports :many
 -- 先に新しい順で20件台に絞ってから表引きする。全件に6つの LEFT JOIN を当てて並べ替えると遅くなるため。
 WITH recent AS (

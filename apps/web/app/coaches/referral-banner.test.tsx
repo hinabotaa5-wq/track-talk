@@ -66,14 +66,32 @@ it("バナー全体が /referral へのリンクである", async () => {
   expect(container.querySelector('a[href="/me"]')).toBeNull();
 });
 
-it("黄色地に濃色文字で、見出しは太字・閉じるボタンなし", async () => {
+it("バナーは48pxの高さで、横パディングだけを持つ", async () => {
+  setActiveLocale("ja");
+  await act(async () => root.render(<ReferralBanner />));
+  const link = container.querySelector('a[href="/referral"]');
+  expect(link?.classList.contains("h-12")).toBe(true);
+  expect(link?.classList.contains("p-4")).toBe(false);
+  expect(link?.classList.contains("px-4")).toBe(true);
+});
+
+it("現行の見出しを小さい文字で1行に省略表示する", async () => {
+  setActiveLocale("ja");
+  await act(async () => root.render(<ReferralBanner />));
+  const headline = container.querySelector('a[href="/referral"] > span > span');
+  expect(headline?.textContent).toBe(HEADLINE_JA);
+  expect(headline?.classList.contains("text-sm")).toBe(true);
+  expect(headline?.classList.contains("truncate")).toBe(true);
+});
+
+it("黄色地に濃色文字で、見出しはセミボールド・閉じるボタンなし", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const link = container.querySelector('a[href="/referral"]');
   expect(link?.className).toContain("bg-yellow-400/70");
   expect(link?.className).toContain("text-slate-900");
   const headline = [...(container.querySelectorAll("span") ?? [])].find((el) => el.textContent === HEADLINE_JA && el.querySelector("span") === null);
-  expect(headline?.className).toContain("font-bold");
+  expect(headline?.className).toContain("font-semibold");
   expect(container.querySelector("button")).toBeNull();
   expect(link?.textContent).not.toContain("×");
 });

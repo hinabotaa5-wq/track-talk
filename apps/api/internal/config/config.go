@@ -109,6 +109,8 @@ type Config struct {
 	// CoachProfileTranslationEnabled が false の間は、コーチプロフィールの英語訳を作らない（本体 #824）。
 	CoachProfileTranslationEnabled bool
 	PostTranslationEnabled         bool
+	// CoachingTranslationEnabled が false の間は、海外コーチとのやり取り（添削・追加質問・やりとり欄）の訳を作らない（本体 #916）。
+	CoachingTranslationEnabled bool
 	// SenseSummaryEnabled が false の間は、感覚メモの1週間のまとめ（AI）の API を 404 にする。
 	// 感覚メモを Claude(Anthropic)に送るので、プライバシーポリシーに委託先を書くまで本番では立てない。
 	SenseSummaryEnabled bool
@@ -189,6 +191,7 @@ func Load() (Config, error) {
 		MailDevLog:                     enabled(os.Getenv("MAIL_DEV_LOG")),
 		CoachProfileTranslationEnabled: enabled(os.Getenv("COACH_PROFILE_TRANSLATION_ENABLED")),
 		PostTranslationEnabled:         enabled(os.Getenv("POST_TRANSLATION_ENABLED")),
+		CoachingTranslationEnabled:     enabled(os.Getenv("COACHING_TRANSLATION_ENABLED")),
 		SenseSummaryEnabled:            enabled(os.Getenv("SENSE_SUMMARY_ENABLED")),
 		StaffMFARequired:               enabled(os.Getenv("STAFF_MFA_REQUIRED")),
 		LocalMediaBaseURL:              strings.TrimRight(os.Getenv("LOCAL_MEDIA_BASE_URL"), "/"),

@@ -35,7 +35,7 @@ export default function ForCoachesPage() {
         <p>
           <strong>1. One-month coaching package (the main offer)</strong>
           <br />
-          An athlete buys a one-month package, and you coach them across the month. They send you training and race videos for feedback — there&apos;s no set cap on videos — and they also ask you questions as they come up, about their training, their technique, and the theory behind how you coach; you answer both, aiming for about 48 hours per reply. It isn&apos;t a video-review service with extras — it&apos;s a month of being coached by you. You also build a training menu at the start and revise it each week. Athletes can renew month to month.
+          An athlete buys a one-month package, and you coach them across the month. They send you training and race videos for feedback — there&apos;s no set cap on videos — and they also ask you questions as they come up, about their training, their technique, and the theory behind how you coach; you answer both, aiming for about 36 hours per reply. It isn&apos;t a video-review service with extras — it&apos;s a month of being coached by you. You also build a training menu at the start and revise it each week. Athletes can renew month to month.
         </p>
         <p>
           <strong>2. Single video review (the entry point)</strong>

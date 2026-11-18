@@ -1,4 +1,5 @@
 "use client";
+import { originalTextClass, type DisplayedText } from "@/lib/coaching-display";
 import { L } from "@/lib/i18n";
 
 import { CircleCheck } from "lucide-react";
@@ -117,7 +118,9 @@ export function CoachInfoRequestForm({
 }
 
 // 差し戻しの履歴。コーチの質問と、再提出したら直す前の相談内容を出す。
-export function ReviewInfoHistory({ info, viewer }: { info: ReviewInfoRequest; viewer: "coach" | "requester" }) {
+// body は海外コーチの質問の和訳を出すとき（本体 #916）の表示。渡されなければ原文だけ。
+export function ReviewInfoHistory({ info, viewer, body }: { info: ReviewInfoRequest; viewer: "coach" | "requester"; body?: DisplayedText }) {
+  const shown = body ?? { text: info.body, original: null };
   const waiting = !info.resubmitted_at;
   return (
     <section className="space-y-2 rounded-xl border border-amber-400/40 bg-amber-500/15 p-3 text-sm">
@@ -125,7 +128,8 @@ export function ReviewInfoHistory({ info, viewer }: { info: ReviewInfoRequest; v
         {waiting ? (viewer === "coach" ? L("差し戻し中（依頼者の再提出を待っています）") : L("コーチから依頼内容の確認が届いています")) : L("内容確認の差し戻し（再提出済み）")}
       </p>
       {info.reason ? <p className="text-xs text-slate-200">{L("種類：{v0}", { v0: reviewInfoReasonLabels[info.reason] })}</p> : null}
-      <p className="whitespace-pre-wrap break-words">{L("コーチの質問：{body}", { body: info.body })}</p>
+      <p className="whitespace-pre-wrap break-words">{L("コーチの質問：{body}", { body: shown.text })}</p>
+      {shown.original !== null ? <p lang="en" className={originalTextClass}>{shown.original}</p> : null}
       {waiting ? (
         <p className="text-xs text-slate-200">{L("再提出の期限：{v0}（過ぎると依頼は終了し、お支払いは取り消し・返金されます）", { v0: formatDateTime(info.resubmit_by) })}</p>
       ) : (

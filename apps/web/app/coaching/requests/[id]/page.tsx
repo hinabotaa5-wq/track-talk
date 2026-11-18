@@ -10,11 +10,12 @@ import { ReviewInfoHistory, ResubmitForm } from "@/components/review-info-reques
 import { Button } from "@/components/ui/button";
 import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { CoachingConsultations } from "@/components/coaching-consultations";
+import { coachText } from "@/lib/coaching-display";
 import { ReviewCoachCard, ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { formatChatDateTime, formatDateTime, formatYen } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
@@ -33,7 +34,7 @@ const chip = (on: boolean) =>
 // 返答が届いたあとの操作: 7日後の「役に立ちましたか」、通報。（星評価は廃止）
 function ResponseActions({ request, token, onChange }: { request: ReviewRequest; token: string | null; onChange: (r: ReviewRequest) => void }) {
   const [error, setError] = useState("");
-  const [reported, setReported] = useState(false);
+  const [reported, setReported] = useState(request.response_reported ?? false);
   const { pending, acquire, release } = useActionLock();
   const confirmDialog = useConfirm();
   const response = request.response;
@@ -93,6 +94,48 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
         <button type="button" onClick={() => void report()} disabled={pending} className="text-xs text-slate-300 underline">{L("この返答を通報する")}</button>
       )}
     </div>
+  );
+}
+
+// 返却後に任意で書ける匿名の感想（本体 #911）。コーチには7日後に本文だけが届く。
+// 送らなくても他の操作（追加質問など）は何も止めない。
+const feedbackMaxLength = 500;
+
+function FeedbackForm({ request, token, onSubmitted }: { request: ReviewRequest; token: string | null; onSubmitted: () => void }) {
+  const [body, setBody] = useState("");
+  const [error, setError] = useState("");
+  const { pending, acquire, release } = useActionLock();
+  const trimmed = body.trim();
+
+  async function submit() {
+    if (!trimmed || !acquire()) return;
+    setError("");
+    try {
+      await apiFetch(`/v1/coaching/requests/${request.id}/feedback`, { method: "POST", token, body: JSON.stringify({ body: trimmed }) });
+      onSubmitted();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : L("送信に失敗しました"));
+    } finally {
+      release();
+    }
+  }
+
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold">{L("この添削はどうでしたか（任意）")}</h2>
+      <textarea
+        aria-label={L("この添削はどうでしたか（任意）")}
+        value={body}
+        maxLength={feedbackMaxLength}
+        rows={4}
+        disabled={pending}
+        onChange={(e) => setBody(e.target.value)}
+        className="w-full rounded-xl border border-white/25 bg-white/10 p-3 text-sm"
+      />
+      <p className="text-xs text-slate-300">{L("感想は匿名で、7日後にコーチへ届きます。どの添削への感想かはコーチには分かりません。")}</p>
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      <Button type="button" disabled={pending || !trimmed} onClick={() => void submit()}>{L("感想を送る")}</Button>
+    </section>
   );
 }
 
@@ -283,32 +326,32 @@ function ReviewRequestView() {
 
   return (
     <div className="mx-auto max-w-md space-y-5">
-      {completedPayment && request.payment?.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} /> : null}
+      {completedPayment && request.payment?.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} variant="compact" /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">{L("1回プラン")}</h1>
         <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
       </div>
 
-      <section className="space-y-1 rounded-xl border border-blue-400/40 bg-blue-500/15 p-3">
-        <p className="text-sm font-semibold text-white">{request.canceled_at ? L("依頼をキャンセルしました") : request.withdrawal ? L("コーチが依頼を返却しました") : request.status === "expired" && request.requested_coach_id ? L("依頼は終了しました") : reviewStatusLabels[request.status]}</p>
+      <div className="space-y-1 text-center text-xs text-slate-400">
+        <p>{request.canceled_at ? L("依頼をキャンセルしました") : request.withdrawal ? L("コーチが依頼を返却しました") : request.status === "expired" && request.requested_coach_id ? L("依頼は終了しました") : reviewStatusLabels[request.status]}</p>
         {request.status === "in_review" ? (
-          <p className="text-sm text-slate-100">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
+          <p>{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
         ) : null}
         {request.status === "needs_info" && request.info_request ? (
-          <p className="text-sm text-slate-100">{L("再提出の期限: {v0}", { v0: formatDateTime(request.info_request.resubmit_by) })}</p>
+          <p>{L("再提出の期限: {v0}", { v0: formatDateTime(request.info_request.resubmit_by) })}</p>
         ) : null}
-        {active && request.started_at ? <p className="text-sm text-slate-100">{L("現在コーチが依頼に対応しています")}</p> : null}
-        {canCancel ? <Button type="button" variant="secondary" disabled={canceling} onClick={() => void cancelReview()}>{L("依頼をキャンセルする")}</Button> : null}
-        {cancelError ? <p role="alert" className="text-sm text-red-400">{cancelError}</p> : null}
-        {request.requested_coach_id && !(request.response && request.coach) ? <div className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-3 text-sm">
-          <p className="font-semibold">{L("選んだコーチ：{v0}", { v0: request.requested_coach_name || L("選択したコーチ") })}</p>
+        {active && request.started_at ? <p>{L("現在コーチが依頼に対応しています")}</p> : null}
+        {request.requested_coach_id && !(request.response && request.coach) ? <div>
+          <p>{L("選んだコーチ：{v0}", { v0: request.requested_coach_name || L("選択したコーチ") })}</p>
           <p>{L("料金{v0}", { v0: formatYen(request.total_price_yen ?? request.base_price_yen ?? reviewPriceYen) })}</p>
-          {request.status === "expired" ? <Link href="/coaching/new" className="mt-1 inline-block text-blue-300 underline">{L("別のコーチを選んで申し込む")}</Link> : null}
         </div> : null}
-        {request.tickets ? <p className="text-sm text-slate-200">{L("チケット{quantity}枚：{v1}", { quantity: request.tickets.quantity, v1: request.tickets.status === "reserved" ? L("1回プランのために確保中") : request.tickets.status === "consumed" ? L("利用済み") : L("残高に返却済み") })}</p> : null}
-      {request.payment ? <p className="text-xs text-slate-300">{paymentText(request.payment)}</p> : null}
-      </section>
+        {request.tickets ? <p>{L("チケット{quantity}枚：{v1}", { quantity: request.tickets.quantity, v1: request.tickets.status === "reserved" ? L("1回プランのために確保中") : request.tickets.status === "consumed" ? L("利用済み") : L("残高に返却済み") })}</p> : null}
+        {request.payment ? <p>{paymentText(request.payment)}</p> : null}
+      </div>
+      {canCancel ? <Button type="button" variant="secondary" disabled={canceling} onClick={() => void cancelReview()}>{L("依頼をキャンセルする")}</Button> : null}
+      {cancelError ? <p role="alert" className="text-sm text-red-400">{cancelError}</p> : null}
+      {request.requested_coach_id && !(request.response && request.coach) && request.status === "expired" ? <Link href="/coaching/new" className="inline-block text-sm text-blue-300 underline">{L("別のコーチを選んで申し込む")}</Link> : null}
 
       {request.status === "awaiting_payment" ? (
         waitingForPayment ? (
@@ -319,37 +362,48 @@ function ReviewRequestView() {
       ) : null}
 
       {request.withdrawal ? <ReviewWithdrawalNotice withdrawal={request.withdrawal} paid={Boolean(request.payment)} /> : null}
-      {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="requester" /> : null}
+      {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="requester" body={coachText(request.info_request.body, request.info_request_ja, { mine: false })} /> : null}
       {request.status === "needs_info" ? <ResubmitForm request={request} token={token} onChange={setRequest} /> : null}
 
       {request.video_url ? (
-        <video
-          src={request.video_url}
-          poster={request.thumbnail_url || undefined}
-          controls
-          playsInline
-          preload="metadata"
-          className="w-full rounded-xl bg-black"
-        />
+        <div className="flex justify-end">
+          <div className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2">
+            <video
+              src={request.video_url}
+              poster={request.thumbnail_url || undefined}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full max-w-[260px] rounded-xl bg-black"
+            />
+          </div>
+        </div>
       ) : request.videos_purged ? (
-        <p className="rounded-xl border border-white/20 bg-white/5 p-3 text-sm text-slate-200">{reviewVideosPurgedNote}</p>
+        <div className="flex justify-end"><p className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2 text-sm text-slate-200">{reviewVideosPurgedNote()}</p></div>
       ) : null}
+
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2">
+          <time dateTime={request.created_at} className="text-xs text-slate-300">{formatChatDateTime(request.created_at)}</time>
+          <p className="whitespace-pre-wrap break-words text-sm">{reviewQuestionText(request)}</p>
+        </div>
+      </div>
 
       {request.response ? (
         <>
           {request.coach ? <ReviewCoachCard coach={request.coach} /> : null}
-          <ReviewResponseView response={request.response} />
+          <ReviewResponseView response={request.response} viewer="requester" />
           <ResponseActions request={request} token={token} onChange={setRequest} />
+          {request.status === "returned" || request.status === "clarifying" ? (
+            request.feedback_submitted ? (
+              <p className="text-sm text-slate-200">{L("感想を送りました")}</p>
+            ) : (
+              <FeedbackForm request={request} token={token} onSubmitted={() => setRequest({ ...request, feedback_submitted: true })} />
+            )
+          ) : null}
           {id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
         </>
       ) : null}
-
-      <dl className="space-y-2 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
-        <div>
-          <dt className="text-xs text-slate-300">{L("相談内容")}</dt>
-          <dd className="whitespace-pre-wrap break-words">{reviewQuestionText(request)}</dd>
-        </div>
-      </dl>
 
       <Link href="/me/coaching/requests" className="block min-h-11 w-full rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-blue-300 transition active:scale-[0.98]">{L("依頼の一覧へ")}</Link>
     </div>

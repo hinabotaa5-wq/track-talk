@@ -288,3 +288,32 @@ func (q *Queries) ListMyReportedTargets(ctx context.Context, arg ListMyReportedT
 	}
 	return items, nil
 }
+
+const reportExists = `-- name: ReportExists :one
+SELECT EXISTS(
+    SELECT 1 FROM reports
+    WHERE reporter_id = $1
+      AND by_guardian = $2
+      AND target_type = $3
+      AND target_id = $4
+)::boolean
+`
+
+type ReportExistsParams struct {
+	ReporterID uuid.UUID `json:"reporter_id"`
+	ByGuardian bool      `json:"by_guardian"`
+	TargetType string    `json:"target_type"`
+	TargetID   uuid.UUID `json:"target_id"`
+}
+
+func (q *Queries) ReportExists(ctx context.Context, arg ReportExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, reportExists,
+		arg.ReporterID,
+		arg.ByGuardian,
+		arg.TargetType,
+		arg.TargetID,
+	)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}

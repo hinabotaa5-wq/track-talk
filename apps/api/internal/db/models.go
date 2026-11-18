@@ -483,6 +483,16 @@ type CoachingMessage struct {
 	SystemKind         *string    `json:"system_kind"`
 }
 
+type CoachingMessageTranslation struct {
+	MessageID  uuid.UUID `json:"message_id"`
+	BodyEn     string    `json:"body_en"`
+	BodyJa     string    `json:"body_ja"`
+	MenuJa     []byte    `json:"menu_ja"`
+	SourceHash string    `json:"source_hash"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
 type CoachingPayment struct {
 	ID                uuid.UUID  `json:"id"`
 	ContractID        *uuid.UUID `json:"contract_id"`
@@ -661,6 +671,11 @@ type CoachingTicketReservation struct {
 	ConsultationID *uuid.UUID `json:"consultation_id"`
 }
 
+type CoachingTranslationAttempt struct {
+	ID          int64     `json:"id"`
+	AttemptedAt time.Time `json:"attempted_at"`
+}
+
 type CoachingVideoReview struct {
 	QuestionID uuid.UUID  `json:"question_id"`
 	ContractID uuid.UUID  `json:"contract_id"`
@@ -696,6 +711,20 @@ type Competition struct {
 	SourceUrl     string     `json:"source_url"`
 	LinkLabel     string     `json:"link_label"`
 	GuidelinesUrl string     `json:"guidelines_url"`
+}
+
+type ConsultationTranslation struct {
+	ConsultationID          uuid.UUID `json:"consultation_id"`
+	QuestionEn              string    `json:"question_en"`
+	QuestionSourceHash      *string   `json:"question_source_hash"`
+	AnswerJa                string    `json:"answer_ja"`
+	AnswerSourceHash        *string   `json:"answer_source_hash"`
+	ClarifyBodyEn           string    `json:"clarify_body_en"`
+	ClarifySourceHash       *string   `json:"clarify_source_hash"`
+	ClarificationJa         string    `json:"clarification_ja"`
+	ClarificationSourceHash *string   `json:"clarification_source_hash"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 type DailyUsageCollection struct {
@@ -1257,6 +1286,16 @@ type Report struct {
 	ByGuardian bool      `json:"by_guardian"`
 }
 
+type ReviewFeedback struct {
+	ID         uuid.UUID  `json:"id"`
+	RequestID  uuid.UUID  `json:"request_id"`
+	CoachID    uuid.UUID  `json:"coach_id"`
+	Body       string     `json:"body"`
+	CreatedAt  time.Time  `json:"created_at"`
+	VisibleAt  time.Time  `json:"visible_at"`
+	NotifiedAt *time.Time `json:"notified_at"`
+}
+
 type ReviewOffer struct {
 	ID             uuid.UUID  `json:"id"`
 	RequestID      uuid.UUID  `json:"request_id"`
@@ -1359,6 +1398,20 @@ type ReviewResponse struct {
 	HiddenAt           *time.Time `json:"hidden_at"`
 	ClarifyBody        *string    `json:"clarify_body"`
 	Hitokoto           *string    `json:"hitokoto"`
+}
+
+type ReviewTranslation struct {
+	RequestID             uuid.UUID `json:"request_id"`
+	QuestionEn            string    `json:"question_en"`
+	QuestionSourceHash    *string   `json:"question_source_hash"`
+	GoodPointJa           string    `json:"good_point_ja"`
+	FixPointsJa           []string  `json:"fix_points_ja"`
+	DrillJa               string    `json:"drill_ja"`
+	ResponseSourceHash    *string   `json:"response_source_hash"`
+	InfoRequestJa         string    `json:"info_request_ja"`
+	InfoRequestSourceHash *string   `json:"info_request_source_hash"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
 }
 
 type SenseNote struct {
