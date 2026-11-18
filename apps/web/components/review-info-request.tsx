@@ -2,6 +2,7 @@
 import { originalTextClass, type DisplayedText } from "@/lib/coaching-display";
 import { L } from "@/lib/i18n";
 
+import { createPortal } from "react-dom";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,19 +13,23 @@ import { formatDateTime } from "@/lib/format";
 import { maxReviewSeconds, minInfoRequestChars, reviewInfoReasonLabels, tooLong, videoDuration } from "@/lib/review";
 import type { CoachReviewRequest, ReviewInfoReason, ReviewInfoRequest, ReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
-// 送信直後の完了表示。フォームが閉じて高さが縮むので、完了の表示が画面の外に出ないようにする。
+// 送信直後の完了表示。チャットの配置・操作を変えず、画面上部に重ねて3秒で消す。
 export function SentBanner({ text }: { text: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(true);
   useEffect(() => {
-    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const timer = setTimeout(() => setVisible(false), 3000);
+    return () => clearTimeout(timer);
   }, []);
-  return (
-    <div ref={ref} role="status" className="flex scroll-mb-24 items-start gap-2 rounded-lg border border-emerald-500/60 bg-emerald-950/50 p-3">
+  if (!visible) return null;
+  // space-y の余白や祖先の重なり順に影響しないよう、本文の外に出す。
+  return createPortal(
+    <div role="status" className="pointer-events-none fixed top-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 shadow-lg flex items-start gap-2 rounded-lg border border-emerald-500/60 bg-emerald-950/50 p-3">
       <CircleCheck className="mt-0.5 size-5 shrink-0 text-emerald-300" aria-hidden />
       <p className="text-sm font-semibold text-emerald-200">{text}</p>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
