@@ -244,7 +244,7 @@ it("追加質問・追加相談の期限は日本語と英語の両方で受諾2
   }
  } finally { setActiveLocale("ja"); }
 });
-const systemIntro = "質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。";
+const systemIntro = "この添削について、担当コーチに1回だけ質問できます。受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。";
 const coachRoom: ConsultationRoom = { ...room, role: "coach", can_purchase: false, consultations: [] };
 it("A1: コーチの添削画面で追加質問がまだ無いときは、追加質問の枠を出さない", async () => {
  await render(coachRoom);
@@ -284,7 +284,7 @@ it("B1: 選手の添削画面は、見出し・システム説明・購入フォ
  expect(container.querySelector("h2")?.textContent).toBe("追加質問");
  expect(container.textContent).not.toContain(reviewIntro);
  expect(container.textContent).not.toContain(reviewTerms);
- expect(container.textContent).toContain("質問・回答は各1回まで。");
+ expect(container.textContent).toContain(systemIntro);
  expect(container.textContent).toContain("質問する（500円）");
 });
 it("B2: 保護者の添削画面は、見出し・説明を従来どおり出す", async () => {
@@ -403,4 +403,60 @@ it("B4: 訳の項目が null（国内コーチ）のときは、ja／en どち�
    expect(container.textContent).toContain("流しは何本がいいですか");
   } finally { setActiveLocale("ja"); }
  }
+});
+
+const shortReviewTerms = "回答がないまま終わった場合に限り、もう1回だけ購入できます。提供・お支払いは TrackTalk の運営者です（回答はコーチに委託します）。";
+it("#960: 購入前は固定短文だけを表示し、宣言・価格・支払い方法を維持する", async () => {
+ await render();
+ const paragraphs = [...container.querySelectorAll("p")];
+ const terms = paragraphs.find((p) => p.textContent === shortReviewTerms)!;
+ expect(terms).toBeTruthy();
+ expect(terms.parentElement?.querySelectorAll("p")).toHaveLength(1);
+ expect(paragraphs.some((p) => p.textContent === "下書きは7日間保存します。送信後は変更できません。")).toBe(true);
+ expect(paragraphs.some((p) => p.textContent === systemIntro)).toBe(true);
+ for (const old of ["質問・回答は各1回まで", "やりとりは終了後1年間保存します", "追加質問は、この添削を担当したコーチへの", "提供者とお支払い先は TrackTalk の運営者で", "18歳未満の方は、購入する前に保護者の許可を得てください。"]) expect(container.textContent).not.toContain(old);
+ expect(container.textContent?.split("未成年の方は保護者に許可を取ってください")).toHaveLength(2);
+ expect(container.textContent).toContain("500円 / 質問1件と回答1件");
+ expect(container.textContent).toContain(payNotice);
+ expect(button("質問する（500円）")?.disabled).toBe(true);
+ await check();
+ expect(button("質問する（500円）")?.disabled).toBe(false);
+});
+it("#960: 追加相談の契約説明と下書き注意は全文一致のまま", async () => {
+ await render(room, undefined, "contract");
+ const paragraphs = [...container.querySelectorAll("p")];
+ const first = "このプランの追加相談の契約の相手はコーチで、料金もコーチが決めます。1回の購入で相談できるのは、新しい質問1件とコーチの回答1件の1回限りです（回答への確認は7日以内に1回無料）。さらに相談するときは、改めて購入してください。";
+ const terms = paragraphs.find((p) => p.textContent === first)!;
+ expect(terms).toBeTruthy();
+ expect([...terms.parentElement!.querySelectorAll("p")].map((p) => p.textContent)).toEqual([first, "代金を請求する権利はコーチにあり、TrackTalk の運営者はコーチから代理受領の権限を受けて代金を受け取ります。運営者へ支払った時点でコーチへの支払いは済み、コーチから同じ代金を重ねて請求されることはありません。"]);
+ expect(paragraphs.some((p) => p.textContent === "購入前に下書きを7日間保存します。送信後は内容を変更できません。18歳未満の方のパーソナル指導の相談は、保護者が支払います。")).toBe(true);
+});
+it("#960: 新文言3件の英訳は指定文と一致する", async () => {
+ installEnglish(en);
+ setActiveLocale("en");
+ try {
+  await render();
+  for (const text of [
+   "You can ask the coach who did this review one question about it. They accept within 24 hours and answer within 12 hours after accepting. If they decline or the time runs out, you get a full refund.",
+   "Only if it ends without an answer can you buy it one more time. TrackTalk's operator provides this and takes your payment (the coach answers on the operator's behalf).",
+   "Drafts are kept for 7 days. You cannot change the content after sending.",
+  ]) expect([...container.querySelectorAll("p")].some((p) => p.textContent === text)).toBe(true);
+ } finally { setActiveLocale("ja"); }
+});
+it.each(["review", "contract"] as const)("%s の質問・回答の動画は幅260px・高さ300pxを上限にする", async (kind) => {
+ const c = { ...draft, status: "answered" as const, answer: "回答", video_url: "https://example.com/q.mp4", answer_video_url: "https://example.com/a.mp4", answered_at: "2026-11-14T02:00:00Z" };
+ await render({ ...room, can_purchase: false, consultations: [c] }, undefined, kind);
+ const videos = [...container.querySelectorAll("video")];
+ expect(videos.map((video) => video.getAttribute("src"))).toEqual([c.video_url, c.answer_video_url]);
+ for (const video of videos) {
+  expect(video.classList).toContain("max-w-[260px]");
+  expect(video.classList).toContain("max-h-[300px]");
+  expect(video.controls).toBe(true);
+  expect(video.playsInline).toBe(true);
+  expect(video.preload).toBe("metadata");
+ }
+});
+it("動画のない相談では動画要素を表示しない", async () => {
+ await render({ ...room, can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答" }] });
+ expect(container.querySelector("video")).toBeNull();
 });

@@ -14,11 +14,11 @@ export function ReferralBanner() {
     <Link
       href="/referral"
       aria-label={headline}
-      className="flex h-12 items-center gap-3 rounded-xl bg-yellow-400/70 px-4 text-slate-900"
+      className="flex h-14 items-center gap-2 rounded-xl bg-yellow-400/70 px-3 text-slate-900"
     >
       <Gift className="size-6 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-semibold">{headline}</span>
+        <span className="block truncate text-[13px] font-semibold min-[390px]:text-base">{headline}</span>
       </span>
       <ChevronRight className="size-5 shrink-0" aria-hidden />
     </Link>

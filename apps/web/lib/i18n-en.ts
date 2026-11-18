@@ -2,8 +2,11 @@
 // 英語を選んだ人だけが読み込む。漏れは lib/i18n-coverage.test.ts で検出する。
 // 文言を足したら、ここにも英語を足す（node --experimental-strip-types scripts/i18n-missing.mjs で漏れを一覧できる）。
 export const en: Readonly<Record<string, string>> = {
+  "この添削について、担当コーチに1回だけ質問できます。受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。": "You can ask the coach who did this review one question about it. They accept within 24 hours and answer within 12 hours after accepting. If they decline or the time runs out, you get a full refund.",
+  "回答がないまま終わった場合に限り、もう1回だけ購入できます。提供・お支払いは TrackTalk の運営者です（回答はコーチに委託します）。": "Only if it ends without an answer can you buy it one more time. TrackTalk's operator provides this and takes your payment (the coach answers on the operator's behalf).",
+  "下書きは7日間保存します。送信後は変更できません。": "Drafts are kept for 7 days. You cannot change the content after sending.",
+
   "外部の連絡先（URL・メールアドレス・電話番号・SNSのID）は送れません。": "You cannot send outside contact details (URLs, email addresses, phone numbers, or social media IDs).",
-  "質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。": "One question and one answer only. No further exchanges are possible. The coach accepts within 24 hours and answers within 12 hours of accepting. Declines and expiries are refunded in full. The exchange is kept for one year after it ends.",
   "紹介特典": "Referral reward",
   "元の画面に戻る": "Return to the previous page",
   "紹介ID": "Referral code",
@@ -1181,14 +1184,11 @@ export const en: Readonly<Record<string, string>> = {
   "保存済みの動画を添付します。": "Your saved video will be attached. ",
   "外す": "Remove",
   "購入前に下書きを7日間保存します。送信後は内容を変更できません。{v0}": "We save a draft for 7 days before purchase. You can't change it after sending.{v0}",
-  "18歳未満の方は、購入する前に保護者の許可を得てください。": "If you're under 18, get your guardian's permission before purchasing.",
   "18歳未満の方のパーソナル指導の相談は、保護者が支払います。": "For people under 18, guardians pay for personal coaching consultations.",
   "保存・送信中…": "Saving and sending…",
   "質問する（チケット1枚）": "Ask (1 ticket)",
   "質問する（{v0}）": "Ask ({v0})",
   "チケットを購入して、この部屋へ戻る": "Buy tickets and return to this room",
-  "追加質問は、この添削を担当したコーチへの、添削の内容についての相談です。この添削について相談できるのは1回限りで、新しい質問1件とコーチの回答1件です。回答への確認など、追加のやりとりはできません。コーチが辞退した場合など、回答がないまま終わった場合に限り、もう1回だけ改めて購入できます。": "An additional question is a question about this review to the coach who did it. You can consult about this review only once: one new question and one answer from the coach. No further back-and-forth, such as follow-ups on the answer. Only if it ends without an answer, such as when the coach declines, can you buy one more time.",
-  "提供者とお支払い先は TrackTalk の運営者で、相談への回答は運営者がコーチに委託して行います。料金・キャンセル・返金は運営者が責任を持って対応します。": "The provider and payee is TrackTalk's operator, which entrusts the coach with answering. The operator is responsible for pricing, cancellations, and refunds.",
   "このプランの追加相談の契約の相手はコーチで、料金もコーチが決めます。1回の購入で相談できるのは、新しい質問1件とコーチの回答1件の1回限りです（回答への確認は7日以内に1回無料）。さらに相談するときは、改めて購入してください。": "For this plan's follow-up consultations, your contract is with the coach, who also sets the price. Each purchase covers one new question and one answer from the coach (one free clarification within 7 days). To ask more, purchase again.",
   "代金を請求する権利はコーチにあり、TrackTalk の運営者はコーチから代理受領の権限を受けて代金を受け取ります。運営者へ支払った時点でコーチへの支払いは済み、コーチから同じ代金を重ねて請求されることはありません。": "The right to charge belongs to the coach, and TrackTalk's operator receives the payment as the coach's authorized agent. Once you pay the operator, your payment to the coach is complete, and the coach won't charge you again for the same amount.",
   "この追加相談を運営に通報しますか？": "Report this follow-up consultation to the team?",

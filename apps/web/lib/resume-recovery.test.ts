@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   consumeExternalReturn,
   externalTripGapMs,
@@ -9,7 +9,12 @@ import {
   shouldRefreshAgain,
 } from "./resume-recovery";
 
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ height: 60 } as DOMRect);
+});
+
 afterEach(() => {
+  vi.restoreAllMocks();
   window.sessionStorage.clear();
   vi.useRealTimers();
 });
@@ -49,7 +54,7 @@ it("自動の取り直しは一定時間に1回まで", () => {
 });
 
 it("header 要素の有無を見分ける", () => {
-  document.body.innerHTML = "<header></header><main><p>本文</p></main>";
+  document.body.innerHTML = "<header><button>戻る</button></header><main><p>本文</p></main>";
   expect(isHeaderMissing(document)).toBe(false);
   document.querySelector("header")!.remove();
   expect(isHeaderMissing(document)).toBe(true);
@@ -64,4 +69,21 @@ it("main の中身が要素ごと空のときだけ空と判定する", () => {
   expect(isMainEmpty(document)).toBe(false);
   document.body.innerHTML = "";
   expect(isMainEmpty(document)).toBe(true);
+});
+
+it.each([
+  '<header></header>',
+  '<header><div></div></header>',
+  '<header style="display:none"><button>戻る</button></header>',
+  '<header style="visibility:hidden"><button>戻る</button></header>',
+  '<header style="opacity:0"><button>戻る</button></header>',
+])("空または非表示の header を見分ける: %s", (html) => {
+  document.body.innerHTML = html;
+  expect(isHeaderMissing(document)).toBe(true);
+});
+
+it("高さが潰れた header を見分ける", () => {
+  document.body.innerHTML = '<header><button>戻る</button></header>';
+  vi.spyOn(document.querySelector("header")!, "getBoundingClientRect").mockReturnValue({ height: 0 } as DOMRect);
+  expect(isHeaderMissing(document)).toBe(true);
 });

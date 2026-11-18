@@ -164,7 +164,7 @@ export default function CoachReviewRequestPage() {
   const [error, setError] = useState("");
   const [startError, setStartError] = useState("");
   const { pending: starting, acquire: acquireStart, release: releaseStart } = useActionLock();
-  // 直前に送った種類。送った内容の先頭に完了バナーを出す（自動では消さない）。
+  // 直前に送った種類。完了バナーを画面上部に重ねて表示し、部品内のタイマーで3秒後に消す。
   const [sent, setSent] = useState<"response" | "info" | null>(null);
 
   useEffect(() => {
@@ -227,7 +227,7 @@ export default function CoachReviewRequestPage() {
               controls
               playsInline
               preload="metadata"
-              className="w-full max-w-[260px] rounded-xl bg-black"
+              className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
             />
           </div>
         </div>

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { hidesHeader } from "./bottom-nav";
+import { useAuth } from "./auth-provider";
+import { profileIncomplete } from "@/lib/profile-gate";
 import {
   consumeExternalReturn,
   hiddenTripGapMs,
@@ -16,7 +18,7 @@ import {
   shouldRefreshAgain,
 } from "@/lib/resume-recovery";
 
-// 外部サイト（Stripe の口座登録など）から戻った直後だけ、ヘッダーと本文の描画を確かめる。
+// 外部サイト（Stripe の口座登録など）から戻った画面と最初の遷移先で、ヘッダーと本文の描画を確かめる。
 // 普段の初期表示やタブ移動では何もしない。壊れていたら、まず表示の取り直し（入力は保たれる）を
 // 1回だけ試し、それでも直らなければ再読み込みの導線を出す。文書の再読み込みは利用者の操作に任せ、
 // 自動では行わない（往復を防ぐ）。
@@ -24,12 +26,14 @@ export function ResumeRecovery() {
   const pathname = usePathname();
   const search = useSearchParams().toString();
   const router = useRouter();
+  const { profile } = useAuth();
+  const mustSetProfile = profileIncomplete(profile);
   const [offerReload, setOfferReload] = useState(false);
-  const routeRef = useRef({ pathname, search });
+  const routeRef = useRef({ pathname, search, mustSetProfile });
   useEffect(() => {
-    routeRef.current = { pathname, search };
-  }, [pathname, search]);
-  const episode = useRef({ armed: false, done: false, refreshed: false, timer: undefined as ReturnType<typeof setTimeout> | undefined });
+    routeRef.current = { pathname, search, mustSetProfile };
+  }, [pathname, search, mustSetProfile]);
+  const episode = useRef({ armed: false, returnPath: null as string | null, refreshed: false, timer: undefined as ReturnType<typeof setTimeout> | undefined });
   const armRef = useRef(() => {});
 
   useEffect(() => {
@@ -46,12 +50,10 @@ export function ResumeRecovery() {
       // 見えていない間の判定はしない。見えたら非表示往復の経路で構え直す。
       if (document.hidden) return;
       const route = routeRef.current;
-      const expectHeader = !hidesHeader(route.pathname, route.search);
+      const expectHeader = !hidesHeader(route.pathname, route.search, route.mustSetProfile);
       const broken = (expectHeader && isHeaderMissing(document)) || isMainEmpty(document);
       if (!broken) {
         state.armed = false;
-        state.done = true;
-        state.refreshed = false;
         setOfferReload(false);
         return;
       }
@@ -61,13 +63,11 @@ export function ResumeRecovery() {
         state.timer = setTimeout(check, recoveryRecheckMs);
         return;
       }
-      state.done = true;
+      state.armed = false;
       setOfferReload(true);
     }
 
     function arm() {
-      // 直った・導線を出した往復は蒸し返さない。
-      if (state.done) return;
       state.armed = true;
       setOfferReload(false);
       clearTimer();
@@ -75,13 +75,18 @@ export function ResumeRecovery() {
     }
     armRef.current = arm;
 
+    function startReturn() {
+      state.returnPath = routeRef.current.pathname;
+      state.refreshed = false;
+      arm();
+    }
+
     function onPageHide() {
       notePageHide(window.sessionStorage);
     }
     function onPageShow(event: PageTransitionEvent) {
-      clearTimer();
       // 戻る・進むで生きた文書が戻ったときも確かめる（再取得が走らない復帰のため）。
-      if (event.persisted) arm();
+      if (event.persisted) startReturn();
     }
     function onVisibility() {
       if (document.hidden) {
@@ -90,11 +95,12 @@ export function ResumeRecovery() {
       }
       const at = hiddenAt;
       hiddenAt = null;
-      if (at !== null && Date.now() - at >= hiddenTripGapMs) arm();
+      if (at !== null && Date.now() - at >= hiddenTripGapMs) startReturn();
     }
 
-    // 外部サイトへの往復のあとの読み込みは、ここで構える。以降のタブ移動では構えない。
-    if (consumeExternalReturn(window.sessionStorage)) arm();
+    // 戻り画面が正常でも、最初の pathname 変更までは次のチェックを予約しておく。
+    if (consumeExternalReturn(window.sessionStorage)) startReturn();
+    else if (state.armed) arm(); // Strict Mode の effect 再登録でも予約済みの判定を保つ。
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisibility);
@@ -106,10 +112,13 @@ export function ResumeRecovery() {
     };
   }, [router]);
 
-  // 構えている間にタブを移ったら、移り先でも確かめ直す。
+  // 外部復帰後の最初の画面遷移だけは、戻り画面のチェック完了後でも構える。
+  // クエリだけの更新では予約を消費しない。判定待ちの遷移は猶予を取り直す。
   useEffect(() => {
     const state = episode.current;
-    if (!state.armed || state.done) return;
+    const firstDestination = state.returnPath !== null && state.returnPath !== pathname;
+    if (firstDestination) state.returnPath = null;
+    if (!state.armed && !firstDestination) return;
     armRef.current();
   }, [pathname, search]);
 
