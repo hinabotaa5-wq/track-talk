@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/migrate"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -318,8 +320,9 @@ func TestCircleMigrationBackfillAndDown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(counts), "EXPECTED_MIGRATION = 181") {
-		t.Fatal("migration count is not 181")
+	latest, err := migrate.ExpectedVersion()
+	if err != nil || !strings.Contains(string(counts), fmt.Sprintf("EXPECTED_MIGRATION = %d", latest)) {
+		t.Fatalf("migration count does not match latest %d: %v", latest, err)
 	}
 }
 
