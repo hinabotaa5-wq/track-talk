@@ -1,32 +1,8 @@
 import { L } from "@/lib/i18n";
-import Link from "next/link";
-import { CoachAvatar } from "@/components/coach-photo";
-import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
-import { coachingCoachListEnabled } from "@/lib/features";
 import { coachText, coachTexts, originalTextClass } from "@/lib/coaching-display";
 import { clarifyReasonLabels } from "@/lib/review";
-import type { ReviewCoach, ReviewResponse } from "@/lib/types";
+import type { ReviewResponse } from "@/lib/types";
 import { formatChatDateTime } from "@/lib/format";
-
-// 返答と一緒に届く、見てくれたコーチのプロフィール。
-export function ReviewCoachCard({ coach }: { coach: ReviewCoach }) {
-  return (
-    <section className="space-y-1 rounded-xl border border-white/20 glass bg-white/10 p-3 text-sm">
-      <div className="flex items-center gap-3">
-        <CoachAvatar url={coach.photo_url} name={coach.nickname} />
-        <p className="font-bold text-white">
-          {coach.nickname ?? L("退会したユーザー")}
-          <span className="ml-2 text-xs font-normal text-slate-300">{coachTierLabels[coach.tier]}</span>
-        </p>
-      </div>
-      <p className="text-slate-100">{coach.events.map((e) => coachEventLabels[e]).join(L("、"))}</p>
-      <p className="whitespace-pre-wrap text-slate-100">{coach.best_record}</p>
-      <p className="whitespace-pre-wrap text-slate-300">{coach.achievements}</p>
-      {/* コーチの詳細はコーチ一覧と一緒に公開する。一覧を閉じている間は準備中の画面へ案内しない。 */}
-      {coach.id && coachingCoachListEnabled ? <Link href={`/coaches/${encodeURIComponent(coach.id)}`} className="block text-sm text-blue-300 underline">{L("このコーチのプロフィールを見る")}</Link> : null}
-    </section>
-  );
-}
 
 // コーチの返答（良い点・直す点・ドリル・見本動画・補足）。利用者とコーチの両方の画面で使う。
 // 海外コーチの回答3点は、和訳があれば和訳を主に・原文を直下に併記する（本体 #916）。コーチ本人の画面（viewer="coach"）は原文だけ。
