@@ -66,22 +66,36 @@ it("バナー全体が /referral へのリンクである", async () => {
   expect(container.querySelector('a[href="/me"]')).toBeNull();
 });
 
-it("バナーは48pxの高さで、横パディングだけを持つ", async () => {
+it("バナーは最小48pxの高さで、横パディングだけを持つ", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const link = container.querySelector('a[href="/referral"]');
-  expect(link?.classList.contains("h-12")).toBe(true);
+  expect(link?.classList.contains("min-h-12")).toBe(true);
+  expect(link?.classList.contains("h-12")).toBe(false);
+  expect([...link!.classList].some((name) => name.startsWith("py-"))).toBe(false);
   expect(link?.classList.contains("p-4")).toBe(false);
   expect(link?.classList.contains("px-4")).toBe(true);
 });
 
-it("現行の見出しを小さい文字で1行に省略表示する", async () => {
+it("見出しは文字サイズと太さを保ち、省略せず詰めた行間で表示する", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const headline = container.querySelector('a[href="/referral"] > span > span');
   expect(headline?.textContent).toBe(HEADLINE_JA);
   expect(headline?.classList.contains("text-sm")).toBe(true);
-  expect(headline?.classList.contains("truncate")).toBe(true);
+  expect(headline?.classList.contains("truncate")).toBe(false);
+  expect(headline?.classList.contains("font-semibold")).toBe(true);
+  expect(headline?.classList.contains("leading-tight")).toBe(true);
+});
+
+it("日本語の見出しを読点の直後で正確な2行に分けて全文表示する", async () => {
+  setActiveLocale("ja");
+  await act(async () => root.render(<ReferralBanner />));
+  const headline = container.querySelector('a[href="/referral"] > span > span');
+  const lines = [...(headline?.children ?? [])];
+  expect(lines.map((line) => line.textContent)).toEqual(["友達2人に紹介すると、", "1回分(500円)無料！"]);
+  expect(lines.every((line) => line.classList.contains("block"))).toBe(true);
+  expect(lines.map((line) => line.textContent).join("")).toBe(HEADLINE_JA);
 });
 
 it("黄色地に濃色文字で、見出しはセミボールド・閉じるボタンなし", async () => {
@@ -90,7 +104,7 @@ it("黄色地に濃色文字で、見出しはセミボールド・閉じるボ�
   const link = container.querySelector('a[href="/referral"]');
   expect(link?.className).toContain("bg-yellow-400/70");
   expect(link?.className).toContain("text-slate-900");
-  const headline = [...(container.querySelectorAll("span") ?? [])].find((el) => el.textContent === HEADLINE_JA && el.querySelector("span") === null);
+  const headline = container.querySelector('a[href="/referral"] > span > span');
   expect(headline?.className).toContain("font-semibold");
   expect(container.querySelector("button")).toBeNull();
   expect(link?.textContent).not.toContain("×");
@@ -101,7 +115,7 @@ it("CoachesView ではバナーがタブ行より前に描画される", async (
   await act(async () => root.render(<CoachesView />));
   await act(async () => { await Promise.resolve(); });
   const html = container.innerHTML;
-  const bannerAt = html.indexOf(HEADLINE_JA);
+  const bannerAt = html.indexOf(`aria-label="${HEADLINE_JA}"`);
   const tabsAt = html.indexOf("coach-list");
   expect(bannerAt).toBeGreaterThanOrEqual(0);
   expect(tabsAt).toBeGreaterThanOrEqual(0);
@@ -120,6 +134,10 @@ it("英語表示では見出しの英訳だけが出て、本文は出ない", a
   await act(async () => root.render(<ReferralBanner />));
   const text = container.textContent ?? "";
   expect(text).toContain(HEADLINE_EN);
+  const headline = container.querySelector('a[href="/referral"] > span > span');
+  expect(headline?.textContent).toBe(HEADLINE_EN);
+  expect(headline?.children).toHaveLength(0);
+  expect(headline?.classList.contains("truncate")).toBe(false);
   expect(text).not.toContain(BODY_EN);
   expect(text).not.toContain(HEADLINE_JA);
   expect(text).not.toContain(BODY_JA);

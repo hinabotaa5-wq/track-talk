@@ -10,15 +10,23 @@ import { L } from "@/lib/i18n";
 // ログイン状態・購入実績によらず常時表示し、タップでログイン不要の説明ページ /referral へ移動する。閉じるボタンは付けない。
 export function ReferralBanner() {
   const headline = L("友達2人に紹介すると、1回分(500円)無料！");
+  const separator = headline.indexOf("、");
   return (
     <Link
       href="/referral"
       aria-label={headline}
-      className="flex h-12 items-center gap-3 rounded-xl bg-yellow-400/70 px-4 text-slate-900"
+      className="flex min-h-12 items-center gap-3 rounded-xl bg-yellow-400/70 px-4 text-slate-900"
     >
       <Gift className="size-6 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{headline}</span>
+        <span className="block text-sm font-semibold leading-tight">
+          {separator === -1 ? headline : (
+            <>
+              <span className="block">{headline.slice(0, separator + 1)}</span>
+              <span className="block">{headline.slice(separator + 1)}</span>
+            </>
+          )}
+        </span>
       </span>
       <ChevronRight className="size-5 shrink-0" aria-hidden />
     </Link>
