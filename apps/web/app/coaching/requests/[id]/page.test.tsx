@@ -7,12 +7,15 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 import { reviewVideosPurgedNote } from "@/lib/review";
 import { ApiRequestError } from "@/lib/api";
+import { Header } from "@/components/header";
+import { BottomNav } from "@/components/bottom-nav";
 import ReviewRequestPage from "./page";
 
-const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
 const featureFlags = vi.hoisted(() => ({ coachList: true }));
 const searchState = vi.hoisted(() => ({ paid: false }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/coaching/requests/review-1",
   useParams: () => ({ id: "review-1" }),
   useRouter: () => routerMock,
   useSearchParams: () => new URLSearchParams(searchState.paid ? "paid=1" : ""),
@@ -30,6 +33,7 @@ const apiFetch = vi.fn();
 // 止まっているときは navigate しないことをソースで確認済み。
 // ここではその契約だけを再現する（未阻止＝push、阻止＝何もしない）。
 vi.mock("next/link", () => ({
+  useLinkStatus: () => ({ pending: false }),
   default: ({ href, children, onClick, ...props }: { href: string; children: ReactNode; onClick?: (e: ReactMouseEvent<HTMLAnchorElement>) => void }) => (
     <a
       href={href}
@@ -121,7 +125,9 @@ async function renderPage() {
   const root = createRoot(container);
   await act(async () => root.render(
     <LeaveGuardProvider>
+      <Header />
       <ReviewRequestPage />
+      <BottomNav />
     </LeaveGuardProvider>,
   ));
   return { container, root };
@@ -160,8 +166,8 @@ it("返却後の質問には有料の追加質問だけを表示する", async (
     expect(container.textContent).toContain("腕振り");
     expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
     expect(container.textContent).toContain("質問する（500円）");
-    // 返却後の匿名の感想（本体 #911）の欄は別枠なので、それ以外の入力欄が追加質問の1つだけであることを見る。
-    expect(container.querySelectorAll(`textarea:not([aria-label="${feedbackLabel}"])`)).toHaveLength(1);
+    // 入力欄は追加質問の1つだけ。
+    expect(container.querySelectorAll("textarea")).toHaveLength(1);
     expect(container.textContent).not.toContain("確認質問を送る（無料）");
   } finally {
     await teardown(root, container);
@@ -759,104 +765,62 @@ function feedbackTextarea(container: HTMLDivElement) {
   return container.querySelector<HTMLTextAreaElement>(`textarea[aria-label="${feedbackLabel}"]`);
 }
 
-function buttonByText(container: HTMLDivElement, text: string) {
-  return Array.from(container.querySelectorAll("button")).find((b) => b.textContent === text) ?? null;
-}
-
-async function typeInto(textarea: HTMLTextAreaElement, value: string) {
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
-    setter?.call(textarea, value);
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
-
-it("B1: 返却済みで未送信なら、感想フォームと匿名・7日後の注意書きを出す", async () => {
-  mockFeedbackRequest({ feedback_submitted: false });
-  const { container, root } = await renderPage();
-  try {
-    expect(container.textContent).toContain(feedbackLabel);
-    const textarea = feedbackTextarea(container);
-    expect(textarea).not.toBeNull();
-    expect(textarea?.maxLength).toBe(500);
-    expect(container.textContent).toContain(feedbackNotice);
-    expect(buttonByText(container, "感想を送る")).not.toBeNull();
-    // 未送信でも追加質問は使える（ブロックしない）。
-    expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
-  } finally {
-    await teardown(root, container);
-  }
-});
-
-it("B2: 送信するとフォームが消えて「感想を送りました」になる", async () => {
-  mockFeedbackRequest({ feedback_submitted: false });
-  const { container, root } = await renderPage();
-  try {
-    const textarea = feedbackTextarea(container);
-    if (!textarea) throw new Error("感想の欄がありません");
-    const button = buttonByText(container, "感想を送る");
-    expect(button?.disabled).toBe(true);
-    await typeInto(textarea, "  分かりやすかったです  ");
-    expect(button?.disabled).toBe(false);
-    await click(button!);
-    expect(apiFetch).toHaveBeenCalledWith("/v1/coaching/requests/review-1/feedback", {
-      method: "POST",
-      token: "token",
-      body: JSON.stringify({ body: "分かりやすかったです" }),
+for (const status of ["returned", "clarifying"]) {
+  for (const submitted of [false, true]) {
+    it(`A1/A2/C1/C2: ${status} 送信済み=${submitted} では感想表示がなく、未送信だけ戻る先を変える`, async () => {
+      mockFeedbackRequest({ status, feedback_submitted: submitted });
+      const { container, root } = await renderPage();
+      try {
+        expect(feedbackTextarea(container)).toBeNull();
+        for (const text of [feedbackLabel, feedbackNotice, "感想を送る", "感想を送りました"]) expect(container.textContent).not.toContain(text);
+        expect(container.textContent).toContain("腕振り");
+        expect(container.textContent).toContain("この返答を通報する");
+        expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
+        routerMock.push.mockClear();
+        await click(container.querySelector('button[aria-label="戻る"]')!);
+        if (submitted) {
+          expect(routerMock.push).not.toHaveBeenCalled();
+          expect(routerMock.replace).toHaveBeenCalledWith("/coaching");
+        } else {
+          expect(routerMock.push).toHaveBeenCalledWith("/coaching/requests/review-1/feedback");
+          expect(routerMock.back).not.toHaveBeenCalled();
+        }
+      } finally { await teardown(root, container); }
     });
-    expect(feedbackTextarea(container)).toBeNull();
-    expect(buttonByText(container, "感想を送る")).toBeNull();
-    expect(container.textContent).toContain("感想を送りました");
-    expect(container.textContent).not.toContain(feedbackNotice);
-  } finally {
-    await teardown(root, container);
   }
-});
-
-it("B3: clarifying でもフォームを出す", async () => {
-  mockFeedbackRequest({ status: "clarifying", feedback_submitted: false });
-  const { container, root } = await renderPage();
-  try {
-    expect(feedbackTextarea(container)).not.toBeNull();
-    expect(container.textContent).toContain(feedbackNotice);
-  } finally {
-    await teardown(root, container);
-  }
-});
+}
 
 for (const status of ["awaiting_payment", "queued", "offered", "in_review", "needs_info", "expired"]) {
-  it(`B3: ${status} ではフォームを出さない`, async () => {
-    mockFeedbackRequest({ status, feedback_submitted: false, due_at: new Date(Date.now() + 3600_000).toISOString() });
+  it(`C2: ${status} では戻る先を差し替えない`, async () => {
+    mockFeedbackRequest({ status, due_at: new Date(Date.now() + 3600_000).toISOString() });
     const { container, root } = await renderPage();
     try {
-      expect(container.textContent).toContain("スタートの姿勢について");
       expect(feedbackTextarea(container)).toBeNull();
-      expect(container.textContent).not.toContain(feedbackLabel);
-      expect(container.textContent).not.toContain("感想を送りました");
-    } finally {
-      await teardown(root, container);
-    }
+      routerMock.push.mockClear();
+      await click(container.querySelector('button[aria-label="戻る"]')!);
+      expect(routerMock.push).not.toHaveBeenCalled();
+    } finally { await teardown(root, container); }
   });
 }
 
-it("B4: 送信済みならフォームを出さず「感想を送りました」だけを出す", async () => {
-  mockFeedbackRequest({ feedback_submitted: true });
-  const { container, root } = await renderPage();
+it("C2: 返答なしでは戻る先を差し替えない", async () => {
+  const { container, root } = await renderWith({ response: null });
   try {
-    expect(feedbackTextarea(container)).toBeNull();
-    expect(container.textContent).not.toContain(feedbackLabel);
-    expect(container.textContent).toContain("感想を送りました");
-    // 送信済みでも追加質問は使える。
-    expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
-  } finally {
-    await teardown(root, container);
-  }
+    await click(container.querySelector('button[aria-label="戻る"]')!);
+    expect(routerMock.push).not.toHaveBeenCalled();
+  } finally { await teardown(root, container); }
 });
 
-it("感想の新しい文言には英訳がある", () => {
-  for (const key of [feedbackLabel, feedbackNotice, "感想を送る", "感想を送りました"]) {
-    expect(en[key]).toBeTruthy();
-  }
+it("C4: 未送信でも依頼一覧リンクと下部タブはそれぞれのリンク先へ進む", async () => {
+  mockFeedbackRequest();
+  const { container, root } = await renderPage();
+  try {
+    await click(listLink(container));
+    expect(routerMock.push).toHaveBeenLastCalledWith("/me/coaching/requests");
+    await click(container.querySelector('nav a[href="/coaching"]')!);
+    expect(routerMock.push).toHaveBeenLastCalledWith("/coaching");
+    expect(routerMock.push).not.toHaveBeenCalledWith("/coaching/requests/review-1/feedback");
+  } finally { await teardown(root, container); }
 });
 
 it("依頼動画→相談文は右・青、返答は左の独立カードとして続く", async () => {
