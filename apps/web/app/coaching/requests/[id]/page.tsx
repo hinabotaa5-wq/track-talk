@@ -15,11 +15,11 @@ import { ReviewCoachCard, ReviewResponseView } from "@/components/review-respons
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatChatDateTime, formatDateTime, formatYen } from "@/lib/format";
+import { formatChatDateTime, formatDateTime } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
-import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewPayMethodLabels, reviewStatusLabels, reviewVideosPurgedNote } from "@/lib/review";
-import type { HelpfulAnswer, ReviewPayment, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewVideosPurgedNote } from "@/lib/review";
+import type { HelpfulAnswer, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { useNow } from "@/lib/use-now";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -141,20 +141,6 @@ function FeedbackForm({ request, token, onSubmitted }: { request: ReviewRequest;
 
 // 支払いのあと戻ってきたとき、Stripe からの知らせが届いてコーチを探し始めるまで、何回か読み直す。
 const paidPolls = 10;
-
-function paymentText(p: ReviewPayment): string {
-  const price = formatYen(p.amount_yen);
-  switch (p.status) {
-    case "authorized":
-      return L("{price}を仮押さえしています（{v1}）。返ってきた時に確定し、目安までに返ってこなければ取り消します。", { price, v1: reviewPayMethodLabels[p.method] });
-    case "captured":
-      return L("{price}をお支払い済みです（{v1}）。", { price, v1: reviewPayMethodLabels[p.method] });
-    case "canceled":
-      return L("添削が成立しなかったため、{price}の仮押さえを取り消しました。代金はかかりません。", { price });
-    case "refunded":
-      return L("添削が成立しなかったため、{price}を返金しました。", { price });
-  }
-}
 
 // お支払いがまだの依頼。支払い方法を選んで、支払い画面を開き直す。
 // 18歳未満は、開き直すときも購入のたびの宣言にチェックが要る。
@@ -331,24 +317,11 @@ function ReviewRequestView() {
       <div className="space-y-1">
         <h1 className="text-2xl font-bold">{L("1回プラン")}</h1>
         <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
+        {request.status === "in_review" ? (
+          <p className="text-sm text-slate-300">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
+        ) : null}
       </div>
 
-      <div className="space-y-1 text-center text-xs text-slate-400">
-        <p>{request.canceled_at ? L("依頼をキャンセルしました") : request.withdrawal ? L("コーチが依頼を返却しました") : request.status === "expired" && request.requested_coach_id ? L("依頼は終了しました") : reviewStatusLabels[request.status]}</p>
-        {request.status === "in_review" ? (
-          <p>{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
-        ) : null}
-        {request.status === "needs_info" && request.info_request ? (
-          <p>{L("再提出の期限: {v0}", { v0: formatDateTime(request.info_request.resubmit_by) })}</p>
-        ) : null}
-        {active && request.started_at ? <p>{L("現在コーチが依頼に対応しています")}</p> : null}
-        {request.requested_coach_id && !(request.response && request.coach) ? <div>
-          <p>{L("選んだコーチ：{v0}", { v0: request.requested_coach_name || L("選択したコーチ") })}</p>
-          <p>{L("料金{v0}", { v0: formatYen(request.total_price_yen ?? request.base_price_yen ?? reviewPriceYen) })}</p>
-        </div> : null}
-        {request.tickets ? <p>{L("チケット{quantity}枚：{v1}", { quantity: request.tickets.quantity, v1: request.tickets.status === "reserved" ? L("1回プランのために確保中") : request.tickets.status === "consumed" ? L("利用済み") : L("残高に返却済み") })}</p> : null}
-        {request.payment ? <p>{paymentText(request.payment)}</p> : null}
-      </div>
       {canCancel ? <Button type="button" variant="secondary" disabled={canceling} onClick={() => void cancelReview()}>{L("依頼をキャンセルする")}</Button> : null}
       {cancelError ? <p role="alert" className="text-sm text-red-400">{cancelError}</p> : null}
       {request.requested_coach_id && !(request.response && request.coach) && request.status === "expired" ? <Link href="/coaching/new" className="inline-block text-sm text-blue-300 underline">{L("別のコーチを選んで申し込む")}</Link> : null}

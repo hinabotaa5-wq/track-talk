@@ -407,7 +407,7 @@ it("返却後＋コーチカードありは「選んだコーチ」枠を出さ�
   }
 });
 
-it("返却前は「選んだコーチ」枠を出す", async () => {
+it("返却前も「選んだコーチ」枠を出さない", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
     return {
@@ -426,14 +426,14 @@ it("返却前は「選んだコーチ」枠を出す", async () => {
   });
   const { container, root } = await renderPage();
   try {
-    expect(container.textContent).toContain("選んだコーチ：デモコーチ");
-    expect(container.textContent).toContain("料金500円");
+    expect(container.textContent).not.toContain("選んだコーチ：");
+    expect(container.textContent).not.toContain("料金500円");
   } finally {
     await unmountPage(container, root);
   }
 });
 
-it("返却後＋コーチなしは「選んだコーチ」枠を残す", async () => {
+it("返却後＋コーチなしも「選んだコーチ」枠を出さない", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     if (path.endsWith("/consultations")) {
       return { consultations: [], role: "requester", funding: "cash", price_yen: 500, can_purchase: false, requires_video: false };
@@ -456,13 +456,13 @@ it("返却後＋コーチなしは「選んだコーチ」枠を残す", async (
   });
   const { container, root } = await renderPage();
   try {
-    expect(container.textContent).toContain("選んだコーチ：デモコーチ");
+    expect(container.textContent).not.toContain("選んだコーチ：");
   } finally {
     await unmountPage(container, root);
   }
 });
 
-it("期限切れは「選んだコーチ」枠と別のコーチへのリンクを出す", async () => {
+it("期限切れは選んだコーチ枠を出さず別のコーチへのリンクを残す", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
     return {
@@ -480,7 +480,7 @@ it("期限切れは「選んだコーチ」枠と別のコーチへのリンク�
   });
   const { container, root } = await renderPage();
   try {
-    expect(container.textContent).toContain("選んだコーチ：デモコーチ");
+    expect(container.textContent).not.toContain("選んだコーチ：");
     expect(container.querySelector('a[href="/coaching/new"]')).not.toBeNull();
     expect(container.textContent).toContain("別のコーチを選んで申し込む");
   } finally {
@@ -575,7 +575,7 @@ it("お支払い待ちのキャンセルは専用の本文で確認し、取り�
       confirmLabel: "依頼をキャンセルする",
     }));
     expect(canceled).toBe(true);
-    expect(container.textContent).toContain("依頼をキャンセルしました");
+    expect(container.textContent).not.toContain("依頼をキャンセルしました");
     expect(cancelButton(container)).toBeUndefined();
     expect(container.textContent).not.toContain("2時間たってもお支払いがなければ");
   } finally {
@@ -858,20 +858,22 @@ it("依頼動画→相談文は右・青、返答は左の独立カードとし�
   } finally { await teardown(root, container); }
 });
 
-it("対応中は相談文1つだけで空の返答カードを出さず、グレーの期限表示とキャンセル操作を残す", async () => {
+it("対応中は相談文1つだけで空の返答カードを出さず、見出し内の期限表示とキャンセル操作を残す", async () => {
   const { container, root } = await renderWith({ response: null, extra: { status: "in_review", started_at: null, due_at: new Date(Date.now() + 86400000).toISOString() } });
   try {
     expect(container.querySelectorAll("time")).toHaveLength(1);
     expect([...container.querySelectorAll("h2")].some((h) => h.textContent === "良い点")).toBe(false);
     const deadline = [...container.querySelectorAll("p")].find((p) => p.textContent?.startsWith("返却期限:"))!;
-    for (const c of ["text-center", "text-xs", "text-slate-400"]) expect(deadline.parentElement?.classList).toContain(c);
+    expect(deadline.previousElementSibling?.textContent).toMatch(/^送った日時 /);
+    expect(deadline.parentElement?.querySelector("h1")?.textContent).toBe("1回プラン");
+    expect(deadline.className).toBe(deadline.previousElementSibling?.className);
     expect(deadline.parentElement?.className).not.toContain("bg-");
     expect([...container.querySelectorAll("button")].some((b) => b.textContent === "依頼をキャンセルする")).toBe(true);
     expect(listLink(container)).toBeTruthy();
   } finally { await teardown(root, container); }
 });
 
-it("Stripeからの支払い同期後は状態・支払い文をシステム表示、紹介をcompactにする", async () => {
+it("Stripeからの支払い同期後も状態・支払い文は出さず、紹介をcompactにする", async () => {
   searchState.paid = true;
   let synced = false;
   const paid = baseRequest({ response: null, extra: { status: "in_review", started_at: null, due_at: new Date(Date.now() + 86400000).toISOString(), payment: { method: "card", status: "captured", amount_yen: 500 }, requested_coach_id: "c1", requested_coach_name: "指名コーチ", tickets: { quantity: 1, status: "consumed" } } });
@@ -884,20 +886,86 @@ it("Stripeからの支払い同期後は状態・支払い文をシステム表�
   const { container, root } = await renderPage();
   try {
     expect(apiFetch).toHaveBeenCalledWith("/v1/coaching/requests/review-1/payment/sync", { method: "POST", token: "token" });
-    const payment = [...container.querySelectorAll("p")].find((p) => p.textContent === "500円をお支払い済みです（カード・Apple Pay・Google Pay）。")!;
-    expect(payment).toBeTruthy();
-    const system = payment.parentElement!;
-    for (const c of ["text-center", "text-xs", "text-slate-400"]) expect(system.classList).toContain(c);
-    expect(system.className).not.toContain("bg-");
-    expect(system.className).not.toContain("border");
-    expect(system.textContent).toContain("添削中");
-    expect(system.textContent).toContain("選んだコーチ：指名コーチ");
-    expect(system.textContent).toContain("料金500円");
-    expect(system.textContent).toContain("チケット1枚：利用済み");
-    expect(system.nextElementSibling?.textContent).toBe("依頼をキャンセルする");
+    expectRemovedSummary(container);
+    expect(cancelButton(container)).toBeDefined();
     expect(container.textContent).toContain("あなたの紹介ID ABC123");
     expect(container.textContent).toContain("無料チケットをプレゼントしました");
     expect(container.querySelector("section h2")?.classList).toContain("text-sm");
     for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "このIDは終了しました。"]) expect(container.textContent).not.toContain(text);
   } finally { searchState.paid = false; await teardown(root, container); }
+});
+
+function expectRemovedSummary(container: HTMLDivElement) {
+  expect(container.querySelector(".text-center.text-xs.text-slate-400")).toBeNull();
+  for (const text of ["添削中", "選んだコーチ：", "料金500円", "チケット2枚：", "チケット1枚：", "現在コーチが依頼に対応しています", "500円を仮押さえしています", "500円をお支払い済みです", "500円の仮押さえを取り消しました", "500円を返金しました"]) expect(container.textContent).not.toContain(text);
+}
+
+it.each(["authorized", "captured", "canceled", "refunded"])("A1–A3: %s でも見出しの期限だけを表示する", async (status) => {
+  for (const started of [false, true]) {
+    const { container, root } = await renderWith({ response: null, extra: {
+      status: "in_review", created_at: "2026-11-18T21:00:00Z", due_at: "2026-11-20T21:00:00Z",
+      started_at: started ? "2026-11-18T22:00:00Z" : null, requested_coach_id: "coach-1", requested_coach_name: "デモコーチ", total_price_yen: 500,
+      tickets: { quantity: 2, status: "reserved" }, payment: { method: "card", status, amount_yen: 500 },
+    } });
+    try {
+      const heading = container.querySelector("h1")!;
+      expect(heading.textContent).toBe("1回プラン");
+      const sent = heading.nextElementSibling!;
+      expect(sent.textContent).toBe("送った日時 2026/11/19 6:00");
+      expect(sent.nextElementSibling?.textContent).toBe("返却期限: 2026/11/21 6:00");
+      expect(sent.nextElementSibling?.className).toBe(sent.className);
+      expectRemovedSummary(container);
+      if (started) expect(cancelButton(container)).toBeUndefined();
+    } finally { await teardown(root, container); }
+  }
+});
+
+it("A4: 再提出期限は差し戻し履歴だけに残す", async () => {
+  const { container, root } = await renderWith({ response: null, extra: {
+    status: "needs_info", due_at: "2026-11-20T21:00:00Z",
+    info_request: { body: "動画を補足してください", reason: "scene", requested_at: "2026-11-18T21:00:00Z", from_status: "in_review", resubmit_by: "2026-11-20T21:00:00Z", original_question: null, video_replaced: false, resubmitted_at: null },
+  } });
+  try {
+    expectRemovedSummary(container);
+    expect(container.textContent).not.toContain("再提出の期限:");
+    expect(container.textContent).not.toContain("返却期限:");
+    expect(container.textContent).toContain("再提出の期限：2026/11/21 6:00（過ぎると依頼は終了し、お支払いは取り消し・返金されます）");
+  } finally { await teardown(root, container); }
+});
+
+it.each(["returned", "expired", "awaiting_payment"])("A5・A6・A8: %s の既存表示・操作を残す", async (status) => {
+  const { container, root } = await renderWith({ response: status === "returned" ? { hidden: false } : null, coach: status === "returned" ? { id: "coach-1" } : null, extra: {
+    status, due_at: "2026-11-20T21:00:00Z", requested_coach_id: "coach-1", requested_coach_name: "デモコーチ", total_price_yen: 500, payment: { method: "card", status: "captured", amount_yen: 500 },
+  } });
+  try {
+    expectRemovedSummary(container);
+    expect(container.textContent).not.toContain("返却期限:");
+    expect([...container.querySelectorAll("p")].some((p) => p.textContent === "返却済み")).toBe(false);
+    if (status === "returned") {
+      expect(container.textContent).toContain("腕振り");
+      expect(container.textContent).toContain("テストコーチ");
+    }
+    if (status === "expired") expect(container.querySelector('a[href="/coaching/new"]')?.textContent).toBe("別のコーチを選んで申し込む");
+    if (status === "awaiting_payment") {
+      expect(cancelButton(container)).toBeDefined();
+      expect(container.textContent).toContain("2時間たってもお支払いがなければ、この依頼は消えます。");
+      expect(buttonByText(container, "確定してお支払いへ")).not.toBeNull();
+    }
+  } finally { await teardown(root, container); }
+});
+
+it("B1: 英語でも既存キーの返却期限が送った日時の直下に出る", async () => {
+  const { setActiveLocale, installEnglish } = await import("@/lib/i18n");
+  installEnglish(en);
+  setActiveLocale("en");
+  let rendered: Awaited<ReturnType<typeof renderWith>> | undefined;
+  try {
+    rendered = await renderWith({ response: null, extra: { status: "in_review", due_at: "2026-11-20T21:00:00Z" } });
+    const sent = rendered.container.querySelector("h1")?.nextElementSibling;
+    expect(sent?.textContent).toMatch(/^Sent /);
+    expect(sent?.nextElementSibling?.textContent).toBe(en["返却期限: {v0}"].replace("{v0}", "Nov 21, 2026, 6:00 AM"));
+  } finally {
+    setActiveLocale("ja");
+    if (rendered) await teardown(rendered.root, rendered.container);
+  }
 });
