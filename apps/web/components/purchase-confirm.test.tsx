@@ -29,8 +29,10 @@ it("pending のあいだはストップウォッチと渡した文言を出し�
   await render({ pending: true, pendingLabel: "お支払い画面へ移動しています" });
   expect(waiting()?.querySelector("svg.screen-loader-watch")).not.toBeNull();
   expect(waiting()?.textContent).toBe("お支払い画面へ移動しています");
-  // ボタンの下に出す。
-  expect(buttons()[1].compareDocumentPosition(waiting()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(waiting()?.getAttribute("aria-busy")).toBe("true");
+  for (const cls of ["fixed", "inset-0", "z-[110]", "pointer-events-auto", "bg-slate-950/70", "backdrop-blur-md", "justify-center"]) {
+    expect(waiting()?.classList.contains(cls)).toBe(true);
+  }
 
   await render({ pending: false, pendingLabel: "お支払い画面へ移動しています" });
   expect(waiting()).toBeNull();
@@ -61,5 +63,22 @@ it("待ちの文言は英語表示では英訳で出る", async () => {
   setActiveLocale("en");
   await render({ pending: true });
   expect(waiting()?.textContent).toBe("Processing");
-  expect(en["お支払い画面へ移動しています"]).toBe("Taking you to the payment page");
+  await render({ pending: true, pendingLabel: en["お支払い画面へ移動しています"] });
+  expect(waiting()?.textContent).toBe("Taking you to the payment page");
+});
+
+it("待っている間はキーボードのフォーカスを留め、解除すると元に戻す", async () => {
+  const back = document.createElement("button");
+  document.body.prepend(back);
+  try {
+    back.focus();
+    await render({ pending: true });
+    expect(document.activeElement).toBe(waiting());
+    const tab = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    await act(async () => waiting()!.dispatchEvent(tab));
+    expect(tab.defaultPrevented).toBe(true);
+    await render({ pending: false });
+    expect(document.activeElement).toBe(back);
+    expect(buttons().map((b) => b.disabled)).toEqual([false, false]);
+  } finally { back.remove(); }
 });

@@ -383,9 +383,6 @@ export default function NewReviewRequestPage() {
               <p className="text-xs text-slate-300">{L("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。")}</p>
             ) : null}
           </PurchaseConfirm>
-          {upload ? (
-            <UploadProgress noun="動画" phase={uploadPhase} progress={upload} fileName={file?.name} fileSize={file?.size} />
-          ) : null}
           {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
         </div>
       ) : (

@@ -443,3 +443,20 @@ it("#960: 新文言3件の英訳は指定文と一致する", async () => {
   ]) expect([...container.querySelectorAll("p")].some((p) => p.textContent === text)).toBe(true);
  } finally { setActiveLocale("ja"); }
 });
+it.each(["review", "contract"] as const)("%s の質問・回答の動画は幅260px・高さ300pxを上限にする", async (kind) => {
+ const c = { ...draft, status: "answered" as const, answer: "回答", video_url: "https://example.com/q.mp4", answer_video_url: "https://example.com/a.mp4", answered_at: "2026-11-14T02:00:00Z" };
+ await render({ ...room, can_purchase: false, consultations: [c] }, undefined, kind);
+ const videos = [...container.querySelectorAll("video")];
+ expect(videos.map((video) => video.getAttribute("src"))).toEqual([c.video_url, c.answer_video_url]);
+ for (const video of videos) {
+  expect(video.classList).toContain("max-w-[260px]");
+  expect(video.classList).toContain("max-h-[300px]");
+  expect(video.controls).toBe(true);
+  expect(video.playsInline).toBe(true);
+  expect(video.preload).toBe("metadata");
+ }
+});
+it("動画のない相談では動画要素を表示しない", async () => {
+ await render({ ...room, can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答" }] });
+ expect(container.querySelector("video")).toBeNull();
+});
