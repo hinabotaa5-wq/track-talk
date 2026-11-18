@@ -58,7 +58,7 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     {showReviewIntro ? <div className="flex justify-start">
       <div className="max-w-[85%] space-y-1 rounded-xl rounded-bl-sm bg-slate-500/20 px-3 py-2">
         <p className="text-xs font-semibold text-slate-300">TrackTalk</p>
-        <p className="text-xs text-slate-300">{L("質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。")}</p>
+        <p className="text-xs text-slate-300">{L("この添削について、担当コーチに1回だけ質問できます。受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。")}</p>
       </div>
     </div> : null}
     {kind === "contract" || data.role === "guardian" ? <>
@@ -120,7 +120,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo,
     <Textarea aria-label={L(kind === "review" ? "追加質問の質問" : "追加相談の質問")} value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder={L("新しく相談したいこと")} />
     <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs text-slate-200">{L("動画（30秒・100MB以内")}{requiresVideo ? L("、必須") : L("、任意")}{L("）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">{L("保存済みの動画を添付します。")}<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">{L("外す")}</button></p> : null}
-    <p className="text-xs text-slate-300">{L("購入前に下書きを7日間保存します。送信後は内容を変更できません。{v0}", { v0: kind === "review" ? L("18歳未満の方は、購入する前に保護者の許可を得てください。") : L("18歳未満の方のパーソナル指導の相談は、保護者が支払います。") })}</p>
+    <p className="text-xs text-slate-300">{kind === "review" ? L("下書きは7日間保存します。送信後は変更できません。") : L("購入前に下書きを7日間保存します。送信後は内容を変更できません。{v0}", { v0: L("18歳未満の方のパーソナル指導の相談は、保護者が支払います。") })}</p>
     {kind === "review" ? <ReviewPayNotice /> : null}
     {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
     <Button type="button" disabled={pending || !body.trim() && !file && !videoID || (needsDeclaration && !declared)} onClick={() => void submit()}>{pending ? L("保存・送信中…") : L("質問する（{v0}）", { v0: formatYen(price) })}</Button>
@@ -131,8 +131,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo,
 export function ConsultationTermsNote({ kind }: { kind: "review" | "contract" }) {
   if (kind === "review") {
     return <div className="space-y-1 text-xs leading-5 text-slate-300">
-      <p>{L("追加質問は、この添削を担当したコーチへの、添削の内容についての相談です。この添削について相談できるのは1回限りで、新しい質問1件とコーチの回答1件です。回答への確認など、追加のやりとりはできません。コーチが辞退した場合など、回答がないまま終わった場合に限り、もう1回だけ改めて購入できます。")}</p>
-      <p>{L("提供者とお支払い先は TrackTalk の運営者で、相談への回答は運営者がコーチに委託して行います。料金・キャンセル・返金は運営者が責任を持って対応します。")}</p>
+      <p>{L("回答がないまま終わった場合に限り、もう1回だけ購入できます。提供・お支払いは TrackTalk の運営者です（回答はコーチに委託します）。")}</p>
     </div>;
   }
   return <div className="space-y-1 text-xs leading-5 text-slate-300">
