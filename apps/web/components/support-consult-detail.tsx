@@ -63,7 +63,7 @@ export function ProposalCard({ p, role }: { p: SupportConsultProposal; role: "at
         {p.content_note ? <div><dt className="text-xs text-slate-300">{L("内容の補足")}</dt><dd className="whitespace-pre-wrap break-words">{p.content_note}</dd></div> : null}
         {p.answer_to_question ? <div><dt className="text-xs text-slate-300">{L("聞きたいことへの回答")}</dt><dd className="whitespace-pre-wrap break-words">{p.answer_to_question}</dd></div> : null}
       </dl>
-      {role === "coach" ? <p className="text-xs text-slate-300">{L("運営手数料{fee_percent}%を引いた、あなたの受け取り: {v1}。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。", { fee_percent: p.fee_percent, v1: formatYen(p.coach_receives_yen) })}</p> : null}
+      {role === "coach" ? <p className="text-xs text-slate-300">{L("運営手数料{fee_percent}%を引いた、あなたの受け取り: {v1}。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。お支払いは、前の月の末日までの分を翌月15日にまとめて行います。", { fee_percent: p.fee_percent, v1: formatYen(p.coach_receives_yen) })}</p> : null}
       <SupportTermsNotice priceYen={p.price_yen} days={p.duration_days} />
     </section>
   );
