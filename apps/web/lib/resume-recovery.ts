@@ -68,9 +68,14 @@ export function shouldRefreshAgain(storage: PickStorage, now = Date.now()) {
   return true;
 }
 
-// 期待される header 要素がないか。アプリ内の header は components/header.tsx の1箇所だけ。
+// 要素の欠落に加え、空の内容・高さの潰れ・非表示も復旧対象にする。
+// ヘッダーを隠す正当な画面かどうかは、呼び出し側が判定する。
 export function isHeaderMissing(doc: Document) {
-  return doc.querySelector("header") === null;
+  const header = doc.querySelector("header");
+  if (!header || !header.querySelector("a, button")) return true;
+  const style = doc.defaultView?.getComputedStyle(header);
+  return header.getBoundingClientRect().height <= 0 || style?.display === "none" ||
+    style?.visibility === "hidden" || style?.visibility === "collapse" || style?.opacity === "0";
 }
 
 // main の中身が要素ごと空か。読み込み中の骨組み・空の表示・失敗の表示はいずれも要素を持つので、
