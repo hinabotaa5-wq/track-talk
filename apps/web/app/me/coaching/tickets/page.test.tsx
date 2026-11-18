@@ -176,3 +176,54 @@ it("販売を止めている間も終了を案内し、残りの枚数と有効�
   expect(container.textContent).toContain("いちばん早い有効期限");
   expect(reviewButton()).toBeUndefined();
 });
+
+// ---- 本体 #917：確定後の待ち表示 ----
+const confirmSection = () => container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
+const pendingStatus = () => confirmSection()?.querySelector('[role="status"]');
+
+it("A5: 確定後は「お支払い画面へ移動しています」とストップウォッチを出す", async () => {
+  mocks.api.mockImplementation(async (path: string, options?: { method?: string }) => options?.method === "POST"
+    ? new Promise(() => {})
+    : path.endsWith("/referral") ? { referral: null } : initial);
+  await render(); await buy();
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  expect(pendingStatus()).toBeFalsy();
+  await buy();
+  expect(pendingStatus()?.textContent).toBe("お支払い画面へ移動しています");
+  expect(pendingStatus()?.querySelector("svg.screen-loader-watch")).not.toBeNull();
+  expect([...confirmSection()!.querySelectorAll("button")].map((b) => b.disabled)).toEqual([true, true]);
+});
+
+it("A5: 支払い画面へ移るあいだは待ち表示を消さず、ブラウザの戻るで戻ってきたら解く", async () => {
+  // 同じページ内の移動（#）にして、jsdom でも assign が通るようにする。
+  const checkout = `${window.location.href.split("#")[0]}#checkout`;
+  mocks.api.mockImplementation(async (path: string, options?: { method?: string }) => options?.method === "POST"
+    ? { purchase_id: "p1", checkout_url: checkout }
+    : path.endsWith("/referral") ? { referral: null } : initial);
+  await render(); await buy();
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await buy();
+  await act(async () => {});
+  expect(window.location.hash).toBe("#checkout");
+  expect(pendingStatus()?.textContent).toBe("お支払い画面へ移動しています");
+  expect(confirmSection()!.querySelector("button")!.disabled).toBe(true);
+  // bfcache から戻ってきたとき（persisted）は押し直せる。
+  const shown = new Event("pageshow") as Event & { persisted?: boolean };
+  Object.defineProperty(shown, "persisted", { value: true });
+  await act(async () => window.dispatchEvent(shown));
+  expect(pendingStatus()).toBeFalsy();
+  expect(confirmSection()!.querySelector("button")!.disabled).toBe(false);
+  window.location.hash = "";
+});
+
+it("A5: 購入画面を開けなかったときは待ち表示が消えてエラー文が出る", async () => {
+  mocks.api.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (options?.method === "POST") throw new ApiRequestError(502, { error: { code: "payment_unavailable", message: "再試行してください" } });
+    return path.endsWith("/referral") ? { referral: null } : initial;
+  });
+  await render(); await buy();
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await buy();
+  expect(pendingStatus()).toBeFalsy();
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("再試行してください");
+});

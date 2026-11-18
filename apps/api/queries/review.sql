@@ -41,6 +41,13 @@ WHERE id = $1;
 SELECT count(*) FROM review_requests
 WHERE requester_id = $1;
 
+-- name: CountCoachReturnedReviews :one
+-- コーチ本人が今までに返却した1回プランの依頼の数（コーチ画面の表示用）。
+-- returned_at は返却時に入り、その後の追加質問（clarifying）でも消えないので、これを完了の目印にする。
+-- 期限切れ・辞退・対応中・差し戻し中は returned_at が無いので数えない。表示以外には使わない。
+SELECT count(*) FROM review_requests
+WHERE coach_id = $1 AND returned_at IS NOT NULL;
+
 -- name: CreateReviewRequest :one
 -- status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
 INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets)

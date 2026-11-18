@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,6 +19,118 @@ type consultationView struct {
 	RequestKey                            string `json:"request_key"`
 	Price                                 int    `json:"price_yen"`
 	Payment                               string `json:"payment_state"`
+}
+
+// Both paid consultation kinds use the stored delivery/acceptance deadlines.
+func TestConsultationDeadlinesAndExpiry(t *testing.T) {
+	for _, kind := range []string{"review", "contract"} {
+		for _, stage := range []string{"offered", "in_review"} {
+			t.Run(kind+"/"+stage, func(t *testing.T) {
+				fakeCoachingCloudinary(t)
+				h, f := setupStripe(t)
+				var owner, coach, root, path string
+				price := 500
+				if kind == "review" {
+					owner, coach, root = answeredTicketRoom(t, h)
+					path = "/v1/coaching/requests/" + root + "/consultations"
+				} else {
+					owner, coach, root = endedCashRoom(t, h)
+					path = "/v1/coaching/contracts/" + root + "/consultations"
+					price = 1200
+				}
+				c := consultationDraft(t, h, owner, path, uuid.NewString(), "新期限の質問")
+				consultationAction(t, h, owner, c.ID, "submit", nil)
+				if code := payConsultation(t, h, c.ID, price); code != 200 {
+					t.Fatalf("pay %d", code)
+				}
+				var hours float64
+				queryRowArgs(t, `SELECT extract(epoch FROM respond_by-paid_at)::float8/3600 FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &hours)
+				if hours != 24 {
+					t.Fatalf("response window %v", hours)
+				}
+				if stage == "in_review" {
+					consultationAction(t, h, coach, c.ID, "accept", nil)
+					queryRowArgs(t, `SELECT extract(epoch FROM answer_by-updated_at)::float8/3600 FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &hours)
+					if hours != 12 {
+						t.Fatalf("answer window %v", hours)
+					}
+					execSQLArgs(t, `UPDATE coaching_consultations SET answer_by=now()-interval '1 minute' WHERE id=$1`, c.ID)
+				} else {
+					execSQLArgs(t, `UPDATE coaching_consultations SET respond_by=now()-interval '1 minute' WHERE id=$1`, c.ID)
+				}
+				if r := tick(t, h, "tick-secret"); r.Code != 200 {
+					t.Fatal(r.Body.String())
+				}
+				var status, payment string
+				queryRowArgs(t, `SELECT status,payment_state FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &status, &payment)
+				if status != "expired" || payment != "refunded" {
+					t.Fatalf("expiry %s %s", status, payment)
+				}
+				refunds := f.refundList()
+				if len(refunds) != 1 || refunds[0].Get("amount") != fmt.Sprint(price) {
+					t.Fatalf("full refund %+v", refunds)
+				}
+			})
+		}
+	}
+}
+
+func TestConsultationLegacyAndNewAttemptsShareLimit(t *testing.T) {
+	h, _, owner, coach, root := answeredCashReviewRoom(t, nil)
+	path := "/v1/coaching/requests/" + root + "/consultations"
+	first := consultationDraft(t, h, owner, path, uuid.NewString(), "旧世代の質問")
+	consultationAction(t, h, owner, first.ID, "submit", nil)
+	if code := payConsultation(t, h, first.ID, 500); code != 200 {
+		t.Fatal(code)
+	}
+	// A6/F7: delivered 30 hours ago, with the original 48-hour saved deadline still ahead.
+	execSQLArgs(t, `UPDATE coaching_consultations SET paid_at=now()-interval '30 hours',respond_by=now()+interval '18 hours' WHERE id=$1`, first.ID)
+	var saved, after time.Time
+	queryRowArgs(t, `SELECT respond_by FROM coaching_consultations WHERE id=$1`, []any{first.ID}, &saved)
+	if r := tick(t, h, "tick-secret"); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	var status string
+	queryRowArgs(t, `SELECT status,respond_by FROM coaching_consultations WHERE id=$1`, []any{first.ID}, &status, &after)
+	if status != "offered" || !saved.Equal(after) {
+		t.Fatalf("legacy response deadline changed: %s %v %v", status, saved, after)
+	}
+	consultationAction(t, h, coach, first.ID, "accept", nil)
+	execSQLArgs(t, `UPDATE coaching_consultations SET answer_by=now()+interval '60 hours' WHERE id=$1`, first.ID)
+	queryRowArgs(t, `SELECT answer_by FROM coaching_consultations WHERE id=$1`, []any{first.ID}, &saved)
+	if r := tick(t, h, "tick-secret"); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	queryRowArgs(t, `SELECT status,answer_by FROM coaching_consultations WHERE id=$1`, []any{first.ID}, &status, &after)
+	if status != "in_review" || !saved.Equal(after) {
+		t.Fatalf("legacy answer deadline changed: %s %v %v", status, saved, after)
+	}
+	// F5: coach suspension closes an old delivered consultation one hour after delivery.
+	execSQLArgs(t, `UPDATE coaching_consultations SET status='offered',paid_at=now()-interval '1 hour',respond_by=now()+interval '47 hours',answer_by=NULL WHERE id=$1`, first.ID)
+	execSQLArgs(t, `UPDATE coach_profiles SET status='suspended',on_duty=false WHERE profile_id=(SELECT coach_id FROM coaching_consultations WHERE id=$1)`, first.ID)
+	if r := tick(t, h, "tick-secret"); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	execSQLArgs(t, `UPDATE coach_profiles SET status='approved',on_duty=true WHERE profile_id=(SELECT coach_id FROM coaching_consultations WHERE id=$1)`, first.ID)
+	if s := reviewRoomState(t, h, owner, root); !s.CanPurchase {
+		t.Fatalf("rebuy after old early expiry %+v", s)
+	}
+	second := consultationDraft(t, h, owner, path, uuid.NewString(), "新世代の質問")
+	consultationAction(t, h, owner, second.ID, "submit", nil)
+	if code := payConsultation(t, h, second.ID, 500); code != 200 {
+		t.Fatal(code)
+	}
+	execSQLArgs(t, `UPDATE coaching_consultations SET paid_at=now()-interval '25 hours',respond_by=now()-interval '1 hour' WHERE id=$1`, second.ID)
+	if r := tick(t, h, "tick-secret"); r.Code != 200 {
+		t.Fatal(r.Body.String())
+	}
+	if s := reviewRoomState(t, h, owner, root); s.CanPurchase || !strings.Contains(s.BlockReason, "上限") {
+		t.Fatalf("mixed-generation third attempt allowed %+v", s)
+	}
+	execSQLArgs(t, `UPDATE coaching_consultations SET status='answered',answered_at=now() WHERE id=$1`, first.ID)
+	if s := reviewRoomState(t, h, owner, root); s.CanPurchase || !strings.Contains(s.BlockReason, "回答済み") {
+		t.Fatalf("answered old consultation did not block %+v", s)
+	}
 }
 
 func consultationAction(t *testing.T, h http.Handler, tok, id, action string, body any) consultationView {

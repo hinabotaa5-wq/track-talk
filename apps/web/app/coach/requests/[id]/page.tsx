@@ -17,7 +17,7 @@ import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { athleteText, originalTextClass } from "@/lib/coaching-display";
-import { formatDateTime } from "@/lib/format";
+import { formatChatDateTime, formatDateTime } from "@/lib/format";
 import { t, type Locale, L } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import {
@@ -29,7 +29,6 @@ import {
 } from "@/lib/review";
 import type { CoachReviewRequest } from "@/lib/types";
 import { useActionLock } from "@/lib/use-action-lock";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -214,23 +213,33 @@ export default function CoachReviewRequestPage() {
         <h1 className="text-2xl font-bold">
           {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
         </h1>
-        <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{t(locale, "coach.detail.question", { text: question ? question.text : reviewQuestionText(request) })}</p>
-        {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
         {request.status === "in_review" ? (
           <p className="text-sm text-slate-300">{t(locale, "coach.detail.due", { date: formatDateTime(request.due_at) })}</p>
         ) : null}
       </div>
 
       {request.video_url ? (
-        <video
-          src={request.video_url}
-          poster={request.thumbnail_url || undefined}
-          controls
-          playsInline
-          preload="metadata"
-          className="w-full rounded-xl bg-black"
-        />
+        <div className="flex justify-start">
+          <div className="max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2">
+            <video
+              src={request.video_url}
+              poster={request.thumbnail_url || undefined}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full max-w-[260px] rounded-xl bg-black"
+            />
+          </div>
+        </div>
       ) : null}
+
+      <div className="flex justify-start">
+        <div className="max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2">
+          <time dateTime={request.created_at} className="text-xs text-slate-300">{formatChatDateTime(request.created_at)}</time>
+          <p className="whitespace-pre-wrap break-words text-sm">{question ? question.text : reviewQuestionText(request)}</p>
+          {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
+        </div>
+      </div>
 
       {sent === "info" && request.info_request ? <SentBanner text={t(locale, "coach.detail.infoSent")} /> : null}
 
@@ -255,15 +264,11 @@ export default function CoachReviewRequestPage() {
 
       {sent === "response" && response ? <SentBanner text={t(locale, "coach.detail.responseSent")} /> : null}
 
-      {response ? <ReviewResponseView response={response} mine /> : null}
+      {response ? <ReviewResponseView response={response} viewer="coach" /> : null}
 
       {response && id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
 
       {request.work_order ? <WorkOrderView order={request.work_order} /> : null}
-
-      <Link href="/coach" className="block text-center text-sm text-blue-300 underline">
-        {t(locale, "coach.detail.toCoach")}
-      </Link>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SupportConsultDetail } from "./support-consult-detail";
 import { emptyAnswers, type SupportConsult } from "@/lib/support-consult";
+import { en } from "@/lib/i18n-en";
 
 const apiFetch = vi.fn();
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
@@ -116,4 +117,35 @@ it("提案画面に、日割りの算定例・返金の時期と方法・終了�
   expect(text).not.toContain("中止");
   expect(text).toContain("契約が終わった時点（期間の満了・途中での終了とも）で、選手・コーチ・保護者のいずれからも見られなくなります");
   expect(text).toContain("動画のファイルは契約の終わりから30日で削除します");
+});
+
+// 本体 #904：継続プランの提案カードで、コーチに報酬の支払日（前の月の末日までの分を翌月15日）を示す（フリーランス法3条の明示）。
+const coachProposalLine = "運営手数料{fee_percent}%を引いた、あなたの受け取り: {v1}。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。お支払いは、前の月の末日までの分を翌月15日にまとめて行います。";
+const oldCoachProposalLine = "運営手数料{fee_percent}%を引いた、あなたの受け取り: {v1}。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。";
+
+it("コーチとして提案カードを見ると、手数料率・受取額は従来どおりで、報酬の支払日の一文が続く", async () => {
+  await render(base, "coach");
+  const card = container.querySelector('section[aria-label="コーチの提案"]')!;
+  expect(card.textContent).toContain("運営手数料25%を引いた、あなたの受け取り: 6,750円。報酬は契約終了時に経過日数の日割りで確定し、期間中は毎月末までの分を仮払いします。お支払いは、前の月の末日までの分を翌月15日にまとめて行います。");
+});
+
+it("選手として提案カードを見ると、コーチ向けの受取額・支払日の行は出ない", async () => {
+  await render(base, "athlete");
+  const card = container.querySelector('section[aria-label="コーチの提案"]')!;
+  expect(card.textContent).not.toContain("あなたの受け取り");
+  expect(card.textContent).not.toContain("翌月15日にまとめて行います");
+});
+
+it("提案フォーム側の受取額の行は従来どおりで、支払日の一文は入らない", async () => {
+  await render({ ...base, status: "requested", proposal: null }, "coach");
+  const price = container.querySelector('input[aria-label="価格"]') as HTMLInputElement;
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  await act(async () => { setter.call(price, "10000"); price.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(container.textContent).toContain("運営手数料25%を引いた、あなたの受け取り: 7,500円");
+  expect(container.textContent).not.toContain("翌月15日にまとめて行います");
+});
+
+it("英訳辞書は新しいコーチ向け文の英訳だけを持ち、旧キーは残っていない", () => {
+  expect(en[coachProposalLine]).toBe("Your earnings after the {fee_percent}% service fee: {v1}. Earnings are finalized at the end of the contract, prorated by days elapsed, and provisionally paid monthly for days through each month-end. Payments are made on the 15th of the following month, covering amounts through the end of the previous month.");
+  expect(Object.prototype.hasOwnProperty.call(en, oldCoachProposalLine)).toBe(false);
 });

@@ -10,7 +10,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachApplyPath } from "@/lib/coach-recruit";
 import { coachingEnabled } from "@/lib/features";
 import { formatYen } from "@/lib/format";
-import { t, type Locale } from "@/lib/i18n";
+import { L, t, type Locale } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import type {
   CoachApplication,
@@ -26,6 +26,7 @@ import {
   Inbox,
   Landmark,
   Layers,
+  MessageSquareText,
   MessagesSquare,
   PenLine,
   UserRound,
@@ -152,6 +153,8 @@ export function CoachDashboard() {
   const locale = useLocale();
   const router = useRouter();
   const [coach, setCoach] = useState<CoachApplication | null | undefined>(undefined);
+  // 今までに返却した添削の件数（本人だけに出す表示用）。応答にキーが無いときは undefined のままで、行を出さない。
+  const [completedReviews, setCompletedReviews] = useState<number | undefined>(undefined);
   const [offers, setOffers] = useState<CoachRequests | null>(null);
   const [consultations, setConsultations] = useState(0);
   const [appliedContracts, setAppliedContracts] = useState(0);
@@ -169,10 +172,11 @@ export function CoachDashboard() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    apiFetch<{ application: CoachApplication | null }>("/v1/coach/me", { token })
+    apiFetch<{ application: CoachApplication | null; completed_review_count?: number }>("/v1/coach/me", { token })
       .then((c) => {
         if (cancelled) return;
         setCoach(c.application);
+        setCompletedReviews(typeof c.completed_review_count === "number" ? c.completed_review_count : undefined);
       })
       .catch(() => {
         if (!cancelled) setError(t(locale, "coach.loadError"));
@@ -265,6 +269,9 @@ export function CoachDashboard() {
           <CoachAvatar url={coach.photo_url} name={coach.name || profile?.nickname || null} size={40} />
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold leading-tight">{coach.on_duty ? t(locale, "coach.onDuty") : t(locale, "coach.offDuty")}</p>
+            {completedReviews !== undefined ? (
+              <p className="text-sm text-slate-200">{t(locale, "coach.completedReviews", { count: completedReviews })}</p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -293,6 +300,8 @@ export function CoachDashboard() {
         <Tile locale={locale} href="/coach/payouts" label={t(locale, "coach.tile.payouts")} Icon={Wallet} dot={payoutsDot} />
         <Tile locale={locale} href="/coach/profile" label={t(locale, "coach.tile.profile")} Icon={UserRound} />
         <Tile locale={locale} href="/me/push" label={t(locale, "coach.tile.push")} Icon={BellRing} />
+        {/* 選手からの匿名の感想（本体 #911）。件数バッジは付けない（届いた時期から特定されないように）。 */}
+        <Tile locale={locale} href="/coach/feedback" label={L("選手からの感想")} Icon={MessageSquareText} />
       </CoachTiles>
 
       <footer className="space-y-1 border-t border-white/15 pt-3">

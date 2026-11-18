@@ -480,3 +480,103 @@ func TestAdminCoachApplicationIncludesPayoutStatus(t *testing.T) {
 		}
 	}
 }
+
+// 添削依頼を1件入れる（返却済みの件数のテスト用）。returned・timedOut は returned_at・timed_out_at を入れるか。
+func seedCompletedCountReview(t *testing.T, coach uuid.UUID, status string, returned, timedOut bool) {
+	t.Helper()
+	actionSeed(t, `INSERT INTO review_requests (id, requester_id, coach_id, tier, event, focus, question, due_at, status,
+			info_request, info_requested_at, info_from_status, resubmit_by, returned_at, timed_out_at)
+		VALUES (gen_random_uuid(), gen_random_uuid(), $1, 'coach', '100m', '{}', 'スタートを見てください', now() + interval '1 day', $2,
+			CASE WHEN $2 = 'needs_info' THEN '質問' END,
+			CASE WHEN $2 = 'needs_info' THEN now() END,
+			CASE WHEN $2 = 'needs_info' THEN 'in_review' END,
+			CASE WHEN $2 = 'needs_info' THEN now() + interval '1 day' END,
+			CASE WHEN $3 THEN now() END,
+			CASE WHEN $4 THEN now() END)`, coach, status, returned, timedOut)
+}
+
+func coachMeRaw(t *testing.T, h http.Handler, tok string) map[string]json.RawMessage {
+	t.Helper()
+	rec := doJSON(t, h, http.MethodGet, "/v1/coach/me", tok, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("coach me %d %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
+// completed_review_count は数字（整数）で返ること。
+func completedReviewCount(t *testing.T, body map[string]json.RawMessage) int {
+	t.Helper()
+	raw, ok := body["completed_review_count"]
+	if !ok {
+		t.Fatalf("completed_review_count がない: %v", body)
+	}
+	var n int
+	if err := json.Unmarshal(raw, &n); err != nil {
+		t.Fatalf("completed_review_count が整数でない: %s", raw)
+	}
+	return n
+}
+
+// #912：コーチ本人の画面に出す「今までの添削」の件数。返却済み（returned_at あり）の1回プランの依頼だけを数える。
+func TestCoachMeCompletedReviewCount(t *testing.T) {
+	h := setup(t)
+
+	// A1・A2：returned 2件＋返却後に追加質問中（clarifying・returned_at あり）1件＝3件。それ以外は数えない。
+	coach, tc := approvedCoachWithServices(t, h, nil)
+	seedCompletedCountReview(t, coach, "returned", true, false)
+	seedCompletedCountReview(t, coach, "returned", true, false)
+	seedCompletedCountReview(t, coach, "clarifying", true, false)
+	seedCompletedCountReview(t, coach, "in_review", false, false)
+	seedCompletedCountReview(t, coach, "needs_info", false, false)
+	seedCompletedCountReview(t, coach, "in_review", false, true) // タイムアウト（timed_out_at のみ）
+	seedCompletedCountReview(t, coach, "expired", false, true)
+	seedCompletedCountReview(t, coach, "expired", false, false)
+	other, _ := approvedCoachWithServices(t, h, nil)
+	seedCompletedCountReview(t, other, "returned", true, false) // 別のコーチの返却済み
+	actionSeed(t, `INSERT INTO review_requests (id, requester_id, coach_id, tier, event, focus, question, due_at, status)
+		VALUES (gen_random_uuid(), gen_random_uuid(), NULL, 'coach', '100m', '{}', 'スタートを見てください', now() + interval '1 day', 'queued')`)
+
+	body := coachMeRaw(t, h, tc)
+	if n := completedReviewCount(t, body); n != 3 {
+		t.Fatalf("A1/A2 completed_review_count = %d, want 3", n)
+	}
+	if n := completedReviewCount(t, coachMeRaw(t, h, token(t, other))); n != 1 {
+		t.Fatalf("other coach completed_review_count = %d, want 1", n)
+	}
+
+	// A3：返却済みが無いコーチは 0。キーは application・rating・completed_review_count の3つ。
+	_, fresh := approvedCoachWithServices(t, h, nil)
+	body = coachMeRaw(t, h, fresh)
+	if n := completedReviewCount(t, body); n != 0 {
+		t.Fatalf("A3 completed_review_count = %d, want 0", n)
+	}
+	if len(body) != 3 {
+		t.Fatalf("A3 keys = %v", body)
+	}
+	var app coachApplication
+	if err := json.Unmarshal(body["application"], &app); err != nil || app.Status != "approved" || app.Name != "テストコーチ" {
+		t.Fatalf("A3 application %s %v", body["application"], err)
+	}
+	var rating struct {
+		Count   *int     `json:"count"`
+		Average *float64 `json:"average"`
+		Paused  *bool    `json:"paused"`
+	}
+	if err := json.Unmarshal(body["rating"], &rating); err != nil || rating.Count == nil || *rating.Count != 0 || rating.Paused == nil || *rating.Paused {
+		t.Fatalf("A3 rating %s %v", body["rating"], err)
+	}
+
+	// A4：プロフィール未作成は application null と 0。未ログインは 401。
+	body = coachMeRaw(t, h, token(t, uuid.New()))
+	if string(body["application"]) != "null" || completedReviewCount(t, body) != 0 || len(body) != 2 {
+		t.Fatalf("A4 %v", body)
+	}
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/me", "", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("A4 anonymous %d %s", rec.Code, rec.Body.String())
+	}
+}

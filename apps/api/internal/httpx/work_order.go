@@ -89,10 +89,10 @@ func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.
 	return buildWorkOrderTerms(work, price*share/100, rr.DueAt, consignedAt), nil
 }
 
-// consultationWorkOrderTerms は、フォーム添削の追加質問の通知。回答の期限は引き受けてから72時間。
+// consultationWorkOrderTerms は、フォーム添削の追加質問の通知。回答の期限は引き受けてから12時間。
 // 内容行は現行差分のまま(補足1回の文は入れない。本体 #625)。
 func consultationWorkOrderTerms(c db.CoachingConsultation, consignedAt time.Time) workOrderTerms {
-	deliverBy := consignedAt.Add(72 * time.Hour)
+	deliverBy := consignedAt.Add(12 * time.Hour)
 	if c.AnswerBy != nil {
 		deliverBy = *c.AnswerBy
 	}

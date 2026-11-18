@@ -1,17 +1,21 @@
 "use client";
 import { L } from "@/lib/i18n";
 
+import { LoadingStopwatch } from "@/components/loading-stopwatch";
 import { Button } from "@/components/ui/button";
 import type { ConfirmRow } from "@/lib/purchase-confirm";
 
 // PurchaseConfirm は、支払い画面へ進む前の最終確認（本体 #569）。確定ボタンを押すまで、何も送らず・何も確保しない。
-export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending, confirmDisabled, children }: {
+// 確定を押してから画面が移るまで（pending のあいだ）は、ボタンの下でストップウォッチを回し、pendingLabel の文言を出す（本体 #917）。
+// pendingLabel を渡さないときは「処理しています」。待ちが見えるよう、遅らせずに pending になった最初の描画から出す。
+export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending, confirmDisabled, pendingLabel, children }: {
   rows: ConfirmRow[];
   confirmLabel: string;
   onConfirm: () => void;
   onBack: () => void;
   pending?: boolean;
   confirmDisabled?: boolean;
+  pendingLabel?: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -30,6 +34,12 @@ export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending
         <Button type="button" className="w-full" disabled={pending || confirmDisabled} onClick={onConfirm}>{confirmLabel}</Button>
         <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={onBack}>{L("戻って直す")}</Button>
       </div>
+      {pending ? (
+        <div role="status" aria-busy="true" className="flex flex-col items-center gap-2 pt-2 text-slate-200">
+          <LoadingStopwatch />
+          <p className="text-sm font-semibold">{pendingLabel ?? L("処理しています")}</p>
+        </div>
+      ) : null}
     </section>
   );
 }
