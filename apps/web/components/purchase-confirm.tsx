@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { L } from "@/lib/i18n";
 
 import { LoadingStopwatch } from "@/components/loading-stopwatch";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { ConfirmRow } from "@/lib/purchase-confirm";
 
 // PurchaseConfirm は、支払い画面へ進む前の最終確認（本体 #569）。確定ボタンを押すまで、何も送らず・何も確保しない。
-// 確定を押してから画面が移るまで（pending のあいだ）は、ボタンの下でストップウォッチを回し、pendingLabel の文言を出す（本体 #917）。
+// 確定を押してから画面が移るまで（pending のあいだ）は、画面全体を覆ってストップウォッチを回し、pendingLabel の文言を出す（本体 #917）。
 // pendingLabel を渡さないときは「処理しています」。待ちが見えるよう、遅らせずに pending になった最初の描画から出す。
 export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending, confirmDisabled, pendingLabel, children }: {
   rows: ConfirmRow[];
@@ -18,6 +19,14 @@ export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending
   pendingLabel?: string;
   children?: React.ReactNode;
 }) {
+  const overlay = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!pending) return;
+    const previous = document.activeElement;
+    overlay.current?.focus({ preventScroll: true });
+    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true }); };
+  }, [pending]);
+
   return (
     <section aria-labelledby="purchase-confirm-heading" className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-sm">
       <h2 id="purchase-confirm-heading" className="font-bold">{L("お申込み内容の確認")}</h2>
@@ -35,7 +44,9 @@ export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending
         <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={onBack}>{L("戻って直す")}</Button>
       </div>
       {pending ? (
-        <div role="status" aria-busy="true" className="flex flex-col items-center gap-2 pt-2 text-slate-200">
+        <div ref={overlay} role="status" aria-busy="true" tabIndex={-1}
+          onKeyDown={(event) => { if (event.key === "Tab") event.preventDefault(); }}
+          className="pointer-events-auto fixed inset-0 z-[110] flex flex-col items-center justify-center gap-2 bg-slate-950/70 p-6 text-center text-slate-200 backdrop-blur-md outline-none">
           <LoadingStopwatch />
           <p className="text-sm font-semibold">{pendingLabel ?? L("処理しています")}</p>
         </div>
