@@ -68,6 +68,7 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  vi.useFakeTimers();
   apiFetch.mockReset();
   localeState.value = "ja";
   scroll = vi.fn();
@@ -76,6 +77,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await act(async () => root.unmount());
+  vi.useRealTimers();
   container.remove();
   HTMLElement.prototype.scrollIntoView = previousScroll;
 });
@@ -111,21 +113,20 @@ async function fillTextarea(textarea: HTMLTextAreaElement, value: string) {
   });
 }
 
-// 返答の送信成功で、送った返答カードの先頭に完了バナーが出てスクロールする。
-it("返答を送ると完了バナーが出てスクロールする", async () => {
+// 完了バナーだけが3秒で消え、返答カードは残る。
+it("返答を送ると上部オーバーレイが出て3秒で消え、返答は残る", async () => {
   apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
     if (!options?.method && path.includes("/consultations")) return emptyRoom;
     if (options?.method === "POST") return responded;
     return base;
   });
   await renderPage();
-  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(document.querySelector('[role="status"]')).toBeNull();
   await act(async () => submitButton("返答を送る").click());
-  expect(container.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
-  expect(scroll).toHaveBeenCalled();
-  // バナーの直下に送った返答カードが続く。
-  const text = container.textContent!;
-  expect(text.indexOf("返答を送りました")).toBeLessThan(text.indexOf("腕振りが良い"));
+  expect(document.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
+  expectOverlay();
+  expect(scroll).not.toHaveBeenCalled();
+  await expectBannerExpires("腕振りが良い");
 });
 
 // 返答の送信に失敗したら、バナーは出さない。
@@ -137,7 +138,7 @@ it("返答の送信に失敗したらバナーは出ない", async () => {
   });
   await renderPage();
   await act(async () => submitButton("返答を送る").click());
-  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(document.querySelector('[role="status"]')).toBeNull();
   expect(container.textContent).toContain("送信に失敗しました");
   expect(scroll).not.toHaveBeenCalled();
 });
@@ -155,8 +156,8 @@ it("保存済みの確認質問と補足は表示し、補足の送信フォー�
   expect(container.textContent).not.toContain("補足を送る");
 });
 
-// 差し戻しの送信成功で、履歴の前に完了バナーが出る。
-it("差し戻すと完了バナーが履歴の前に出る", async () => {
+// 差し戻しも同じオーバーレイ・消去になり、履歴は残る。
+it("差し戻すと上部オーバーレイが出て3秒で消え、履歴は残る", async () => {
   const sentBack = {
     ...base,
     status: "needs_info",
@@ -183,10 +184,10 @@ it("差し戻すと完了バナーが履歴の前に出る", async () => {
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await act(async () => submitButton("質問を付けて差し戻す").click());
-  expect(container.querySelector('[role="status"]')?.textContent).toContain("差し戻しました");
-  expect(scroll).toHaveBeenCalled();
-  const text = container.textContent!;
-  expect(text.indexOf("差し戻しました")).toBeLessThan(text.indexOf("差し戻し中"));
+  expect(document.querySelector('[role="status"]')?.textContent).toContain("差し戻しました");
+  expectOverlay();
+  expect(scroll).not.toHaveBeenCalled();
+  await expectBannerExpires("差し戻し中");
 });
 
 // 返答フォームは良い点・直す点・ドリル・ひとこと・見本動画の5項目で、直す点は1欄だけ。
@@ -227,7 +228,7 @@ it("返答の送信内容は直す点1つとひとことを含む", async () => 
   expect(payload.fix_points).toEqual(["接地を直す"]);
   expect(payload.drill).toBe("もも上げ");
   expect(payload.hitokoto).toBe("次は抜き脚だけ意識してみましょう");
-  expect(container.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
+  expect(document.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
 });
 
 // ひとことが空だと送れず、項目の指摘が出る（サーバーが 422 を返した想定）。
@@ -255,7 +256,7 @@ it("ひとことが空だと送信できず項目の指摘が出る", async () =
   // ひとことは空のまま送る。
   await act(async () => submitButton("返答を送る").click());
   expect(JSON.parse(sentBody).hitokoto).toBe("");
-  expect(container.querySelector('[role="status"]')).toBeNull();
+  expect(document.querySelector('[role="status"]')).toBeNull();
   expect(container.textContent).toContain("ひとことを入力してください");
 });
 
@@ -322,4 +323,54 @@ it("返答前は空の返答を出さず、期限とフォームを従来どお�
   expect(container.textContent).toContain("返却期限");
   expect(responseForm()).toBeTruthy();
   expect(container.textContent).not.toContain("コーチ画面へ");
+});
+
+function expectOverlay() {
+  const banner = document.querySelector('[role="status"]')!;
+  expect(banner.parentElement).toBe(document.body);
+  expect(container.contains(banner)).toBe(false);
+  for (const name of ["fixed", "top-4", "z-50", "pointer-events-none", "max-w-md", "border-emerald-500/60", "bg-emerald-950/50"]) {
+    expect(banner.classList.contains(name)).toBe(true);
+  }
+  expect(banner.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+}
+
+async function expectBannerExpires(remainingText: string) {
+  await act(async () => vi.advanceTimersByTime(2999));
+  expect(document.querySelector('[role="status"]')).not.toBeNull();
+  await act(async () => vi.advanceTimersByTime(1));
+  expect(document.querySelector('[role="status"]')).toBeNull();
+  expect(container.textContent).toContain(remainingText);
+  await renderPage();
+  await act(async () => vi.advanceTimersByTime(6000));
+  expect(document.querySelector('[role="status"]')).toBeNull();
+  expect(container.textContent).toContain(remainingText);
+}
+
+it("英語の Response sent も上部オーバーレイで3秒後に消える", async () => {
+  localeState.value = "en";
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    if (options?.method === "POST") return responded;
+    return base;
+  });
+  await renderPage();
+  await act(async () => submitButton("Send response").click());
+  expect(document.querySelector('[role="status"]')?.textContent).toContain("Response sent");
+  expectOverlay();
+  expect(scroll).not.toHaveBeenCalled();
+  await expectBannerExpires("腕振りが良い");
+});
+
+it("差し戻しの送信に失敗したらバナーは出ない", async () => {
+  apiFetch.mockImplementation(async (_path: string, options?: { method?: string }) => {
+    if (options?.method === "POST") throw new Error("送信に失敗しました");
+    return base;
+  });
+  await renderPage();
+  await fillTextarea(container.querySelector("details textarea")!, "どこが分からないか具体的に教えてください");
+  await act(async () => submitButton("質問を付けて差し戻す").click());
+  expect(document.querySelector('[role="status"]')).toBeNull();
+  expect(container.textContent).toContain("送信に失敗しました");
+  expect(scroll).not.toHaveBeenCalled();
 });
