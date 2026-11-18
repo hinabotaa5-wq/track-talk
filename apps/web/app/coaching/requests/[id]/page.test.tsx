@@ -3,6 +3,7 @@ import { act, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { LeaveGuardProvider } from "@/components/leave-guard";
+import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 import { reviewVideosPurgedNote } from "@/lib/review";
 import { ApiRequestError } from "@/lib/api";
@@ -11,6 +12,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import ReviewRequestPage from "./page";
 
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
+const featureFlags = vi.hoisted(() => ({ coachList: true }));
 const searchState = vi.hoisted(() => ({ paid: false }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/coaching/requests/review-1",
@@ -56,13 +58,13 @@ vi.mock("@/lib/features", async (original) => ({
   ...await original<typeof import("@/lib/features")>(),
   coachingMessagingEnabled: true,
   coachingConsultationEnabled: true,
-  coachingCoachListEnabled: true,
+  get coachingCoachListEnabled() { return featureFlags.coachList; },
 }));
 
 type RequestFixture = {
   response?: { hidden: boolean } | null;
   rating?: { stars: number | null; helpful: null } | null;
-  coach?: { id: string } | null;
+  coach?: { id?: string } | null;
   extra?: Record<string, unknown>;
 };
 
@@ -136,6 +138,8 @@ async function teardown(root: Root, container: HTMLDivElement) {
   container.remove();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  featureFlags.coachList = true;
+  setActiveLocale("ja");
 }
 
 function listLink(container: HTMLDivElement) {
@@ -211,12 +215,33 @@ it("未評価の返却済み依頼でもコーチのプロフィールへ遷移�
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
     if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
-    return baseRequest({ coach: { id: "coach-1" } });
+    return baseRequest({ coach: { id: "coach-1" }, extra: { video_url: "https://example.com/request.mp4" } });
   });
   const { container, root } = await renderPage();
   try {
     const profile = container.querySelector('a[href="/coaches/coach-1"]');
     expect(profile).not.toBeNull();
+    expect(container.querySelectorAll('a[href^="/coaches/"]')).toHaveLength(1);
+    expect(profile!.textContent).toBe("このコーチのプロフィールを見る");
+    const header = container.querySelector("h1")!.parentElement!.parentElement!;
+    expect(header.lastElementChild).toBe(profile);
+    expect(header.classList).toContain("items-start");
+    expect(header.classList).toContain("justify-between");
+    expect(header.firstElementChild!.textContent).toContain("送った日時");
+    for (const cls of ["inline-flex", "min-h-9", "items-center", "rounded-full", "border", "border-white/25", "bg-white/10", "text-sm", "text-blue-300", "transition", "active:scale-[0.98]"]) {
+      expect(profile!.classList).toContain(cls);
+    }
+    expect(profile!.classList).not.toContain("underline");
+    const question = [...container.querySelectorAll("p")].find((p) => p.textContent === "スタートの姿勢について")!;
+    const response = [...container.querySelectorAll("h2")].find((h) => h.textContent === "良い点")!;
+    for (const element of [container.querySelector("video")!, question, response]) {
+      expect(profile!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(question.parentElement!.parentElement!.nextElementSibling).toBe(response.closest("section"));
+    for (const text of ["テストコーチ", "100m", "10秒台", "実績"]) {
+      expect(container.textContent!.replace(profile!.textContent!, "")).not.toContain(text);
+    }
+    expect(container.querySelector("img")).toBeNull();
     await click(profile!);
     expect(routerMock.push).toHaveBeenCalledWith("/coaches/coach-1");
   } finally {
@@ -383,7 +408,7 @@ async function unmountPage(container: HTMLDivElement, root: ReturnType<typeof cr
   vi.unstubAllGlobals();
 }
 
-it("返却後＋コーチカードありは「選んだコーチ」枠を出さない", async () => {
+it("返却後＋コーチ情報ありは「選んだコーチ」枠を出さない", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     if (path.endsWith("/consultations")) {
       return { consultations: [], role: "requester", funding: "cash", price_yen: 500, can_purchase: true, requires_video: false };
@@ -407,7 +432,7 @@ it("返却後＋コーチカードありは「選んだコーチ」枠を出さ�
   const { container, root } = await renderPage();
   try {
     expect(container.textContent).not.toContain("選んだコーチ：");
-    expect(container.textContent).toContain("デモコーチ");
+    expect(container.textContent).not.toContain("デモコーチ");
   } finally {
     await unmountPage(container, root);
   }
@@ -676,14 +701,14 @@ it("動画が削除済みの依頼は保存期間の注記と相談内容を出�
   }
 });
 
-it("返却後も「誰に見てもらうか」は出ず、相談内容とコーチカードの種目は残る", async () => {
+it("返却後は相談内容を残しコーチの名前と種目は出さない", async () => {
   const { container, root } = await renderWith({ coach: { id: "coach-1" } });
   try {
     expect(container.textContent).not.toContain("誰に見てもらうか");
     expect(dlTerms(container)).toEqual([]);
     expect(container.textContent).toContain("スタートの姿勢について");
-    expect(container.textContent).toContain("テストコーチ");
-    expect(container.textContent).toContain("100m");
+    expect(container.textContent).not.toContain("テストコーチ");
+    expect(container.textContent).not.toContain("100m");
   } finally {
     await teardown(root, container);
   }
@@ -810,6 +835,7 @@ it("依頼動画→相談文は右・青、返答は左の独立カードとし�
     expect(container.querySelectorAll("dl")).toHaveLength(0);
     const video = container.querySelector("video")!;
     expect(video.classList).toContain("max-w-[260px]");
+    expect(video.classList).toContain("max-h-[300px]");
     expect(video.controls).toBe(true);
     expect(video.closest("div.flex")?.classList).toContain("justify-end");
     expect(video.parentElement?.classList).toContain("bg-blue-500/25");
@@ -864,4 +890,54 @@ it("Stripeからの支払い同期後は状態・支払い文をシステム表�
     expect(container.querySelector("section h2")?.classList).toContain("text-sm");
     for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "このIDは終了しました。"]) expect(container.textContent).not.toContain(text);
   } finally { searchState.paid = false; await teardown(root, container); }
+});
+
+
+it.each([
+  { label: "一覧無効", coach: { id: "coach-1" }, list: false },
+  { label: "コーチなし", coach: null, list: true },
+  { label: "IDなし", coach: {}, list: true },
+])("$label では詳細リンクを出さず返答を表示する", async ({ coach, list }) => {
+  featureFlags.coachList = list;
+  apiFetch.mockImplementation(async (path: string) => mockConsultationsEmpty(path) ?? baseRequest({ coach }));
+  const { container, root } = await renderPage();
+  try {
+    expect(container.querySelector('a[href^="/coaches/"]')).toBeNull();
+    expect(container.textContent).toContain("腕振り");
+    expect(container.textContent).toContain("接地位置");
+  } finally { await teardown(root, container); }
+});
+
+it("返答前は選んだコーチの表示を維持し詳細リンクを出さない", async () => {
+  apiFetch.mockImplementation(async () => baseRequest({ response: null, extra: {
+    status: "in_review", due_at: "2026-12-01T00:00:00Z", requested_coach_id: "coach-1", requested_coach_name: "選択済みコーチ",
+  } }));
+  const { container, root } = await renderPage();
+  try {
+    expect(container.querySelector('a[href^="/coaches/"]')).toBeNull();
+    expect(container.textContent).toContain("選んだコーチ：選択済みコーチ");
+  } finally { await teardown(root, container); }
+});
+
+it("運営非表示の返答でも詳細リンクを維持しIDをエンコードする", async () => {
+  apiFetch.mockImplementation(async (path: string) => mockConsultationsEmpty(path) ?? baseRequest({
+    response: { hidden: true }, coach: { id: "coach/1" },
+  }));
+  const { container, root } = await renderPage();
+  try {
+    expect(container.querySelector('a[href="/coaches/coach%2F1"]')).not.toBeNull();
+    expect(container.textContent).toContain("この返答は運営が非表示にしました。");
+  } finally { await teardown(root, container); }
+});
+
+it("英語表示では右上リンクに既存の英訳を使う", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockImplementation(async (path: string) => mockConsultationsEmpty(path) ?? baseRequest({ coach: { id: "coach-1" } }));
+  const { container, root } = await renderPage();
+  try {
+    const profile = container.querySelector('a[href="/coaches/coach-1"]')!;
+    expect(profile.textContent).toBe("View this coach's profile");
+    expect(container.querySelector("h1")!.parentElement!.parentElement!.lastElementChild).toBe(profile);
+  } finally { await teardown(root, container); }
 });

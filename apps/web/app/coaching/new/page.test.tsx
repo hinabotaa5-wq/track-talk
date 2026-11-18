@@ -1021,3 +1021,43 @@ it("B4: 動画なしの申込では署名を取りに行かない", async () => 
   expect(mocks.upload).not.toHaveBeenCalled();
   expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
 });
+
+it("#959: 動画送信・取り込み・保存からStripe遷移まで確認画面は待ちオーバーレイだけを出す", async () => {
+  let progress!: (value: { loaded: number; total: number; percent: number }) => void;
+  let finishUpload!: (value: { public_id: string }) => void;
+  let finishRequest!: (value: { id: string; checkout_url: string }) => void;
+  const assign = vi.fn();
+  try {
+    mocks.upload.mockImplementation((_file: File, _signed: unknown, _token: unknown, onProgress: typeof progress) => {
+      progress = onProgress;
+      return new Promise((resolve) => { finishUpload = resolve; });
+    });
+    await openReviewConfirm({
+      video: new File(["1234567890"], "run.mp4", { type: "video/mp4" }),
+      request: () => new Promise((resolve) => { finishRequest = resolve; }),
+    });
+    vi.stubGlobal("location", { ...window.location, assign });
+    await pressConfirm();
+    const expectOverlayOnly = () => {
+      expect(pendingStatus()?.textContent).toBe("お支払い画面へ移動しています");
+      expect(container.querySelector('[role="progressbar"]')).toBeNull();
+      for (const text of ["動画を送っています", "取り込み中", "投稿を保存しています"]) expect(container.textContent).not.toContain(text);
+      // ファイル名は既存の申込み内容の行だけ。進捗カードには出さない。
+      expect([...container.querySelectorAll("p")].some((p) => p.textContent === "run.mp4")).toBe(false);
+    };
+    expectOverlayOnly();
+    await act(async () => progress({ loaded: 5, total: 10, percent: 50 }));
+    expectOverlayOnly();
+    await act(async () => progress({ loaded: 10, total: 10, percent: 100 }));
+    expectOverlayOnly();
+    await act(async () => finishUpload({ public_id: "pre1" }));
+    expectOverlayOnly();
+    expect(signCalls()).toBe(1);
+    expect(mocks.upload).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests")![1].body);
+    expect(body.video_public_id).toBe("pre1");
+    await act(async () => finishRequest({ id: "r1", checkout_url: "https://checkout.stripe.com/test" }));
+    expect(assign).toHaveBeenCalledWith("https://checkout.stripe.com/test");
+    expectOverlayOnly();
+  } finally { vi.unstubAllGlobals(); }
+});
