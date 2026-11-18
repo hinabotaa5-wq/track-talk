@@ -652,7 +652,7 @@ it("動画なし（悩みのみ）の依頼は動画も保存期間の注記も�
   const { container, root } = await renderWith({ response: null, extra: { status: "in_review", due_at: new Date().toISOString() } });
   try {
     expect(container.querySelector("video")).toBeNull();
-    expect(container.textContent).not.toContain(reviewVideosPurgedNote);
+    expect(container.textContent).not.toContain(reviewVideosPurgedNote());
     expect(dlTerms(container)).toEqual([]);
   } finally {
     await teardown(root, container);
@@ -663,7 +663,7 @@ it("動画が削除済みの依頼は保存期間の注記と相談内容を出�
   const { container, root } = await renderWith({ response: null, extra: { status: "in_review", due_at: new Date().toISOString(), videos_purged: true } });
   try {
     expect(container.querySelector("video")).toBeNull();
-    expect(container.textContent).toContain(reviewVideosPurgedNote);
+    expect(container.textContent).toContain(reviewVideosPurgedNote());
     expect(container.textContent).toContain("スタートの姿勢について");
   } finally {
     await teardown(root, container);

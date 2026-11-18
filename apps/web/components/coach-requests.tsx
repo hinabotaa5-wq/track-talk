@@ -75,7 +75,7 @@ export function CoachRequestsSection({ token, locale }: { token: string | null; 
                 className="w-full rounded-lg bg-black"
               />
             ) : request.videos_purged ? (
-              <p className="text-xs text-slate-300">{reviewVideosPurgedNote}</p>
+              <p className="text-xs text-slate-300">{reviewVideosPurgedNote()}</p>
             ) : null}
             <Link
               href={`/coach/requests/${request.id}`}

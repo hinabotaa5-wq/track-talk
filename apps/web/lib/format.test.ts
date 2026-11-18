@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { installEnglish, setActiveLocale } from "./i18n";
+import { en } from "./i18n-en";
 import { formatChatDateTime, formatDateTime, fromJstInput, toJstInput, todayInTokyo } from "./format";
 
 it("チャット日時は日本時間の月日・時分だけで、年と秒を省く", () => {
@@ -7,6 +9,22 @@ it("チャット日時は日本時間の月日・時分だけで、年と秒を�
   expect(formatChatDateTime("2026-01-02T12:34:00+09:00")).toBe("1/2 12:34");
   expect(formatChatDateTime("invalid")).toBe("");
   expect(formatDateTime("2026-11-17T21:19:37Z")).toContain("2026");
+});
+
+describe("formatDateTime の表示言語（本体 #944）", () => {
+  afterEach(() => setActiveLocale("ja"));
+
+  it("日本語表示では従来どおり日本の書式で、日本時間で出す", () => {
+    setActiveLocale("ja");
+    expect(formatDateTime("2026-11-18T02:05:00Z")).toBe("2026/11/18 11:05");
+  });
+
+  it("英語表示では英語の書式で、日本時間で出す", () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    expect(formatDateTime("2026-11-18T02:05:00Z")).toBe("Nov 18, 2026, 11:05 AM");
+    expect(formatDateTime("2026-11-18T14:30:00Z")).toBe("Nov 18, 2026, 11:30 PM");
+  });
 });
 
 describe("todayInTokyo", () => {
