@@ -251,6 +251,7 @@ func TestPostTranslationBackfillScopeAndMigration(t *testing.T) {
 			w.WriteHeader(500)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"content":[{"type":"text","text":%q}],"stop_reason":"end_turn"}`, postTranslationReply)
 	}))
 	defer endpoint.Close()
@@ -273,7 +274,7 @@ func TestPostTranslationBackfillScopeAndMigration(t *testing.T) {
 		ids = append(ids, id)
 		execSQLArgs(t, `INSERT INTO posts(id,author_id,title,body,kind,cloudinary_public_id,youtube_video_id,youtube_thumbnail_url,instagram_type,instagram_shortcode,x_post_id)
  VALUES($1,$2,'日本語','本文',$3,
- CASE WHEN $3='video' THEN 'track-talk/' || $1::text END,
+ CASE WHEN $3='video' THEN 'track-talk/' || $1::uuid::text END,
  CASE WHEN $3='youtube' THEN 'abcdefghijk' END,
  CASE WHEN $3='youtube' THEN 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg' END,
  CASE WHEN $3='instagram' THEN 'reel' END,
@@ -286,6 +287,8 @@ func TestPostTranslationBackfillScopeAndMigration(t *testing.T) {
 	execSQLArgs(t, `INSERT INTO post_translations(post_id,source_hash,title_en,body_en) VALUES($1,$2,'Current','Current body')`, current, hex.EncodeToString(sum[:]))
 	execSQLArgs(t, `UPDATE posts SET hidden_at=now() WHERE id=$1`, ids[11])
 	execSQLArgs(t, `UPDATE posts SET deleted_at=now() WHERE id=$1`, ids[12])
+	// The recruitment detail endpoint requires its detail row (schedule is NOT NULL).
+	execSQLArgs(t, `INSERT INTO recruitment_details(post_id,schedule) VALUES($1,'毎週土曜')`, ids[4])
 	// Even deliberately inserted translations cannot escape on excluded kinds.
 	for _, id := range ids[:8] {
 		execSQLArgs(t, `INSERT INTO post_translations(post_id,source_hash,title_en,body_en) VALUES($1,$2,'Injected','Injected body')`, id, hex.EncodeToString(sum[:]))
