@@ -43,6 +43,15 @@ const glyphClass = "size-7";
 const INK = "#0F172A";
 const WHITE = "#FFFFFF";
 
+// ほぼ黒（#0F172A）のグリフはダークの背景に沈むため、ダークのときだけ白にする（#951 運営者指示 2026-11-19）。
+// ダークは「端末がダークで data-theme="light" で固定していない」か「data-theme="dark" で固定」のとき
+// （globals.css と同じ条件）。fill 属性より CSS の fill が優先されるので、ライトは属性の #0F172A のまま。
+// Tailwind がクラス名を拾えるよう、完全な文字列で書く。
+const inkToWhiteInDark =
+  "[:root[data-theme=dark]_&]:fill-[#FFFFFF] [@media(prefers-color-scheme:dark)]:[:root:not([data-theme=light])_&]:fill-[#FFFFFF]";
+const whiteToInkInDark =
+  "[:root[data-theme=dark]_&]:fill-[#0F172A] [@media(prefers-color-scheme:dark)]:[:root:not([data-theme=light])_&]:fill-[#0F172A]";
+
 // Instagram の線画グリフ。形は instagram-link.tsx と同じ値（rect／path／line、viewBox・stroke 各値）で、
 // 線の色だけブランド色 #E1306C にしている。
 function InstagramGlyph() {
@@ -81,6 +90,7 @@ function XGlyph() {
     <svg viewBox="0 0 24 24" aria-hidden="true" data-sns-icon="X" className={glyphClass}>
       <path
         fill={INK}
+        className={inkToWhiteInDark}
         d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.59-6.63 7.59H.47l8.6-9.83L0 1.15h7.59l5.24 6.93zM17.61 20.64h2.04L6.49 3.24H4.3z"
       />
     </svg>
@@ -93,6 +103,7 @@ function TikTokGlyph() {
     <svg viewBox="0 0 24 24" aria-hidden="true" data-sns-icon="TikTok" className={glyphClass}>
       <path
         fill={INK}
+        className={inkToWhiteInDark}
         d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"
       />
     </svg>
@@ -127,12 +138,12 @@ function LineGlyph() {
   );
 }
 
-// note：黒い角丸正方形に白抜きの「n」の字形。
+// note：黒い角丸正方形に白抜きの「n」の字形。ダークでは白い正方形に黒い「n」へ反転する。
 function NoteGlyph() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" data-sns-icon="note" className={glyphClass}>
-      <rect x="2" y="2" width="20" height="20" rx="4.5" ry="4.5" fill={INK} />
-      <path fill={WHITE} d="M7 17V7.25h5.6A4 4 0 0 1 16.6 11.25V17h-2.5v-5.6c0-.95-.6-1.65-1.6-1.65H9.5V17z" />
+      <rect x="2" y="2" width="20" height="20" rx="4.5" ry="4.5" fill={INK} className={inkToWhiteInDark} />
+      <path fill={WHITE} className={whiteToInkInDark} d="M7 17V7.25h5.6A4 4 0 0 1 16.6 11.25V17h-2.5v-5.6c0-.95-.6-1.65-1.6-1.65H9.5V17z" />
     </svg>
   );
 }

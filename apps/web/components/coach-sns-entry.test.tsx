@@ -104,6 +104,34 @@ it.each(brandCases)("%s は %s 専用のブランド色グリフ（Globe でな�
   expect(filled(svg, color)).toBe(true);
 });
 
+it.each([
+  ["https://x.com/a", "X"],
+  ["https://www.tiktok.com/@a", "TikTok"],
+  ["https://note.com/a", "note"],
+])("%s のほぼ黒の部分は、ダーク（端末設定・data-theme 固定の両方）のときだけ白にする", async (url) => {
+  await render(url);
+  const { svg } = iconOf(container.querySelector("a"));
+  const ink = Array.from(svg?.querySelectorAll('[fill="#0F172A"]') ?? []);
+  expect(ink.length).toBeGreaterThan(0);
+  for (const el of ink) {
+    const cls = el.getAttribute("class") ?? "";
+    expect(cls).toContain("[:root[data-theme=dark]_&]:fill-[#FFFFFF]");
+    expect(cls).toContain("[@media(prefers-color-scheme:dark)]:[:root:not([data-theme=light])_&]:fill-[#FFFFFF]");
+  }
+  // note の白抜き「n」はダークでは黒にして、白い正方形の上で読めるようにする。
+  for (const el of Array.from(svg?.querySelectorAll('[fill="#FFFFFF"]') ?? [])) {
+    expect(el.getAttribute("class") ?? "").toContain("[:root[data-theme=dark]_&]:fill-[#0F172A]");
+  }
+});
+
+it("ブランド色が背景に沈まないもの（Instagram／YouTube／Facebook／LINE）はダークでも色を変えない", async () => {
+  for (const url of ["https://www.instagram.com/a", "https://www.youtube.com/@a", "https://www.facebook.com/a", "https://line.me/R/ti/p/@a"]) {
+    await render(url);
+    const { svg } = iconOf(container.querySelector("a"));
+    expect(svg?.outerHTML).not.toContain("data-theme");
+  }
+});
+
 it("7プラットフォームのグリフはそれぞれ異なる SVG で、note と LINE は白抜きの字形を持つ", async () => {
   const urls = [
     "https://www.instagram.com/a",
