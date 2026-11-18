@@ -286,6 +286,7 @@ export type Profile = {
   mfa_required?: boolean;
   // いまの版の説明で、海外の事業者に預けることに同意済みなら true。
   overseas_consent?: boolean;
+  documents_consent?: boolean;
   created_at: string;
   updated_at?: string;
 };

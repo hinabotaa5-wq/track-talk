@@ -196,3 +196,47 @@ func TestStorageCleanupWaitsForConcurrentPostBeforeDeleting(t *testing.T) {
 		t.Fatal("media deleted")
 	}
 }
+
+// Only expired histories belonging to deleted accounts are removed, including the no-transaction fallback.
+func TestStorageCleanupDocumentConsents(t *testing.T) {
+	now := time.Date(2035, 11, 19, 0, 0, 0, 0, time.UTC)
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"resources": []any{}})
+	}))
+	defer cloud.Close()
+	h := setupConfig(t, func(c *config.Config) {
+		c.StorageCleanupSecret = "document-cleanup"
+		c.Clock = func() time.Time { return now }
+		c.CloudName = "demo"
+		c.CloudAPIKey = "key"
+		c.CloudAPISecret = "secret"
+		c.CloudAPIBase = cloud.URL
+	})
+	execSQLArgs(t, `DELETE FROM document_consents`)
+	cutoff := now.AddDate(-5, 0, 0)
+	for _, tc := range []struct {
+		deleted     bool
+		consent     time.Time
+		transaction *time.Time
+	}{
+		{false, cutoff.Add(-time.Hour), nil},
+		{true, cutoff.Add(-time.Hour), nil},
+		{true, cutoff, nil},
+		{true, cutoff.Add(time.Hour), nil},
+		{true, cutoff.Add(-time.Hour), &now},
+		{true, now, func() *time.Time { v := cutoff.Add(-time.Hour); return &v }()},
+	} {
+		var deleted *time.Time
+		if tc.deleted {
+			deleted = &now
+		}
+		execSQLArgs(t, `INSERT INTO document_consents(user_id,document,version,consented_at,account_deleted_at,last_transaction_at) VALUES($1,'terms','test',$2,$3,$4)`, uuid.New(), tc.consent, deleted, tc.transaction)
+	}
+	rec := cleanupRequest(h, "document-cleanup")
+	var body struct {
+		Deleted int64 `json:"document_consents_deleted"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != 200 || body.Deleted != 2 {
+		t.Fatalf("cleanup %d %s %v", rec.Code, rec.Body.String(), err)
+	}
+}

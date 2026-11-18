@@ -744,6 +744,16 @@ type DeletedAccount struct {
 	DeletedAt time.Time `json:"deleted_at"`
 }
 
+type DocumentConsent struct {
+	ID                int64      `json:"id"`
+	UserID            uuid.UUID  `json:"user_id"`
+	Document          string     `json:"document"`
+	Version           string     `json:"version"`
+	ConsentedAt       time.Time  `json:"consented_at"`
+	AccountDeletedAt  *time.Time `json:"account_deleted_at"`
+	LastTransactionAt *time.Time `json:"last_transaction_at"`
+}
+
 type DomesticMajor struct {
 	Slug          string    `json:"slug"`
 	Year          int32     `json:"year"`

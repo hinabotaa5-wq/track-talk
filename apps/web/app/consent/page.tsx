@@ -1,4 +1,5 @@
 "use client";
+import { documentConsentVersions } from "@/lib/document-consent";
 import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
@@ -26,7 +27,7 @@ function ConsentForm() {
   useEffect(() => {
     if (loading) return;
     if (!session) router.replace(loginPathFrom(window.location));
-    else if (profile?.overseas_consent) router.replace(next);
+    else if (profile?.overseas_consent && profile?.documents_consent) router.replace(next);
   }, [loading, session, profile, next, router]);
 
   async function onConsent() {
@@ -34,6 +35,7 @@ function ConsentForm() {
     setError("");
     try {
       await apiFetch<void>("/v1/me/consents/overseas", { method: "POST", token });
+      await apiFetch<void>("/v1/me/consents/documents", { method: "POST", token, body: JSON.stringify({ versions: documentConsentVersions }) });
       await refreshProfile();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : L("同意を記録できませんでした。時間をおいてもう一度お試しください。"));
