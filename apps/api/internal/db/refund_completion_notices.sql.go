@@ -119,8 +119,8 @@ func (q *Queries) EnqueueReviewRefundNotice(ctx context.Context, arg EnqueueRevi
 }
 
 const insertRefundCompletionBell = `-- name: InsertRefundCompletionBell :execrows
-INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-VALUES ($1, $2, 'message', $3, $4, $5)
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, coaching_role)
+VALUES ($1, $2, 'message', $3, $4, $5, 'player')
 ON CONFLICT (id) DO NOTHING
 `
 

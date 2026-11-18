@@ -17,8 +17,8 @@ SELECT nominal_yen, share_percent FROM coaching_ticket_reservations WHERE reques
 
 -- name: InsertWorkOrderNotification :exec
 -- 取引条件を届けるお知らせ。法律上の明示にあたるので、本人の通知の設定に関わらず、まとめずに必ず1件入れる。
-INSERT INTO notifications (id, recipient_id, kind, title, body, url)
-VALUES ($1, $2, 'message', $3, $4, $5);
+INSERT INTO notifications (id, recipient_id, kind, title, body, url, coaching_role)
+VALUES ($1, $2, 'message', $3, $4, $5, 'coach');
 
 -- name: CreateWorkOrderDelivery :one
 -- 届けた記録(宛先・日時・送った文面)。同じ通知を2回届けない。

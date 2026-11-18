@@ -56,8 +56,8 @@ func coachingNotifications(t *testing.T, h http.Handler, tok string) []noteItem 
 func circleNotice(t *testing.T, to uuid.UUID, kind, role, url string, request *uuid.UUID) uuid.UUID {
 	t.Helper()
 	id := uuid.New()
-	actionSeed(t, `INSERT INTO notifications(id, recipient_id, kind, coaching_role, url, review_request_id, title)
-		VALUES($1,$2,$3,NULLIF($4,''),NULLIF($5,''),$6,'notice')`, id, to, kind, role, url, request)
+	actionSeed(t, `INSERT INTO notifications(id, recipient_id, kind, coaching_role, url, review_request_id, title, body, post_id)
+		VALUES($1,$2,$3,NULLIF($4,''),NULLIF($5,''),$6,'notice','',CASE WHEN $6::uuid IS NULL AND $3 <> 'message' THEN gen_random_uuid() END)`, id, to, kind, role, url, request)
 	return id
 }
 
@@ -155,6 +155,8 @@ func TestCircleActionNotificationDeduplication(t *testing.T) {
 func TestCircleContractAndScreenReads(t *testing.T) {
 	h := setup(t)
 	coach, tc := approvedCoachWithServices(t, h, nil)
+	// Start from an acknowledged application result, before isolating contract chat notices.
+	circleGet(t, h, tc, "/v1/coach/me")
 	player := uuid.New()
 	tu := token(t, player)
 	circleGet(t, h, tu, "/v1/me")
@@ -274,7 +276,7 @@ func TestCircleMigrationBackfillAndDown(t *testing.T) {
 			a := uuid.New()
 			ann = &a
 		}
-		exec(`INSERT INTO notifications(id,recipient_id,kind,url,title,announcement_id) VALUES($1,$2,$3,$4,$5,$6)`, n, tc.to, tc.kind, tc.url, tc.title, ann)
+		exec(`INSERT INTO notifications(id,recipient_id,kind,url,title,announcement_id,body,review_request_id) VALUES($1,$2,$3,$4,$5,$6,'',CASE WHEN $3 <> 'message' THEN gen_random_uuid() END)`, n, tc.to, tc.kind, tc.url, tc.title, ann)
 		// Remember the expected role independently of the migration's SQL.
 		exec(`CREATE TEMP TABLE IF NOT EXISTS expected_roles(id uuid PRIMARY KEY, role text) ON COMMIT DROP`)
 		exec(`INSERT INTO expected_roles VALUES($1,$2)`, n, tc.role)

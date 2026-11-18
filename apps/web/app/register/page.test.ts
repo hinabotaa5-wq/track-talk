@@ -111,7 +111,14 @@ describe("RegisterPage", () => {
 
       await vi.waitFor(() => expect(router.push).toHaveBeenCalled());
       expect(signUp).toHaveBeenCalledTimes(1);
-      expect(signUp.mock.calls[0][0].options.data).toEqual({ overseas_consent_version: "overseas-2026-10" });
+      expect(signUp.mock.calls[0][0].options.data).toEqual({
+        overseas_consent_version: "overseas-2026-10",
+        document_consent_versions: {
+          terms: "terms-2026-11-18",
+          guidelines: "guidelines-2026-11-15",
+          privacy: "privacy-2026-11-18",
+        },
+      });
       expect(router.push).toHaveBeenCalledWith("/register/sent");
       expect(sessionStorage.getItem("tracktalk-signup-sent-email")).toBe("runner@example.com");
     } finally {

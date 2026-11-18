@@ -47,7 +47,7 @@ async function mockApis(page: Page, { signDelayMs = 0, processingPolls = -1 } = 
       if (route.request().method() === "POST") posted.push(route.request().postDataJSON());
       return route.fulfill({ json: { id: "p1" } });
     }
-    if (path.endsWith("/me")) return route.fulfill({ json: { id: userID, nickname: "テスト選手", event: "100m", mfa_required: false, overseas_consent: true } });
+    if (path.endsWith("/me")) return route.fulfill({ json: { id: userID, nickname: "テスト選手", event: "100m", mfa_required: false, overseas_consent: true, documents_consent: true } });
     return route.fulfill({ json: { notifications: [], unread: 0 } });
   });
   await page.route("https://api.cloudinary.com/**", async (route) => {
