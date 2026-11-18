@@ -302,6 +302,7 @@ it("依頼動画→相談文は左・白系で、自分の返答は右・青で�
   expect(video.playsInline).toBe(true);
   expect(video.getAttribute("poster")).toBe("https://example.com/run.jpg");
   expect(video.classList).toContain("max-w-[260px]");
+  expect(video.classList).toContain("max-h-[300px]");
   expect(video.closest("div.flex")?.classList).toContain("justify-start");
   expect(video.parentElement?.classList).toContain("bg-white/10");
   expect(video.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

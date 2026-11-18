@@ -374,7 +374,7 @@ function ReviewRequestView() {
               controls
               playsInline
               preload="metadata"
-              className="w-full max-w-[260px] rounded-xl bg-black"
+              className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
             />
           </div>
         </div>
