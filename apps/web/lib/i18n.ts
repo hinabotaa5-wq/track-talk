@@ -180,7 +180,6 @@ const ja = {
   "coach.detail.sendResponse": "返答を送る",
   "coach.detail.responseSent": "返答を送りました",
   "coach.detail.infoSent": "差し戻しました",
-  "coach.detail.toCoach": "コーチ画面へ",
 } as const;
 
 export type I18nKey = keyof typeof ja;
@@ -333,7 +332,6 @@ const en: Record<I18nKey, string> = {
   "coach.detail.sendResponse": "Send response",
   "coach.detail.responseSent": "Response sent",
   "coach.detail.infoSent": "Sent back for clarification",
-  "coach.detail.toCoach": "Back to Coach",
 };
 
 // 文言を取る。英語にないキーは日本語を返す。{name} は vars で置き換える。

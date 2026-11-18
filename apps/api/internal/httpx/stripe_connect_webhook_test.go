@@ -1,9 +1,12 @@
 package httpx_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -164,5 +167,94 @@ func TestStripeConnectWebhookRequiresBothKeys(t *testing.T) {
 				t.Fatalf("missing key %d", rec.Code)
 			}
 		})
+	}
+}
+
+func TestStripeWebhookRefundSynchronizationByOrigin(t *testing.T) {
+	for _, tc := range []struct {
+		name, key, eventType string
+		syncRefund           bool
+	}{
+		{"connect-refund-updated", testConnectWebhookSecret, "refund.updated", false},
+		{"connect-charge-refunded", testConnectWebhookSecret, "charge.refunded", false},
+		{"connect-refund-created", testConnectWebhookSecret, "refund.created", false},
+		{"connect-refund-failed", testConnectWebhookSecret, "refund.failed", false},
+		{"platform-refund-updated", testWebhookSecret, "refund.updated", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x := newCapturedFixture(t)
+			refundID := "re_" + uuid.NewString()
+			object := map[string]any{
+				"id": refundID, "currency": "jpy", "payment_intent": x.intent,
+				"amount": 1500, "status": "succeeded",
+			}
+			if tc.eventType == "charge.refunded" {
+				object = map[string]any{
+					"id": "ch_" + uuid.NewString(), "currency": "jpy",
+					"payment_intent": x.intent, "amount_refunded": 1500,
+					"refunds": map[string]any{"data": []map[string]any{
+						{"id": refundID, "amount": 1500, "status": "succeeded"},
+					}},
+				}
+			} else if tc.eventType == "refund.failed" {
+				object["status"] = "failed"
+			}
+
+			var logs bytes.Buffer
+			previousLogger := slog.Default()
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(previousLogger) })
+			rec := stripeWebhook(t, x.h, tc.key, tc.eventType, object)
+			var received struct {
+				Received bool `json:"received"`
+			}
+			if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &received) != nil || !received.Received {
+				t.Fatalf("receipt %d %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(logs.String(), `"msg":"unknown stripe refund"`) ||
+				!strings.Contains(logs.String(), refundID) {
+				t.Fatalf("missing refund alert: %s", logs.String())
+			}
+			wantStatus, wantRefunds := "captured", 0
+			if tc.syncRefund {
+				wantStatus, wantRefunds = "refunded", 1
+			}
+			if got := reviewPaymentStatus(t, x.request); got != wantStatus {
+				t.Fatalf("payment status %s, want %s", got, wantStatus)
+			}
+			if got := scalar(t, `SELECT count(*) FROM captured_payment_refunds WHERE payment_id=$1 AND status='succeeded'`, x.payment); got != wantRefunds {
+				t.Fatalf("successful refunds %d, want %d", got, wantRefunds)
+			}
+			if !tc.syncRefund && scalar(t, `SELECT count(*) FROM captured_payment_refunds WHERE payment_id=$1`, x.payment) != 0 {
+				t.Fatal("Connect notification created a refund record")
+			}
+		})
+	}
+}
+
+func TestStripeWebhookConnectAccountAndUnsupportedEvents(t *testing.T) {
+	h, f := setupStripe(t)
+	id := uuid.New()
+	tok := token(t, id)
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", tok, coachApplicationBody()); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d", rec.Code)
+	}
+	account := "acct_" + id.String()
+	execSQLArgs(t, `UPDATE coach_profiles SET stripe_account_id=$2,payouts_enabled=false WHERE profile_id=$1`, id, account)
+	f.setEnabled(account, true)
+	rec := stripeWebhook(t, h, testConnectWebhookSecret, "account.updated", map[string]any{"id": account, "payouts_enabled": false})
+	var enabled bool
+	queryRowArgs(t, `SELECT payouts_enabled FROM coach_profiles WHERE profile_id=$1`, []any{id}, &enabled)
+	if rec.Code != http.StatusOK || !enabled {
+		t.Fatalf("account sync %d, payouts enabled %v", rec.Code, enabled)
+	}
+	for _, eventType := range []string{"checkout.session.completed", "checkout.session.async_payment_succeeded", "charge.dispute.created"} {
+		rec := stripeWebhook(t, h, testConnectWebhookSecret, eventType, map[string]any{})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "unsupported_event") {
+			t.Fatalf("unsupported %s: %d %s", eventType, rec.Code, rec.Body.String())
+		}
+	}
+	if len(f.sessions) != 0 || len(f.transfers) != 0 || len(f.refunds) != 0 {
+		t.Fatal("Connect notification performed payment operations")
 	}
 }
