@@ -81,7 +81,7 @@ it("英語でも初回読み込み中はストップウォッチだけで、バ�
   setActiveLocale("en");
   await render();
   expect(stopwatches()).toHaveLength(1);
-  expect(container.textContent).not.toContain("Refer two people and get one free review (¥500)!");
+  expect(container.textContent).not.toContain("Refer 2 people, get 1 free (¥500)!");
   expect(container.textContent).not.toContain("Refer two friends and get a free review!");
   expect(container.textContent).not.toContain("One-time Plan");
   expect(container.textContent).not.toContain("Ongoing plan");
