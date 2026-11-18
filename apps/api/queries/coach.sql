@@ -44,6 +44,7 @@ SELECT
     c.photo_public_id,
     (c.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
     c.payouts_enabled,
+    c.country_code,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
@@ -128,6 +129,9 @@ SELECT
     c.sns_urls,
     c.hitokoto,
     c.service_types,
+    -- 1回プランの受付状態と、国旗に使う国（本体 #932）。
+    c.on_duty,
+    c.country_code,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
@@ -150,6 +154,14 @@ CROSS JOIN LATERAL (
 WHERE c.status = 'approved'
   AND (sqlc.narg(profile_id)::uuid IS NULL OR c.profile_id = sqlc.narg(profile_id))
 ORDER BY c.tier, c.reviewed_at, c.profile_id;
+
+-- name: SetCoachCountry :one
+-- 運営がコーチの国を設定する（本体 #932）。状態は問わない。コーチ本人には変更手段を作らない。
+UPDATE coach_profiles
+SET country_code = sqlc.arg(country_code)::text,
+    updated_at = now()
+WHERE profile_id = sqlc.arg(profile_id)
+RETURNING *;
 
 -- name: SetCoachPhoto :one
 -- 顔写真を差し替える。前の写真の ID を返すので、Cloudinary から消す。

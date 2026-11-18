@@ -61,7 +61,7 @@ it("コーチタブでは評価の平均・件数・停止表示と「順番に�
     applied_at: "2026-11-01T00:00:00Z", reviewed_at: null, on_duty: true, daily_cap: 5,
     photo_url: "", pledged: true, payouts_ready: true,
     stripe_linked: true, payouts_enabled: true,
-    rating_count: 8, rating_average: 2.1, rating_paused: true,
+    rating_count: 8, rating_average: 2.1, rating_paused: true, country_code: "JP",
   };
   mocks.api.mockImplementation((path: string) =>
     Promise.resolve(
@@ -110,4 +110,65 @@ it("隠れていたタブは開いたときに読む", async () => {
   });
   await act(async () => {});
   expect(calledPaths().filter((p) => p.includes("source=feedback"))).not.toEqual([]);
+});
+
+// 本体 #932 B5: コーチタブの各行に今の国（コードと国旗）を出し、運営が国を設定できる。
+it("コーチタブで国を表示し、「国を設定」で API を呼んで行の表示を更新する", async () => {
+  const coach = (id: string, name: string) => ({
+    profile_id: id, status: "approved", nickname: name,
+    service_types: ["video_review"], tier: "coach", events: ["100m"],
+    best_record: "", achievements: "", years: 3, sns_urls: [], hitokoto: "",
+    applied_at: "2026-11-01T00:00:00Z", reviewed_at: null, on_duty: true, daily_cap: 5,
+    photo_url: "", pledged: true, payouts_ready: true,
+    stripe_linked: true, payouts_enabled: true,
+    rating_count: 0, rating_average: 0, rating_paused: false, country_code: "JP",
+  });
+  mocks.api.mockImplementation((path: string, init?: { method?: string; body?: string }) => {
+    if (path === "/v1/admin/coaching/coaches/coach-1/country" && init?.method === "POST") {
+      const code = (JSON.parse(init.body ?? "{}") as { country_code: string }).country_code.trim().toUpperCase();
+      return Promise.resolve({ application: { ...coach("coach-1", "国を変えるコーチ"), country_code: code } });
+    }
+    return Promise.resolve(
+      path.startsWith("/v1/admin/coach-applications")
+        ? { applications: path.includes("status=approved") ? [coach("coach-1", "国を変えるコーチ"), coach("coach-2", "そのままのコーチ")] : [], meta: { page: 1, per_page: 50, total: 2 } }
+        : path.startsWith("/v1/admin/reports") ? emptyList("reports") : emptyList("inquiries"),
+    );
+  });
+  await act(async () => {
+    root.render(<ConfirmProvider><Page /></ConfirmProvider>);
+  });
+  await act(async () => {});
+  // 他のタブ（初期の通報タブ）には国の欄を出さない。
+  expect(container.querySelector('[aria-label="国コード"]')).toBeNull();
+  const coachTab = Array.from(container.querySelectorAll('[role="tab"]')).find((b) => b.textContent === "コーチ")!;
+  await act(async () => {
+    coachTab.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await act(async () => {});
+  const approvedFilter = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("承認済み"))!;
+  await act(async () => {
+    approvedFilter.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await act(async () => {});
+
+  const rows = () => Array.from(container.querySelectorAll("li")).filter((li) => li.querySelector('[data-testid="coach-country"]'));
+  expect(rows().map((li) => li.querySelector('[data-testid="coach-country"]')?.textContent)).toEqual(["国: JP 🇯🇵", "国: JP 🇯🇵"]);
+  const input = rows()[0].querySelector<HTMLInputElement>('[aria-label="国コード"]')!;
+  expect(input.value).toBe("JP");
+
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "US");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const submit = Array.from(rows()[0].querySelectorAll("button")).find((b) => b.textContent === "国を設定")!;
+  await act(async () => {
+    submit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await act(async () => {});
+
+  const call = mocks.api.mock.calls.find((c) => c[0] === "/v1/admin/coaching/coaches/coach-1/country");
+  expect(call?.[1]).toMatchObject({ method: "POST", token: "admin-token" });
+  expect(JSON.parse(String((call?.[1] as { body: string }).body))).toEqual({ country_code: "US" });
+  expect(rows().map((li) => li.querySelector('[data-testid="coach-country"]')?.textContent)).toEqual(["国: US 🇺🇸", "国: JP 🇯🇵"]);
+  expect(container.textContent).toContain("国を設定しました");
 });

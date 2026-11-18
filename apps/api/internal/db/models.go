@@ -148,6 +148,7 @@ type CoachProfile struct {
 	SnsUrls         []string   `json:"sns_urls"`
 	Name            string     `json:"name"`
 	Hitokoto        string     `json:"hitokoto"`
+	CountryCode     string     `json:"country_code"`
 }
 
 type CoachProfileTranslation struct {

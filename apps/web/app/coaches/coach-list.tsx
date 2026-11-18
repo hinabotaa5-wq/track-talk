@@ -9,7 +9,7 @@ import { apiFetch } from "@/lib/api";
 import { rememberCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { formatYen } from "@/lib/format";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import { coachDisplayText } from "@/lib/coach-display";
+import { coachDisplayText, countryFlagEmoji } from "@/lib/coach-display";
 import type { PublicCoach } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -62,15 +62,19 @@ export function CoachList({ onSettled }: { onSettled?: () => void }) {
           {shown.map((c) => {
             const price = coachPrice(c);
             const displayName = coachDisplayText(c.nickname, c.nickname_en);
-            const displayHitokoto = coachDisplayText(c.hitokoto, c.hitokoto_en);
+            const flag = countryFlagEmoji(c.country_code);
             return (
             <li id={`coach-${c.id}`} key={c.id} className="min-w-0">
               <Link href={`/coaches/${encodeURIComponent(c.id)}`} onNavigate={() => rememberCoachDetailPreview(c, result.fetchedAt)} className="app-card flex h-full flex-col items-center gap-3 border border-transparent p-4 text-center text-sm transition-all hover:border-blue-400/50 hover:shadow-md focus-visible:outline-2 focus-visible:outline-blue-400">
                 <CoachAvatar url={c.photo_url} name={displayName} size={80} />
                 <div className="w-full min-w-0 space-y-1 break-words">
-                  <p className="font-bold text-white">{displayName ?? L("名前なし")}</p>
+                  <p className="font-bold text-white">
+                    {flag ? <span aria-hidden="true" data-testid="coach-flag">{flag} </span> : null}
+                    {displayName ?? L("名前なし")}
+                  </p>
                   <p className="text-xs text-slate-200">{c.events.map((e) => coachEventLabels[e]).join(L("、"))}</p>
-                  {displayHitokoto ? <p className="truncate text-xs text-slate-200">{displayHitokoto}</p> : null}
+                  {/* 1回プランの受付状態（本体 #932）。受付停止中も一覧から外さず、表示だけで区別する。 */}
+                  <p className={`text-xs font-bold ${c.on_duty ? "text-blue-400" : "text-red-400"}`}>{c.on_duty ? L("受付中") : L("受付停止中")}</p>
                   {price ? <p className="font-semibold text-blue-300">{price}</p> : null}
                 </div>
               </Link>

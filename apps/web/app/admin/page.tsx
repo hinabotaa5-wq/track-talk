@@ -18,6 +18,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { fetchAllPages } from "@/lib/paging";
 import { formatDateTime } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { countryFlagEmoji } from "@/lib/coach-display";
 import { coachingEnabled } from "@/lib/features";
 import { payoutAccountStatus, payoutAccountStatusLabels } from "@/lib/payout-account-status";
 import { productKindLabels } from "@/lib/product";
@@ -473,6 +474,21 @@ function CoachesAdmin({ token }: { token: string | null }) {
     }
   }
 
+  // コーチの国を設定する（本体 #932）。国は運営だけが設定し、一覧の名前の前の国旗に使う。
+  async function setCountry(a: AdminCoachApplication, code: string) {
+    try {
+      const d = await apiFetch<{ application: { country_code: string } }>(`/v1/admin/coaching/coaches/${a.profile_id}/country`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ country_code: code }),
+      });
+      setItems((current) => current.map((x) => (x.profile_id === a.profile_id ? { ...x, country_code: d.application.country_code } : x)));
+      setMessage("国を設定しました");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "国を設定できませんでした");
+    }
+  }
+
   return (
     <div className="space-y-3">
       <DemoCodesAdmin token={token} />
@@ -520,6 +536,7 @@ function CoachesAdmin({ token }: { token: string | null }) {
             {a.hitokoto ? (
               <p className="whitespace-pre-wrap">ひとこと: {a.hitokoto}</p>
             ) : null}
+            <CoachCountryForm key={a.country_code} application={a} onSubmit={(code) => setCountry(a, code)} />
             {a.status === "approved" ? (
               <p className="text-xs text-slate-200">
                 受け取り口座: {payoutAccountStatusLabels[payoutAccountStatus(a)]}
@@ -558,6 +575,38 @@ function CoachesAdmin({ token }: { token: string | null }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+// コーチの国の表示と設定欄（本体 #932）。「コーチ」タブの応募行だけに出す。
+function CoachCountryForm({ application, onSubmit }: { application: AdminCoachApplication; onSubmit: (code: string) => Promise<void> }) {
+  const [code, setCode] = useState(application.country_code ?? "");
+  const [busy, setBusy] = useState(false);
+  const flag = countryFlagEmoji(application.country_code);
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setBusy(true);
+        void onSubmit(code).finally(() => setBusy(false));
+      }}
+    >
+      <span data-testid="coach-country">
+        国: {application.country_code}
+        {flag ? ` ${flag}` : ""}
+      </span>
+      <input
+        aria-label="国コード"
+        value={code}
+        maxLength={2}
+        onChange={(e) => setCode(e.target.value)}
+        className="w-14 rounded-md border border-white/25 bg-white/10 px-2 py-1 text-sm uppercase"
+      />
+      <button type="submit" disabled={busy} className="text-sm text-blue-300 underline disabled:opacity-50">
+        国を設定
+      </button>
+    </form>
   );
 }
 

@@ -27,7 +27,7 @@ const coach: PublicCoach = {
   best_record: "10秒00", achievements: "全国大会優勝\n県記録保持者", years: 10,
   sns_urls: ["https://www.instagram.com/testcoach/?utm_source=qr", "note-test"],
   hitokoto: "よろしくお願いします", rating_count: 0, rating_average: 0,
-  service_types: ["video_review"], plans: [], support_consult: null,
+  service_types: ["video_review"], plans: [], support_consult: null, on_duty: true, country_code: "JP",
 };
 
 let container: HTMLDivElement;

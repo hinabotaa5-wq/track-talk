@@ -106,7 +106,7 @@ SET status = 'ended',
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'suspended'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 // 運営が止めていたコーチを、戻さないまま登録を終えた状態にする。止めている間に留保していた報酬は消さず、
@@ -139,12 +139,13 @@ func (q *Queries) EndSuspendedCoach(ctx context.Context, profileID uuid.UUID) (C
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
 
 const getCoachProfile = `-- name: GetCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code FROM coach_profiles
 WHERE profile_id = $1
 `
 
@@ -176,6 +177,7 @@ func (q *Queries) GetCoachProfile(ctx context.Context, profileID uuid.UUID) (Coa
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -238,6 +240,7 @@ SELECT
     c.photo_public_id,
     (c.stripe_account_id IS NOT NULL)::boolean AS stripe_linked,
     c.payouts_enabled,
+    c.country_code,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
@@ -277,6 +280,7 @@ type ListCoachApplicationsRow struct {
 	PhotoPublicID  *string    `json:"photo_public_id"`
 	StripeLinked   bool       `json:"stripe_linked"`
 	PayoutsEnabled bool       `json:"payouts_enabled"`
+	CountryCode    string     `json:"country_code"`
 	RatingCount    int32      `json:"rating_count"`
 	RatingAverage  float64    `json:"rating_average"`
 }
@@ -306,6 +310,7 @@ func (q *Queries) ListCoachApplications(ctx context.Context, arg ListCoachApplic
 			&i.PhotoPublicID,
 			&i.StripeLinked,
 			&i.PayoutsEnabled,
+			&i.CountryCode,
 			&i.RatingCount,
 			&i.RatingAverage,
 		); err != nil {
@@ -366,6 +371,9 @@ SELECT
     c.sns_urls,
     c.hitokoto,
     c.service_types,
+    -- 1回プランの受付状態と、国旗に使う国（本体 #932）。
+    c.on_duty,
+    c.country_code,
     r.rating_count,
     r.rating_average
 FROM coach_profiles c
@@ -402,6 +410,8 @@ type ListPublicCoachesRow struct {
 	SnsUrls       []string  `json:"sns_urls"`
 	Hitokoto      string    `json:"hitokoto"`
 	ServiceTypes  []string  `json:"service_types"`
+	OnDuty        bool      `json:"on_duty"`
+	CountryCode   string    `json:"country_code"`
 	RatingCount   int32     `json:"rating_count"`
 	RatingAverage float64   `json:"rating_average"`
 }
@@ -428,6 +438,8 @@ func (q *Queries) ListPublicCoaches(ctx context.Context, profileID *uuid.UUID) (
 			&i.SnsUrls,
 			&i.Hitokoto,
 			&i.ServiceTypes,
+			&i.OnDuty,
+			&i.CountryCode,
 			&i.RatingCount,
 			&i.RatingAverage,
 		); err != nil {
@@ -442,7 +454,7 @@ func (q *Queries) ListPublicCoaches(ctx context.Context, profileID *uuid.UUID) (
 }
 
 const lockCoachProfile = `-- name: LockCoachProfile :one
-SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto FROM coach_profiles
+SELECT profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code FROM coach_profiles
 WHERE profile_id = $1
 FOR UPDATE
 `
@@ -475,6 +487,7 @@ func (q *Queries) LockCoachProfile(ctx context.Context, profileID uuid.UUID) (Co
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -517,7 +530,7 @@ SET rating_reset_at = now(),
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 // 評価で順番から外れたコーチを戻す。これより前の★は数えなくなる。
@@ -549,6 +562,7 @@ func (q *Queries) ResetCoachRating(ctx context.Context, profileID uuid.UUID) (Co
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -559,7 +573,7 @@ SET status = 'approved',
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'suspended'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 // 運営が止めたコーチを承認済みに戻す。受付はコーチが自分で入れ直す。
@@ -591,6 +605,7 @@ func (q *Queries) ResumeCoach(ctx context.Context, profileID uuid.UUID) (CoachPr
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -603,7 +618,7 @@ SET status = $1,
 WHERE profile_id = $2
   AND status = 'pending'
   AND ($1::text <> 'approved' OR photo_public_id IS NOT NULL)
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 type ReviewCoachApplicationParams struct {
@@ -640,6 +655,54 @@ func (q *Queries) ReviewCoachApplication(ctx context.Context, arg ReviewCoachApp
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
+	)
+	return i, err
+}
+
+const setCoachCountry = `-- name: SetCoachCountry :one
+UPDATE coach_profiles
+SET country_code = $1::text,
+    updated_at = now()
+WHERE profile_id = $2
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
+`
+
+type SetCoachCountryParams struct {
+	CountryCode string    `json:"country_code"`
+	ProfileID   uuid.UUID `json:"profile_id"`
+}
+
+// 運営がコーチの国を設定する（本体 #932）。状態は問わない。コーチ本人には変更手段を作らない。
+func (q *Queries) SetCoachCountry(ctx context.Context, arg SetCoachCountryParams) (CoachProfile, error) {
+	row := q.db.QueryRow(ctx, setCoachCountry, arg.CountryCode, arg.ProfileID)
+	var i CoachProfile
+	err := row.Scan(
+		&i.ProfileID,
+		&i.Tier,
+		&i.Events,
+		&i.BestRecord,
+		&i.Achievements,
+		&i.Years,
+		&i.Status,
+		&i.AppliedAt,
+		&i.ReviewedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OnDuty,
+		&i.DailyCap,
+		&i.LastOfferedAt,
+		&i.RatingResetAt,
+		&i.PhotoPublicID,
+		&i.PledgedAt,
+		&i.PledgeVersion,
+		&i.StripeAccountID,
+		&i.PayoutsEnabled,
+		&i.ServiceTypes,
+		&i.SnsUrls,
+		&i.Name,
+		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -684,7 +747,7 @@ SET tier = EXCLUDED.tier,
     reviewed_at = NULL,
     updated_at = now()
 WHERE coach_profiles.status IN ('pending', 'rejected', 'withdrawn')
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 type SubmitCoachApplicationParams struct {
@@ -739,6 +802,7 @@ func (q *Queries) SubmitCoachApplication(ctx context.Context, arg SubmitCoachApp
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -750,7 +814,7 @@ SET status = 'suspended',
     updated_at = now()
 WHERE profile_id = $1
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 // 運営が承認済みのコーチを止める。受付も止める。コーチの機能は毎回 status を見るので、次の操作から使えなくなる。
@@ -782,6 +846,7 @@ func (q *Queries) SuspendCoach(ctx context.Context, profileID uuid.UUID) (CoachP
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -797,7 +862,7 @@ SET name = COALESCE(NULLIF($1::text, ''), name),
     updated_at = now()
 WHERE profile_id = $7
   AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 type UpdateCoachProfileParams struct {
@@ -848,6 +913,7 @@ func (q *Queries) UpdateCoachProfile(ctx context.Context, arg UpdateCoachProfile
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -856,7 +922,7 @@ const updateCoachServices = `-- name: UpdateCoachServices :one
 UPDATE coach_profiles
 SET service_types = $1::text[], updated_at = now()
 WHERE profile_id = $2 AND status = 'approved'
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 type UpdateCoachServicesParams struct {
@@ -892,6 +958,7 @@ func (q *Queries) UpdateCoachServices(ctx context.Context, arg UpdateCoachServic
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }

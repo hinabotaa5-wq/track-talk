@@ -22,6 +22,7 @@ vi.mock("@/components/coaching-plans", () => ({ PublicPlanList: ({ plans }: { pl
 const coach: PublicCoach = {
   id: "coach-1", nickname: "テストコーチ", photo_url: "", tier: "coach", events: ["100m"],
   best_record: "10秒台", achievements: "全国大会出場", years: 10, sns_urls: ["https://www.instagram.com/testcoach/", "@tracktalk.office", "javascript:alert(1)"], hitokoto: "よろしくお願いします", rating_count: 0, rating_average: 0,
+  on_duty: true, country_code: "JP",
   service_types: ["video_review"],
   plans: [{ id: "plan-1", title: "公開中の動画添削", kind: "single", description: "説明", duration_days: 7,
     price_yen: 2000, capacity: 3, published: true, service_type: "video_review",
@@ -45,7 +46,8 @@ it("一覧は2列で各コーチの詳細ページへリンクし、プランは
   expect(container.querySelector("ul")?.classList.contains("grid-cols-2")).toBe(true);
   expect([...container.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual(["/coaches/coach-1", "/coaches/coach-2"]);
   expect(container.textContent).not.toContain("公開中の動画添削");
-  expect(container.textContent).toContain("よろしくお願いします");
+  // 一覧カードにはひとことを出さない（本体 #932）。詳細では出す（下のテスト）。
+  expect(container.textContent).not.toContain("よろしくお願いします");
 });
 
 it("詳細URLを直接開いても対象コーチのプロフィールと公開プランを取得する", async () => {
@@ -200,4 +202,67 @@ it("一覧の公開ゲートで取得に失敗すると、プレビューを取�
   await act(async () => root.render(<CoachDetailPage />));
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("コーチの詳細を読み込めませんでした");
   expect(container.querySelector("h1")).toBeNull();
+});
+
+// 本体 #932 B1: 受付 ON は「受付中」、OFF は「受付停止中」。OFF のコーチも一覧に残り、並びは API の順のまま。
+it("受付状態のバッジを出し、受付停止中のコーチも API の順のまま一覧に残す", async () => {
+  apiFetch.mockResolvedValue({ coaches: [
+    { ...coach, id: "coach-off", nickname: "停止中のコーチ", on_duty: false },
+    { ...coach, id: "coach-on", nickname: "受付中のコーチ", on_duty: true },
+  ] });
+  await act(async () => root.render(<CoachList />));
+  const cards = [...container.querySelectorAll("li")];
+  expect(cards.map((li) => li.id)).toEqual(["coach-coach-off", "coach-coach-on"]);
+  expect(cards[0].textContent).toContain("受付停止中");
+  expect(cards[1].textContent).toContain("受付中");
+  expect(cards[1].textContent).not.toContain("受付停止中");
+  const badge = (li: Element, text: string) => [...li.querySelectorAll("p")].find((p) => p.textContent === text);
+  expect(badge(cards[0], "受付停止中")?.className).toMatch(/text-red-\d+/);
+  expect(badge(cards[0], "受付停止中")?.className).toContain("font-bold");
+  expect(badge(cards[1], "受付中")?.className).toMatch(/text-blue-\d+/);
+  expect(badge(cards[1], "受付中")?.className).toContain("font-bold");
+  // バッジは表示だけで、リンク先は変えない。
+  expect([...container.querySelectorAll("a")].map((a) => a.getAttribute("href"))).toEqual(["/coaches/coach-off", "/coaches/coach-on"]);
+});
+
+// 本体 #932 B2: ひとことが入っていても一覧には出さず、詳細では出す。
+it("一覧カードにひとことを出さず、詳細では出す", async () => {
+  apiFetch.mockResolvedValue({ coaches: [{ ...coach, hitokoto: "一覧には出ないひとこと" }] });
+  await act(async () => root.render(<CoachList />));
+  expect(container.textContent).not.toContain("一覧には出ないひとこと");
+  await act(async () => root.unmount()); root = createRoot(container);
+  apiFetch.mockResolvedValue({ ...coach, hitokoto: "一覧には出ないひとこと" });
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.textContent).toContain("一覧には出ないひとこと");
+});
+
+// 本体 #932 B3: 名前の前に国旗。不正なコードでは国旗も余分な空白も出さない。
+it("名前の前に国旗を出し、不正なコードでは名前だけを出す", async () => {
+  apiFetch.mockResolvedValue({ coaches: [
+    { ...coach, id: "jp", nickname: "日本のコーチ", country_code: "JP" },
+    { ...coach, id: "us", nickname: "米国のコーチ", country_code: "US" },
+    { ...coach, id: "empty", nickname: "空のコーチ", country_code: "" },
+    { ...coach, id: "three", nickname: "三字のコーチ", country_code: "USA" },
+  ] });
+  await act(async () => root.render(<CoachList />));
+  const names = [...container.querySelectorAll("li p.font-bold.text-white")].map((p) => p.textContent);
+  expect(names).toEqual(["🇯🇵 日本のコーチ", "🇺🇸 米国のコーチ", "空のコーチ", "三字のコーチ"]);
+});
+
+// 本体 #932 B4: 英語表示ではバッジが既存の英訳になり、国旗はそのまま出る。
+it("英語表示では Accepting／Paused を出し、国旗はそのまま", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockResolvedValue({ coaches: [
+    { ...coach, id: "on", country_code: "US", on_duty: true },
+    { ...coach, id: "off", country_code: "JP", on_duty: false },
+  ] });
+  await act(async () => root.render(<CoachList />));
+  const cards = [...container.querySelectorAll("li")];
+  expect(cards[0].textContent).toContain("Accepting");
+  expect(cards[0].textContent).toContain("🇺🇸");
+  expect(cards[1].textContent).toContain("Paused");
+  expect(cards[1].textContent).toContain("🇯🇵");
+  expect(container.textContent).not.toContain("受付中");
+  expect(container.textContent).not.toContain("受付停止中");
 });

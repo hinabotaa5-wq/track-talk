@@ -581,7 +581,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 type SetCoachPayoutsEnabledParams struct {
@@ -617,6 +617,7 @@ func (q *Queries) SetCoachPayoutsEnabled(ctx context.Context, arg SetCoachPayout
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -626,7 +627,7 @@ UPDATE coach_profiles
 SET payouts_enabled = $1,
     updated_at = now()
 WHERE stripe_account_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 type SetCoachPayoutsEnabledByAccountParams struct {
@@ -663,6 +664,7 @@ func (q *Queries) SetCoachPayoutsEnabledByAccount(ctx context.Context, arg SetCo
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
@@ -672,7 +674,7 @@ UPDATE coach_profiles
 SET stripe_account_id = COALESCE(stripe_account_id, $1),
     updated_at = now()
 WHERE profile_id = $2
-RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto
+RETURNING profile_id, tier, events, best_record, achievements, years, status, applied_at, reviewed_at, created_at, updated_at, on_duty, daily_cap, last_offered_at, rating_reset_at, photo_public_id, pledged_at, pledge_version, stripe_account_id, payouts_enabled, service_types, sns_urls, name, hitokoto, country_code
 `
 
 type SetCoachStripeAccountParams struct {
@@ -709,6 +711,7 @@ func (q *Queries) SetCoachStripeAccount(ctx context.Context, arg SetCoachStripeA
 		&i.SnsUrls,
 		&i.Name,
 		&i.Hitokoto,
+		&i.CountryCode,
 	)
 	return i, err
 }
