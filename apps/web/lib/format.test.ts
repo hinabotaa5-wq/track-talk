@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { fromJstInput, toJstInput, todayInTokyo } from "./format";
+import { formatChatDateTime, formatDateTime, fromJstInput, toJstInput, todayInTokyo } from "./format";
+
+it("チャット日時は日本時間の月日・時分だけで、年と秒を省く", () => {
+  expect(formatChatDateTime("2026-11-17T21:19:37Z")).toBe("11/18 6:19");
+  expect(formatChatDateTime("2026-12-31T15:05:00Z")).toBe("1/1 0:05");
+  expect(formatChatDateTime("2026-01-02T12:34:00+09:00")).toBe("1/2 12:34");
+  expect(formatChatDateTime("invalid")).toBe("");
+  expect(formatDateTime("2026-11-17T21:19:37Z")).toContain("2026");
+});
 
 describe("todayInTokyo", () => {
   it("reads today in Japan time", () => {

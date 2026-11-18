@@ -2,6 +2,8 @@
 // 英語を選んだ人だけが読み込む。漏れは lib/i18n-coverage.test.ts で検出する。
 // 文言を足したら、ここにも英語を足す（node --experimental-strip-types scripts/i18n-missing.mjs で漏れを一覧できる）。
 export const en: Readonly<Record<string, string>> = {
+  "外部の連絡先（URL・メールアドレス・電話番号・SNSのID）は送れません。": "You cannot send outside contact details (URLs, email addresses, phone numbers, or social media IDs).",
+  "質問・回答は各1回まで。追加のやりとりはできません。コーチの受諾は48時間以内、回答は受諾後72時間以内。辞退・期限切れは全額返金します。やりとりは終了後1年間保存します。": "One question and one answer only. No further exchanges are possible. The coach accepts within 48 hours and answers within 72 hours of accepting. Declines and expiries are refunded in full. The exchange is kept for one year after it ends.",
   "紹介特典": "Referral reward",
   "元の画面に戻る": "Return to the previous page",
   "紹介ID": "Referral code",
@@ -2098,12 +2100,6 @@ export const en: Readonly<Record<string, string>> = {
   "回答待ち": "Awaiting answer",
   "回答済み": "Answered",
   "回答済み・この追加質問は終了しました": "Answered — this follow-up question is now closed.",
-  "あなたの質問": "Your question",
-  "選手の質問": "Player's question",
-  "あなたの回答": "Your answer",
-  "あなたの確認": "Your clarifying question",
-  "選手の確認": "Player's clarifying question",
-  "あなたの補足": "Your follow-up",
   "辞退されました": "Declined",
   "期限切れ": "Expired",
   "取り下げ済み": "Withdrawn",

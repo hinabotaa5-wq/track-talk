@@ -1,12 +1,12 @@
 "use client";
 import { L } from "@/lib/i18n";
 
-import { contactNoticeText, looksLikeSolicitation, solicitationWarningText } from "@/lib/solicitation";
+import { looksLikeSolicitation, solicitationWarningText } from "@/lib/solicitation";
 import { useRef, useState } from "react";
 
 // ContactNotice は、コーチングのテキストの接点に常に出す注意文。
 export function ContactNotice({ className = "" }: { className?: string }) {
-  return <span className={`block text-xs text-slate-300 ${className}`}>{L(contactNoticeText)}</span>;
+  return <span className={`block text-xs text-slate-300 ${className}`}>{L("外部の連絡先（URL・メールアドレス・電話番号・SNSのID）は送れません。")}</span>;
 }
 
 // useSolicitationGuard は、勧誘に使われやすい言葉があるとき、最初の送信だけ止めて警告する。
