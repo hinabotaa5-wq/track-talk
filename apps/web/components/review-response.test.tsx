@@ -82,6 +82,7 @@ it.each(["requester", "coach"] as const)("%s は項目ごとに独立したカ�
   expect(video.controls).toBe(true);
   expect(video.playsInline).toBe(true);
   expect(video.classList).toContain("max-w-[260px]");
+  expect(video.classList).toContain("max-h-[300px]");
   expect(container.querySelector("button")).toBeNull();
 });
 

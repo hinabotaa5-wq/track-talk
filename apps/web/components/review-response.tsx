@@ -48,7 +48,7 @@ export function ReviewResponseView({ response, viewer = "requester" }: { respons
       {response.demo_video_url ? (
         <div className={card}>
           <h2 className="text-xs font-semibold text-slate-300">{L("見本動画")}</h2>
-          <video src={response.demo_video_url} controls playsInline preload="metadata" className="w-full max-w-[260px] rounded-lg bg-black" />
+          <video src={response.demo_video_url} controls playsInline preload="metadata" className="w-full max-w-[260px] max-h-[300px] rounded-lg bg-black" />
         </div>
       ) : null}
       {response.clarify_reason ? (

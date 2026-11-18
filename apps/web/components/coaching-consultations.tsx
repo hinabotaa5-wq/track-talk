@@ -206,11 +206,11 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
     {c.hidden || c.purged ? <p className="text-sm text-slate-300">{c.hidden ? L("運営が確認のため非表示にしています") : L("保存期間が終了しました")}</p> : <>
       <ChatBubble side={askerSide} at={c.created_at}>
         <Translated shown={question} lang="ja" />
-        {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
+        {c.video_url ? <video src={c.video_url} controls playsInline preload="metadata" className="mt-1 w-full max-w-[260px] max-h-[300px] rounded-lg" /> : null}
       </ChatBubble>
       {c.answer ? <ChatBubble side={coachSide} at={c.answered_at}>
         <Translated shown={answer} lang="en" />
-        {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="mt-1 w-full rounded-lg" /> : null}
+        {c.answer_video_url ? <video src={c.answer_video_url} controls playsInline preload="metadata" className="mt-1 w-full max-w-[260px] max-h-[300px] rounded-lg" /> : null}
       </ChatBubble> : null}
       {c.videos_purged ? <p className="text-xs text-slate-300">{L("動画は保存期間を過ぎたため削除しました（文章は引き続き見られます）。")}</p> : null}
       {kind === "contract" ? <>

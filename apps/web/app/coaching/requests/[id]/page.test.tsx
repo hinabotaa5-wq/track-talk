@@ -871,6 +871,7 @@ it("依頼動画→相談文は右・青、返答は左の独立カードとし�
     expect(container.querySelectorAll("dl")).toHaveLength(0);
     const video = container.querySelector("video")!;
     expect(video.classList).toContain("max-w-[260px]");
+    expect(video.classList).toContain("max-h-[300px]");
     expect(video.controls).toBe(true);
     expect(video.closest("div.flex")?.classList).toContain("justify-end");
     expect(video.parentElement?.classList).toContain("bg-blue-500/25");
