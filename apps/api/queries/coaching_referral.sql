@@ -23,7 +23,7 @@ WHERE c.code = $1 AND c.owner_id <> sqlc.arg(buyer)::uuid AND c.closed_at IS NUL
                   WHERE a.referrer_id = c.owner_id AND a.buyer_id = sqlc.arg(buyer)::uuid AND a.canceled_at IS NULL);
 
 -- name: GetCoachingReferralProgress :one
--- 有効な周があればそれを、なければ直近に終了した周を返す。進捗は周に所属する。
+-- 有効な周があればそれを、なければ終了から7日未満の周のうち直近の周を返す。進捗は周に所属する。
 SELECT c.code, (c.closed_at IS NULL)::boolean AS active,
     (SELECT count(*)::int FROM coaching_referral_counts a
      WHERE a.referral_code = c.code AND a.canceled_at IS NULL) AS friend_count,
@@ -32,6 +32,7 @@ FROM coaching_referral_codes c
 LEFT JOIN coaching_referral_rewards r ON r.referral_code = c.code AND r.canceled_at IS NULL
 LEFT JOIN coaching_ticket_lots l ON l.id = r.lot_id
 WHERE c.owner_id = $1
+  AND (c.closed_at IS NULL OR c.closed_at > now() - interval '7 days')
 ORDER BY c.closed_at IS NULL DESC, c.issued_at DESC
 LIMIT 1;
 

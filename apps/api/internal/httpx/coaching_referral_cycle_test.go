@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -433,4 +434,83 @@ func TestCoachingReferralCardOriginHeldUntilCapture(t *testing.T) {
 	if check.Code != 200 || json.Unmarshal(check.Body.Bytes(), &out) != nil || out.Valid || !out.AlreadyCounted {
 		t.Fatalf("check for counted buyer %d %s", check.Code, check.Body.String())
 	}
+}
+
+func TestCoachingReferralEndedCycleDisplayWindow(t *testing.T) {
+	h := setupIsolatedStripe(t)
+	admin := adminToken(t, h)
+
+	t.Run("voided cycles and active priority", func(t *testing.T) {
+		ownerID, owner := demoRequester(t, h, admin)
+		_, buyer := demoRequester(t, h, admin)
+		issue := func() (string, uuid.UUID) {
+			payment := insertReviewPayment(t, ownerID, "authorized")
+			execSQLArgs(t, `SELECT coaching_issue_referral_code($1, 'purchase', NULL, $2)`, ownerID, payment)
+			var code string
+			queryRowArgs(t, `SELECT code FROM coaching_referral_codes WHERE origin_review_payment_id=$1`, []any{payment}, &code)
+			return code, payment
+		}
+		void := func(payment uuid.UUID) {
+			execSQLArgs(t, `UPDATE review_payments SET status='canceled', canceled_at=now() WHERE id=$1`, payment)
+		}
+
+		first, payment := issue()
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET issued_at=now() - interval '60 days' WHERE code=$1`, first)
+		void(payment)
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() - interval '6 days' WHERE code=$1`, first)
+		if got := myReferral(t, h, owner); got == nil || got.Active || got.Code != first || got.GrantedAt != nil {
+			t.Fatalf("voided cycle at six days: %+v", got)
+		}
+
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() - interval '8 days' WHERE code=$1`, first)
+		var closedBefore, closedAfter time.Time
+		queryRowArgs(t, `SELECT closed_at FROM coaching_referral_codes WHERE code=$1`, []any{first}, &closedBefore)
+		if got := myReferral(t, h, owner); got != nil {
+			t.Fatalf("voided cycle at eight days: %+v", got)
+		}
+		queryRowArgs(t, `SELECT closed_at FROM coaching_referral_codes WHERE code=$1`, []any{first}, &closedAfter)
+		if !closedAfter.Equal(closedBefore) {
+			t.Fatalf("closed_at changed from %s to %s", closedBefore, closedAfter)
+		}
+		if referralCheck(t, h, buyer, first) {
+			t.Fatal("hidden closed code is still usable")
+		}
+
+		active, payment := issue()
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET issued_at=now() - interval '30 days' WHERE code=$1`, active)
+		if got := myReferral(t, h, owner); got == nil || !got.Active || got.Code != active {
+			t.Fatalf("30-day-old active cycle alongside an expired closed cycle: %+v", got)
+		}
+
+		void(payment)
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() - interval '30 days' WHERE code=$1`, first)
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() - interval '6 days' WHERE code=$1`, active)
+		if got := myReferral(t, h, owner); got == nil || got.Active || got.Code != active {
+			t.Fatalf("most recent closed cycle: %+v", got)
+		}
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() - interval '8 days' WHERE code=$1`, active)
+		if got := myReferral(t, h, owner); got != nil {
+			t.Fatalf("both closed cycles past the display window: %+v", got)
+		}
+	})
+
+	t.Run("rewarded cycle retains its ticket lot", func(t *testing.T) {
+		_, owner, lotID := grantRewardLot(t, h, admin)
+		var code string
+		queryRowArgs(t, `SELECT referral_code FROM coaching_referral_rewards WHERE lot_id=$1`, []any{lotID}, &code)
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() - interval '6 days' WHERE code=$1`, code)
+		if got := myReferral(t, h, owner); got == nil || got.Active || got.Code != code || got.GrantedAt == nil {
+			t.Fatalf("rewarded cycle at six days: %+v", got)
+		}
+
+		execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() - interval '8 days' WHERE code=$1`, code)
+		if got := myReferral(t, h, owner); got != nil {
+			t.Fatalf("rewarded cycle at eight days: %+v", got)
+		}
+		var available int
+		queryRowArgs(t, `SELECT available FROM coaching_ticket_lots WHERE id=$1 AND kind='referral_reward'`, []any{lotID}, &available)
+		if available != 1 {
+			t.Fatalf("reward lot available=%d, want 1", available)
+		}
+	})
 }
