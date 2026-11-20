@@ -74,6 +74,16 @@ func TestCoachingReferralCouponPurchaseAndWithdrawal(t *testing.T) {
 	if got := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", other, couponReviewBody()); got.Code != 422 || !strings.Contains(got.Body.String(), "coupon_unavailable") {
 		t.Fatalf("non-owner: %d %s", got.Code, got.Body.String())
 	}
+	execSQLArgs(t, `UPDATE coaching_referral_coupons SET expires_at=now()-interval '1 hour' WHERE id=$1`, coupon)
+	if got := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", owner, couponReviewBody()); got.Code != 422 || !strings.Contains(got.Body.String(), "coupon_unavailable") {
+		t.Fatalf("expired coupon: %d %s", got.Code, got.Body.String())
+	}
+	execSQLArgs(t, `UPDATE coaching_referral_coupons SET expires_at=granted_at+interval '6 months' WHERE id=$1`, coupon)
+	if got := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", owner, map[string]any{
+		"product_id": "six", "request_key": uuid.NewString(), "guardian_permission": true, "use_coupon": true,
+	}); got.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("coupon on ticket pack: %d %s", got.Code, got.Body.String())
+	}
 	missingPermission := couponReviewBody()
 	delete(missingPermission, "guardian_permission")
 	if got := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", owner, missingPermission); got.Code != 422 || !strings.Contains(got.Body.String(), "guardian_permission_required") {
@@ -327,5 +337,48 @@ func TestCoachingReferralCouponMigrationBackfillsEarningLinks(t *testing.T) {
 	}
 	if _, err := tx.Exec(ctx, string(source)); err == nil || !strings.Contains(err.Error(), "cannot roll back migration 187") {
 		t.Fatalf("down must stop when a coupon exists: %v", err)
+	}
+}
+
+func TestCoachingReferralCouponRestoredAfterReviewDeadlines(t *testing.T) {
+	h := setupIsolatedStripe(t)
+	admin := adminToken(t, h)
+	_, owner, coupon, _ := grantReferralCoupon(t, h, admin)
+	assertReleased := func(id string) {
+		t.Helper()
+		if rec := tick(t, h, "tick-secret"); rec.Code != 200 {
+			t.Fatalf("tick %d %s", rec.Code, rec.Body.String())
+		}
+		var released bool
+		queryRowArgs(t, `SELECT EXISTS (SELECT FROM coaching_referral_coupons WHERE id=$1 AND used_at IS NULL AND used_reservation_id IS NULL)
+            AND EXISTS (SELECT FROM coaching_ticket_reservations WHERE request_id=$2 AND status='released')`, []any{coupon, id}, &released)
+		if !released {
+			t.Fatalf("coupon was not restored for %s", id)
+		}
+	}
+	queued := createCouponReview(t, h, owner)
+	execSQLArgs(t, `UPDATE review_requests SET status='queued', coach_id=NULL, due_at=now()-interval '1 minute' WHERE id=$1`, queued)
+	assertReleased(queued)
+
+	onDutyCoach(t, h, admin)
+	awaitingInfo := createCouponReview(t, h, owner)
+	execSQLArgs(t, `UPDATE review_requests SET status='needs_info', info_from_status='in_review', info_request='確認したいこと',
+        info_requested_at=now()-interval '25 hours', resubmit_by=now()-interval '1 minute' WHERE id=$1`, awaitingInfo)
+	assertReleased(awaitingInfo)
+}
+
+func TestTicketReviewEarningRetainsReservationAfterWithdrawal(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setupIsolatedStripe(t)
+	admin := adminToken(t, h)
+	ownerID, owner := demoRequester(t, h, admin)
+	buySixTickets(t, h, owner)
+	review := consumeOneTicketReview(t, h, admin, owner)
+	execSQLArgs(t, `DELETE FROM profiles WHERE id=$1`, ownerID)
+	var found bool
+	queryRowArgs(t, `SELECT EXISTS (SELECT FROM coach_earnings e JOIN coaching_ticket_reservations r ON r.id=e.reservation_id
+         WHERE e.review_request_id=$1 AND e.amount_yen=350 AND r.request_id IS NULL AND r.owner_id IS NULL)`, []any{review}, &found)
+	if !found {
+		t.Fatal("regular ticket earning lost its reservation link after withdrawal")
 	}
 }
