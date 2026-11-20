@@ -117,6 +117,7 @@ FROM coaching_referral_codes c
 LEFT JOIN coaching_referral_rewards r ON r.referral_code = c.code AND r.canceled_at IS NULL
 LEFT JOIN coaching_ticket_lots l ON l.id = r.lot_id
 WHERE c.owner_id = $1
+  AND (c.closed_at IS NULL OR c.closed_at > now() - interval '7 days')
 ORDER BY c.closed_at IS NULL DESC, c.issued_at DESC
 LIMIT 1
 `
@@ -129,7 +130,7 @@ type GetCoachingReferralProgressRow struct {
 	ExpiresAt   *time.Time `json:"expires_at"`
 }
 
-// 有効な周があればそれを、なければ直近に終了した周を返す。進捗は周に所属する。
+// 有効な周があればそれを、なければ終了から7日未満の周のうち直近の周を返す。進捗は周に所属する。
 func (q *Queries) GetCoachingReferralProgress(ctx context.Context, ownerID uuid.UUID) (GetCoachingReferralProgressRow, error) {
 	row := q.db.QueryRow(ctx, getCoachingReferralProgress, ownerID)
 	var i GetCoachingReferralProgressRow
