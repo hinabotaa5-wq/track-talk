@@ -382,6 +382,7 @@ export default function NewReviewRequestPage() {
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
+            showPendingOverlay={!useCoupon}
             pendingLabel={cashPayment ? L("お支払い画面へ移動しています") : undefined}
           >
             {cashPayment ? <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}

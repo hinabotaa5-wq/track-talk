@@ -1065,7 +1065,10 @@ it("#959: 動画送信・取り込み・保存からStripe遷移まで確認画�
 it("無料チケットと別にクーポンを選べ、購入前チェック付きでクーポンだけを送信する", async () => {
   await renderKinds("&pay=reward", 0, 1);
   const previous = mocks.api.getMockImplementation()!;
+  let complete!: (result: { id: string }) => void;
+  const submitting = new Promise<{ id: string }>((resolve) => { complete = resolve; });
   mocks.api.mockImplementation(async (path: string, options?: unknown) => {
+    if (path === "/v1/coaching/requests") return submitting;
     if (path === "/v1/me/coaching/tickets") {
       return { ...kindSummary(0, 1), coupon: { count: 2, earliest_expires_at: "2026-12-01T00:00:00Z" } };
     }
@@ -1085,6 +1088,9 @@ it("無料チケットと別にクーポンを選べ、購入前チェック付�
   expect(confirm.textContent).toContain("使うクーポンの有効期限");
   expect(confirm.textContent).not.toContain("紹介ID");
   const body = await postedBody(confirm, "確定して特典クーポンで送る");
+  expect(button("確定して特典クーポンで送る")?.disabled).toBe(true);
+  expect(confirm.querySelector('[aria-busy="true"]')).toBeNull();
+  await act(async () => complete({ id: "r1" }));
   expect(body).toMatchObject({ use_coupon: true, guardian_permission: true });
   for (const key of ["method", "use_tickets", "ticket_kind", "referral_code"]) {
     expect(body).not.toHaveProperty(key);

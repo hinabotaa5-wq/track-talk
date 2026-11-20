@@ -9,7 +9,7 @@ import type { ConfirmRow } from "@/lib/purchase-confirm";
 // PurchaseConfirm は、支払い画面へ進む前の最終確認（本体 #569）。確定ボタンを押すまで、何も送らず・何も確保しない。
 // 確定を押してから画面が移るまで（pending のあいだ）は、画面全体を覆ってストップウォッチを回し、pendingLabel の文言を出す（本体 #917）。
 // pendingLabel を渡さないときは「処理しています」。待ちが見えるよう、遅らせずに pending になった最初の描画から出す。
-export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending, confirmDisabled, pendingLabel, children }: {
+export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending, confirmDisabled, pendingLabel, showPendingOverlay = true, children }: {
   rows: ConfirmRow[];
   confirmLabel: string;
   onConfirm: () => void;
@@ -17,15 +17,17 @@ export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending
   pending?: boolean;
   confirmDisabled?: boolean;
   pendingLabel?: string;
+  showPendingOverlay?: boolean;
   children?: React.ReactNode;
 }) {
   const overlay = useRef<HTMLDivElement>(null);
+  const overlayVisible = pending && showPendingOverlay;
   useEffect(() => {
-    if (!pending) return;
+    if (!overlayVisible) return;
     const previous = document.activeElement;
     overlay.current?.focus({ preventScroll: true });
     return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true }); };
-  }, [pending]);
+  }, [overlayVisible]);
 
   return (
     <section aria-labelledby="purchase-confirm-heading" className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-sm">
@@ -43,7 +45,7 @@ export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending
         <Button type="button" className="w-full" disabled={pending || confirmDisabled} onClick={onConfirm}>{confirmLabel}</Button>
         <Button type="button" variant="secondary" className="w-full" disabled={pending} onClick={onBack}>{L("戻って直す")}</Button>
       </div>
-      {pending ? (
+      {overlayVisible ? (
         <div ref={overlay} role="status" aria-busy="true" tabIndex={-1}
           onKeyDown={(event) => { if (event.key === "Tab") event.preventDefault(); }}
           className="pointer-events-auto fixed inset-0 z-[110] flex flex-col items-center justify-center gap-2 bg-slate-950/70 p-6 text-center text-slate-200 backdrop-blur-md outline-none">
