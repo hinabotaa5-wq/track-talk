@@ -13,6 +13,31 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func TestCoachingReferralCoupon(t *testing.T) {
+	// Migrate one isolated database for the suite. setupStripe resets its data
+	// before each case so every case still exercises an independent scenario.
+	isolateReferralDatabase(t)
+	fakeCoachingCloudinary(t)
+	for _, test := range []struct {
+		name string
+		run  func(*testing.T, http.Handler)
+	}{
+		{"purchase and used coupon withdrawal", coachingReferralCouponPurchaseAndWithdrawal},
+		{"release after qualifying refund", coachingReferralCouponReleaseAfterQualifyingRefund},
+		{"earliest expiry and concurrent use", coachingReferralCouponConcurrentUseAndEarliestExpiry},
+		{"expired coupon reissue", coachingReferralCouponExpiredReissue},
+		{"unused coupon and legacy lot withdrawal", coachingReferralUnusedCouponAndLegacyLotWithdrawal},
+		{"backfill and guarded rollback", coachingReferralCouponMigrationBackfillsEarningLinks},
+		{"review and resubmission deadlines", coachingReferralCouponRestoredAfterReviewDeadlines},
+		{"standard ticket earning after withdrawal", ticketReviewEarningRetainsReservationAfterWithdrawal},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h, _ := setupStripe(t)
+			test.run(t, h)
+		})
+	}
+}
+
 func grantReferralCoupon(t *testing.T, h http.Handler, admin string) (uuid.UUID, string, uuid.UUID, string) {
 	t.Helper()
 	ownerID, owner := demoRequester(t, h, admin)
@@ -48,9 +73,7 @@ func createCouponReview(t *testing.T, h http.Handler, owner string) string {
 	return result.ID
 }
 
-func TestCoachingReferralCouponPurchaseAndWithdrawal(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h := setupIsolatedStripe(t)
+func coachingReferralCouponPurchaseAndWithdrawal(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	_, coach := onDutyCoach(t, h, admin)
 	ownerID, owner, coupon, pack := grantReferralCoupon(t, h, admin)
@@ -140,8 +163,7 @@ func TestCoachingReferralCouponPurchaseAndWithdrawal(t *testing.T) {
 	}
 }
 
-func TestCoachingReferralCouponReleaseAfterQualifyingRefund(t *testing.T) {
-	h := setupIsolatedStripe(t)
+func coachingReferralCouponReleaseAfterQualifyingRefund(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	onDutyCoach(t, h, admin)
 	ownerID, owner, coupon, pack := grantReferralCoupon(t, h, admin)
@@ -178,8 +200,7 @@ func TestCoachingReferralCouponReleaseAfterQualifyingRefund(t *testing.T) {
 	execSQLArgs(t, `DELETE FROM profiles WHERE id=$1`, ownerID)
 }
 
-func TestCoachingReferralCouponConcurrentUseAndEarliestExpiry(t *testing.T) {
-	h := setupIsolatedStripe(t)
+func coachingReferralCouponConcurrentUseAndEarliestExpiry(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	ownerID, owner, earliest, _ := grantReferralCoupon(t, h, admin)
 	later := uuid.New()
@@ -221,8 +242,7 @@ func TestCoachingReferralCouponConcurrentUseAndEarliestExpiry(t *testing.T) {
 	}
 }
 
-func TestCoachingReferralCouponExpiredReissue(t *testing.T) {
-	h := setupIsolatedStripe(t)
+func coachingReferralCouponExpiredReissue(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	_, coach := onDutyCoach(t, h, admin)
 	ownerID, owner, coupon, _ := grantReferralCoupon(t, h, admin)
@@ -258,8 +278,7 @@ func TestCoachingReferralCouponExpiredReissue(t *testing.T) {
 	}
 }
 
-func TestCoachingReferralUnusedCouponAndLegacyLotWithdrawal(t *testing.T) {
-	h := setupIsolatedStripe(t)
+func coachingReferralUnusedCouponAndLegacyLotWithdrawal(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	couponOwner, _, coupon, _ := grantReferralCoupon(t, h, admin)
 	lotOwner, _, lot := grantRewardLot(t, h, admin)
@@ -274,8 +293,7 @@ func TestCoachingReferralUnusedCouponAndLegacyLotWithdrawal(t *testing.T) {
 	}
 }
 
-func TestCoachingReferralCouponMigrationBackfillsEarningLinks(t *testing.T) {
-	h := setupIsolatedStripe(t)
+func coachingReferralCouponMigrationBackfillsEarningLinks(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	owner, _ := demoRequester(t, h, admin)
 	ctx := context.Background()
@@ -340,8 +358,7 @@ func TestCoachingReferralCouponMigrationBackfillsEarningLinks(t *testing.T) {
 	}
 }
 
-func TestCoachingReferralCouponRestoredAfterReviewDeadlines(t *testing.T) {
-	h := setupIsolatedStripe(t)
+func coachingReferralCouponRestoredAfterReviewDeadlines(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	_, owner, coupon, _ := grantReferralCoupon(t, h, admin)
 	assertReleased := func(id string) {
@@ -367,9 +384,7 @@ func TestCoachingReferralCouponRestoredAfterReviewDeadlines(t *testing.T) {
 	assertReleased(awaitingInfo)
 }
 
-func TestTicketReviewEarningRetainsReservationAfterWithdrawal(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h := setupIsolatedStripe(t)
+func ticketReviewEarningRetainsReservationAfterWithdrawal(t *testing.T, h http.Handler) {
 	admin := adminToken(t, h)
 	ownerID, owner := demoRequester(t, h, admin)
 	buySixTickets(t, h, owner)

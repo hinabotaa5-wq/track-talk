@@ -17,6 +17,13 @@ import (
 // このファイルのテストでは setup/setupStripe を直接使わない。
 func setupIsolatedStripe(t *testing.T) http.Handler {
 	t.Helper()
+	isolateReferralDatabase(t)
+	h, _ := setupStripe(t)
+	return h
+}
+
+func isolateReferralDatabase(t *testing.T) {
+	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = "postgres://tracktalk:tracktalk@127.0.0.1:55432/tracktalk?sslmode=disable"
@@ -55,8 +62,6 @@ func setupIsolatedStripe(t *testing.T) http.Handler {
 	// ポートの直書きはしない（本体 #795：CI の 5432 で SKIP になる原因だった）。
 	t.Setenv("DATABASE_URL", cfg.ConnString())
 	_ = isolated.Close(ctx)
-	h, _ := setupStripe(t)
-	return h
 }
 
 // §12-5: 追加質問（kind=consultation）の購入は、有効な紹介コードが存在しても
