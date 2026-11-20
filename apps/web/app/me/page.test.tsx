@@ -322,6 +322,6 @@ it("紹介IDをまだ持たない人には、マイページで無料チケッ�
   await renderSignedIn();
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回分(500円)無料！");
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
-  expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に次回の動画添削1回分が無料になるクーポンをプレゼントします。");
+  expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
   expect(container.textContent).not.toContain("紹介IDを使わずに購入すると、あなたの紹介IDが発行されます。");
 });
