@@ -21,7 +21,7 @@ import { coachingCoachListEnabled } from "@/lib/features";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewVideosPurgedNote } from "@/lib/review";
-import type { HelpfulAnswer, ReviewPayMethod, ReviewRequest } from "@/lib/types";
+import type { HelpfulAnswer, ReviewPayMethod, ReviewRequest as BaseReviewRequest } from "@/lib/types";
 import { useNow } from "@/lib/use-now";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -34,6 +34,8 @@ const chip = (on: boolean) =>
   }`;
 
 // 返答が届いたあとの操作: 7日後の「役に立ちましたか」、通報。（星評価は廃止）
+type ReviewRequest = BaseReviewRequest & { used_coupon?: boolean };
+
 function ResponseActions({ request, token, onChange }: { request: ReviewRequest; token: string | null; onChange: (r: ReviewRequest) => void }) {
   const [error, setError] = useState("");
   const [reported, setReported] = useState(request.response_reported ?? false);
@@ -198,7 +200,9 @@ function ReviewRequestView() {
   async function cancelReview() {
     if (!await confirmDialog({
       title: L("1回プランの依頼をキャンセルしますか？"),
-      body: request?.status === "awaiting_payment"
+      body: request?.used_coupon
+        ? L("クーポンを戻します。有効期限を過ぎている場合は失効します。")
+        : request?.status === "awaiting_payment"
         ? L("まだお支払いは済んでいません。取り消すと、この依頼ではお支払いができなくなります。")
         : L("お支払いは全額返金・取消し、チケットは返還します。"),
       confirmLabel: L("依頼をキャンセルする"),
@@ -283,6 +287,7 @@ function ReviewRequestView() {
         <div className="min-w-0 space-y-1">
           <h1 className="text-2xl font-bold">{L("1回プラン")}</h1>
           <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
+          {request.used_coupon ? <p className="text-sm text-slate-300">{L("お支払い：紹介特典クーポン")}</p> : null}
           {request.status === "in_review" ? (
             <p className="text-sm text-slate-300">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
           ) : null}

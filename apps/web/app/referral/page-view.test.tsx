@@ -26,7 +26,7 @@ const JA_TEXTS = [
   "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。",
   "友達が、購入の手続きで紹介IDを入力して購入を完了する",
   "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。",
-  "友達2人が購入すると、無料チケットをプレゼント",
+  "友達2人が購入すると、次回の動画添削が無料になるクーポンをプレゼント",
   "あと何人かは、マイページで確認できます。",
   "注意点",
   "紹介IDを使って購入すると、この購入ではあなたの紹介IDは発行されません。",
@@ -35,7 +35,7 @@ const JA_TEXTS = [
   "自分の紹介IDは、自分の購入には使えません。",
   "同じ友達は、同じ紹介者には1回だけ数えられます。",
   "対象は1回プランの都度払いとチケット6枚パックです。追加質問は対象外です。",
-  "無料チケットは、もらった本人だけが使えます。払戻しはできません。",
+  "無料クーポンは、もらった本人だけが次回の1回プランで使えます。払戻しはできません。",
   "コーチ一覧へ",
 ];
 
@@ -46,15 +46,15 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
   for (const expected of JA_TEXTS) expect(text).toContain(expected);
   expect(container.querySelector("h1")?.textContent).toBe("友達2人に紹介すると、1回分(500円)無料！");
   expect(text).not.toContain("友達2人に紹介すると、1回無料！");
-  expect(text).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
-  expect(text).not.toContain("無料チケットは動画添削1回分です。有効期限は、プレゼントされてから6か月です。");
+  expect(text).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に次回の動画添削1回分が無料になるクーポンをプレゼントします。");
+  expect(text).not.toContain("クーポンの有効期限は、プレゼントされてから6か月です。");
   const stepTitles = [...container.querySelectorAll("ol > li")].map((li) => li.textContent ?? "");
   expect(stepTitles).toHaveLength(5);
   expect(stepTitles[0]).toContain("購入すると、あなたの紹介IDが発行されます");
   expect(stepTitles[1]).toContain("紹介IDを友達に伝える");
   expect(stepTitles[2]).toContain("友達がコーチを選んで、申し込みに進む");
   expect(stepTitles[3]).toContain("友達が、購入の手続きで紹介IDを入力して購入を完了する");
-  expect(stepTitles[4]).toContain("友達2人が購入すると、無料チケットをプレゼント");
+  expect(stepTitles[4]).toContain("友達2人が購入すると、次回の動画添削が無料になるクーポンをプレゼント");
   expect(container.querySelector('a[href="/me"]')).toBeNull();
   expect(container.querySelector('a[href="/coaching"]')).not.toBeNull();
   expect(text).not.toContain("紹介IDを使わずに購入すると、あなたの紹介IDが発行されます");
@@ -69,7 +69,7 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
     "自分の紹介IDは、自分の購入には使えません。",
     "同じ友達は、同じ紹介者には1回だけ数えられます。",
     "対象は1回プランの都度払いとチケット6枚パックです。追加質問は対象外です。",
-    "無料チケットは、もらった本人だけが使えます。払戻しはできません。",
+    "無料クーポンは、もらった本人だけが次回の1回プランで使えます。払戻しはできません。",
   ]);
 });
 

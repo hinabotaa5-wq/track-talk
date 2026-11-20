@@ -149,6 +149,13 @@ function TicketsPage() {
     <Button type="button" disabled={pending} onClick={() => void load().catch(() => setError(L("読み込めませんでした")))}>{L("チケット情報を再読み込み")}</Button>
     {summary ? <>
       <TicketBalance summary={summary} />
+      {summary.coupon ? (
+        <section className="space-y-1 rounded-xl border border-white/15 p-3">
+          <h2 className="font-semibold">{L("紹介特典クーポン")}</h2>
+          <p className="text-sm text-slate-200">{L("残り {n} 枚", { n: summary.coupon.count })}</p>
+          {summary.coupon.earliest_expires_at ? <p className="text-xs text-slate-300">{L("いちばん早い有効期限 {expiry}", { expiry: formatDateTime(summary.coupon.earliest_expires_at) })}</p> : null}
+        </section>
+      ) : null}
       {summary.sales_open === false ? <p role="status" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">{summary.purchase_block_reason}</p> : null}
       {confirming ? (
         <PurchaseConfirm

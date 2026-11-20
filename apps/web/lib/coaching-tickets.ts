@@ -17,6 +17,7 @@ export type TicketSummary = {
   can_purchase: boolean; purchase_block_reason: string; unit_yen: number;
   // false の間はチケットの新規販売を止めている。購入済みの残高・履歴・返金はそのまま。
   sales_open?: boolean;
+  coupon?: { count: number; earliest_expires_at: string | null };
   next_expiry?: TicketNextExpiry | null;
   is_minor?: boolean | null;
   // 単発の料金・添削1回に使う枚数・有効期限（月）。価格の比較と条件の表示に使う。

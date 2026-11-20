@@ -120,8 +120,8 @@ WHERE t.status = 'reserved' AND t.consultation_id IS NULL AND (r.id IS NULL OR r
 SELECT * FROM review_requests WHERE id = $1 FOR UPDATE;
 
 -- name: RecordTicketReviewEarnings :exec
-INSERT INTO coach_earnings (id,coach_id,source,review_request_id,gross_yen,share_percent,amount_yen, confirmed_at)
-SELECT gen_random_uuid(),r.coach_id,'review',r.id,t.nominal_yen,t.share_percent,t.nominal_yen*t.share_percent/100,r.returned_at
+INSERT INTO coach_earnings (id,coach_id,source,review_request_id,gross_yen,share_percent,amount_yen, confirmed_at, reservation_id)
+SELECT gen_random_uuid(),r.coach_id,'review',r.id,t.nominal_yen,t.share_percent,t.nominal_yen*t.share_percent/100,r.returned_at,t.id
 FROM coaching_ticket_reservations t JOIN review_requests r ON r.id = t.request_id
 WHERE t.id = $1 AND t.status = 'consumed' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL
 ON CONFLICT (review_request_id) DO NOTHING;

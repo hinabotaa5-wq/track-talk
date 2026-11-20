@@ -1061,3 +1061,33 @@ it("#959: 動画送信・取り込み・保存からStripe遷移まで確認画�
     expectOverlayOnly();
   } finally { vi.unstubAllGlobals(); }
 });
+
+it("無料チケットと別にクーポンを選べ、購入前チェック付きでクーポンだけを送信する", async () => {
+  await renderKinds("&pay=reward", 0, 1);
+  const previous = mocks.api.getMockImplementation()!;
+  mocks.api.mockImplementation(async (path: string, options?: unknown) => {
+    if (path === "/v1/me/coaching/tickets") {
+      return { ...kindSummary(0, 1), coupon: { count: 2, earliest_expires_at: "2026-12-01T00:00:00Z" } };
+    }
+    return previous(path, options);
+  });
+  // Use a fresh mount so the ticket summary loads with the coupons.
+  await act(async () => root.render(<NewReviewRequestPage key="coupons" />));
+  expect(button("無料チケット（残り")).toBeDefined();
+  expect(pressed("チケット（6枚）")).toBe("true");
+  await act(async () => button("紹介特典クーポン")!.click());
+  expect(pressed("紹介特典クーポン")).toBe("true");
+  const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  expect(checkbox.checked).toBe(false);
+  await act(async () => checkbox.click());
+  const confirm = await fillAndConfirm();
+  expect(confirm.textContent).toContain("紹介特典クーポン（¥500 → ¥0、このあとのお支払いはありません）");
+  expect(confirm.textContent).toContain("使うクーポンの有効期限");
+  expect(confirm.textContent).not.toContain("紹介ID");
+  const body = await postedBody(confirm, "確定して特典クーポンで送る");
+  expect(body).toMatchObject({ use_coupon: true, guardian_permission: true });
+  for (const key of ["method", "use_tickets", "ticket_kind", "referral_code"]) {
+    expect(body).not.toHaveProperty(key);
+  }
+  expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
+});
