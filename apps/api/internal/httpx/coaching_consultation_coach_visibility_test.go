@@ -246,9 +246,10 @@ func TestCoachDoesNotSeePaidThenInvalidatedImmediately(t *testing.T) {
 		t.Fatalf("pay %d", code)
 	}
 	var status string
-	queryRowArgs(t, `SELECT status FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &status)
-	if status != "expired" {
-		t.Fatalf("status %s", status)
+	var marked bool
+	queryRowArgs(t, `SELECT status, offered_at IS NOT NULL FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &status, &marked)
+	if status != "expired" || marked {
+		t.Fatalf("invalid payment status=%s delivery recorded=%t", status, marked)
 	}
 	if r := tick(t, h, "tick-secret"); r.Code != 200 {
 		t.Fatal(r.Body.String())

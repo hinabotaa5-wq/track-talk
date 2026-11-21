@@ -220,6 +220,10 @@ func (s *Server) completeConsultationCheckout(ctx context.Context, sess stripe.C
 		if c.Status != "offered" {
 			return s.releaseConsultationFunding(ctx, q, c)
 		}
+		// Only record delivery once every check has passed and this transaction will commit offered.
+		if err := q.RecordCashConsultationOffer(ctx, id); err != nil {
+			return err
+		}
 		notify = true
 		return nil
 	})

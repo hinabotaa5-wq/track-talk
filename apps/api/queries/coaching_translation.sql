@@ -69,11 +69,12 @@ WHERE p.locale = 'en'
 ORDER BY r.created_at;
 
 -- name: ListEnCoachConsultations :many
--- backfill の対象：担当コーチの locale が 'en' の追加質問。下書き・隠した・消した相談は除く。
+-- backfill の対象：担当コーチの locale が 'en' の送達済み追加質問。隠した・消した相談は除く。
 SELECT c.* FROM coaching_consultations c
 JOIN profiles p ON p.id = c.coach_id
 WHERE p.locale = 'en'
-  AND c.status <> 'draft'
+  AND (c.status IN ('offered','in_review','answered','declined')
+       OR (c.status IN ('expired','cancelled') AND c.offered_at IS NOT NULL))
   AND c.hidden_at IS NULL
   AND c.purged_at IS NULL
 ORDER BY c.created_at;

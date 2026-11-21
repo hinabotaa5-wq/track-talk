@@ -346,6 +346,7 @@ type CoachingConsultation struct {
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
 	VideosPurgedAt      *time.Time `json:"videos_purged_at"`
+	OfferedAt           *time.Time `json:"offered_at"`
 }
 
 type CoachingConsultationAccessLog struct {
