@@ -32,6 +32,7 @@ function formatVideoSize(bytes: number): string {
 
 export type ReviewConfirmInput = {
   method: "card" | "paypay" | "tickets";
+  useCoupon?: boolean;
   priceYen: number;
   hasVideo: boolean;
   // 申込内容そのもの（誤送信防止のため確認画面に出す）。
@@ -47,7 +48,7 @@ export type ReviewConfirmInput = {
   ticketKind?: TicketKind | null;
 };
 
-export function reviewConfirmRows({ method, priceYen, hasVideo, question, eventLabel, videoFileName, videoFileSizeBytes, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
+export function reviewConfirmRows({ method, useCoupon, priceYen, hasVideo, question, eventLabel, videoFileName, videoFileSizeBytes, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
   const content = hasVideo
     ? (coachName ? L("1回プラン（動画1本・担当 {coachName}）", { coachName }) : L("1回プラン（動画1本）"))
     : (coachName ? L("1回プラン（悩みのみ・担当 {coachName}）", { coachName }) : L("1回プラン（悩みのみ）"));
@@ -63,6 +64,14 @@ export function reviewConfirmRows({ method, priceYen, hasVideo, question, eventL
     },
     { label: L("回答期限"), value: L("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）") },
   ];
+  if (useCoupon) {
+    rows.push(
+      { label: L("お支払い"), value: L("紹介特典クーポン（¥500 → ¥0、このあとのお支払いはありません）") },
+      { label: L("使うクーポンの有効期限"), value: nextExpiry ? formatDateTime(nextExpiry.expires_at) : L("なし") },
+      { label: L("キャンセル・クーポンの戻り"), value: L("送信時にクーポンを確保し、返却時に使います。着手前はキャンセルでき、その場合はクーポンが戻ります。着手後はキャンセルできません。期限までに返らない場合もクーポンは戻りますが、戻す時点で有効期限を過ぎていた場合は失効します。ただし、運営者またはコーチの都合で終了した場合は、有効期限を過ぎていてもクーポンを出し直します。") },
+    );
+    return rows;
+  }
   if (method === "tickets") {
     const expiry = nextExpiry ? formatDateTime(nextExpiry.expires_at) : L("期限なし（以前に購入した分）");
     if (ticketKind === "reward") {

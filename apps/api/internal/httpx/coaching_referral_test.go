@@ -77,20 +77,30 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 		t.Fatalf("return %d %s", rec.Code, rec.Body.String())
 	}
 	assertCount(2)
-	var lot uuid.UUID
+	var coupon uuid.UUID
 	var correctExpiry bool
-	queryRowArgs(t, `SELECT l.id, l.expires_at=r.granted_at + interval '6 months'
-		FROM coaching_referral_rewards r JOIN coaching_ticket_lots l ON l.id=r.lot_id
-		WHERE r.referrer_id=$1 AND l.kind='referral_reward' AND l.purchase_id IS NULL AND l.available=1`,
-		[]any{ownerID}, &lot, &correctExpiry)
+	queryRowArgs(t, `SELECT c.id, c.expires_at=c.granted_at + interval '6 months'
+        FROM coaching_referral_rewards r JOIN coaching_referral_coupons c ON c.id=r.coupon_id
+        WHERE r.referrer_id=$1 AND r.lot_id IS NULL AND c.used_at IS NULL`,
+		[]any{ownerID}, &coupon, &correctExpiry)
 	if !correctExpiry {
 		t.Fatal("wrong reward expiry")
+	}
+	var lots int
+	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_lots WHERE owner_id=$1 AND kind='referral_reward'`, []any{ownerID}, &lots)
+	if lots != 0 {
+		t.Fatalf("new reward created %d legacy lots", lots)
 	}
 	notices := coachingNotifications(t, h, owner)
 	count := 0
 	for _, n := range notices {
 		if strings.Contains(n.Title, "紹介特典") {
 			count++
+			if n.Title != "紹介特典：無料クーポンを1枚プレゼントしました" ||
+				n.Body != "特典クーポン：付与日から6か月有効／付与された本人だけが次回の購入で使えます／払戻しはできません" ||
+				n.URL != "/me/coaching/tickets" {
+				t.Fatalf("unexpected reward notice: %+v", n)
+			}
 		}
 	}
 	if count != 1 {
@@ -104,10 +114,10 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 	// This is the purchase status transition made by the completed refund.
 	execSQLArgs(t, "UPDATE coaching_ticket_purchases SET refunded_yen=amount_yen, status='refunded' WHERE id=$1", pack)
 	assertCount(1)
-	var available int
-	queryRowArgs(t, "SELECT available FROM coaching_ticket_lots WHERE id=$1", []any{lot}, &available)
-	if available != 0 {
-		t.Fatalf("canceled reward still has %d available", available)
+	var canceled bool
+	queryRowArgs(t, "SELECT canceled_at IS NOT NULL FROM coaching_referral_coupons WHERE id=$1", []any{coupon}, &canceled)
+	if !canceled {
+		t.Fatal("unused coupon was not canceled")
 	}
 	checkout(afterReward, code)
 	assertCount(2)

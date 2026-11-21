@@ -145,6 +145,11 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	coupon, err := s.q.ReferralCouponBalance(r.Context(), p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	purchases, err := s.q.ListMyTicketPurchases(r.Context(), &p.ID)
 	if err != nil {
 		MapDBError(w, err)
@@ -169,6 +174,7 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 	w, read := s.coachingReadOnSuccess(w, r, p.ID, "player", nil, "/me/coaching/tickets")
 	defer read()
 	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "balance_by_kind": byKind, "purchases": purchases, "ledger": ledgerOut,
+		"coupon":       map[string]any{"count": coupon.Count, "earliest_expires_at": referralExpiry(coupon.EarliestExpiresAt)},
 		"can_purchase": s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
 		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
 		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths, "terms_version": ticketWordingVersion})
@@ -581,6 +587,68 @@ func reissueExpiredRewardLot(ctx context.Context, q *db.Queries, lot db.Coaching
 	})
 }
 
+// reserveReviewCoupon runs in the request transaction under LockReviewRequester.
+func reserveReviewCoupon(ctx context.Context, q *db.Queries, p db.Profile, rr db.ReviewRequest) error {
+	couponID, err := q.LockAvailableReferralCoupon(ctx, p.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return &ticketRuleError{"coupon_unavailable", "使える紹介特典クーポンがありません。お支払い方法を選び直してください"}
+	}
+	if err != nil {
+		return err
+	}
+	reservation, err := q.CreateTicketReservation(ctx, db.CreateTicketReservationParams{
+		ID: uuid.New(), OwnerID: &p.ID, RequestID: &rr.ID,
+		Quantity: reviewTicketUnits, NominalYen: reviewPriceYen, SharePercent: reviewSharePercent,
+	})
+	if err != nil {
+		return err
+	}
+	return q.UseReferralCoupon(ctx, db.UseReferralCouponParams{ID: couponID, UsedReservationID: &reservation.ID})
+}
+
+func releaseReviewCoupon(ctx context.Context, q *db.Queries, reservation db.CoachingTicketReservation) error {
+	// 紹介カウントの取消しと同じ順（紹介ID→クーポン）でロックする。
+	if err := q.LockReferralCodeForCouponRelease(ctx, &reservation.ID); err != nil {
+		return err
+	}
+	coupon, err := q.LockReferralCouponByReservation(ctx, &reservation.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	refunded, err := q.ReferralCouponHasRefund(ctx, &coupon.ID)
+	if err != nil {
+		return err
+	}
+	if refunded {
+		return q.CancelReleasedReferralCoupon(ctx, coupon.ID)
+	}
+	if err := q.ReleaseReferralCoupon(ctx, coupon.ID); err != nil {
+		return err
+	}
+	if coupon.ExpiresAt.After(time.Now()) {
+		return nil
+	}
+	coachCaused, err := coachCausedReviewEnd(ctx, q, reservation)
+	if err != nil || !coachCaused {
+		return err
+	}
+	if err := q.ReissueReferralCoupon(ctx, coupon.OwnerID); err != nil {
+		return err
+	}
+	if wanted, err := notificationWanted(ctx, q, coupon.OwnerID, notifyCoaching, true); err != nil || !wanted {
+		return err
+	}
+	title := "紹介特典：期限切れの無料クーポンを出し直しました"
+	body := "運営者・コーチの都合で終わった1回プランで使った分を出し直しました。新しい特典クーポン：" + referralCouponTerms
+	url, role := "/me/coaching/tickets", "player"
+	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
+		ID: uuid.New(), RecipientID: coupon.OwnerID, Title: &title, Body: &body, Url: &url, CoachingRole: &role,
+	})
+}
+
 func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.CoachingTicketReservation, consume bool) error {
 	t, err := q.LockTicketReservation(ctx, reservation.ID)
 	if err != nil {
@@ -592,6 +660,11 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 	allocations, err := q.ListTicketAllocations(ctx, t.ID)
 	if err != nil {
 		return err
+	}
+	if !consume && len(allocations) == 0 {
+		if err := releaseReviewCoupon(ctx, q, t); err != nil {
+			return err
+		}
 	}
 	kind := "release"
 	if consume {
@@ -612,7 +685,7 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 			forfeit := l.ExpiresAt != nil && !l.ExpiresAt.After(time.Now())
 			refundInvalidated := false
 			if l.Kind == "referral_reward" {
-				refunded, err := q.ReferralRewardHasRefund(ctx, l.ID)
+				refunded, err := q.ReferralRewardHasRefund(ctx, &l.ID)
 				if err != nil {
 					return err
 				}
@@ -642,7 +715,7 @@ func settleReviewTickets(ctx context.Context, q *db.Queries, reservation db.Coac
 			return err
 		}
 		if !consume && expired > 0 {
-			if err := q.CancelReleasedReferralReward(ctx, a.LotID); err != nil {
+			if err := q.CancelReleasedReferralReward(ctx, &a.LotID); err != nil {
 				return err
 			}
 		}
@@ -714,6 +787,12 @@ func (s *Server) attachTicketReservation(ctx context.Context, out map[string]any
 	}
 	if err != nil {
 		return err
+	}
+	if err := s.attachReviewCoupon(ctx, out, id); err != nil {
+		return err
+	}
+	if out["used_coupon"] == true {
+		return nil
 	}
 	out["tickets"] = map[string]any{"quantity": t.Quantity, "status": t.Status, "nominal_yen": t.NominalYen}
 	return nil

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
@@ -13,6 +14,16 @@ import (
 )
 
 const referralRewardTerms = "特典チケット：付与日から6か月有効／付与された本人だけが使えます／払戻しはできません"
+
+const referralCouponTerms = "特典クーポン：付与日から6か月有効／付与された本人だけが次回の購入で使えます／払戻しはできません"
+
+// referralExpiry converts the SQL sentinel for an absent expiry to JSON null.
+func referralExpiry(t time.Time) *time.Time {
+	if t.Equal(time.Unix(0, 0)) {
+		return nil
+	}
+	return &t
+}
 
 func normalizeReferralCode(code string) string {
 	return strings.ToUpper(strings.TrimSpace(width.Narrow.String(code)))
@@ -48,7 +59,7 @@ func recordCoachingReferral(ctx context.Context, q *db.Queries, buyer, ticketID,
 	if wanted, err := notificationWanted(ctx, q, id, notifyCoaching, true); err != nil || !wanted {
 		return err
 	}
-	title, body, url := "紹介特典：無料チケットを1枚プレゼントしました", referralRewardTerms, "/me/coaching/tickets"
+	title, body, url := "紹介特典：無料クーポンを1枚プレゼントしました", referralCouponTerms, "/me/coaching/tickets"
 	role := "player"
 	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
 		ID: uuid.New(), RecipientID: id, Title: &title, Body: &body, Url: &url, CoachingRole: &role,
@@ -69,7 +80,10 @@ func (s *Server) myCoachingReferral(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]any{"referral": progress})
+	JSON(w, http.StatusOK, map[string]any{"referral": struct {
+		db.GetCoachingReferralProgressRow
+		ExpiresAt *time.Time `json:"expires_at"`
+	}{progress, referralExpiry(progress.ExpiresAt)}})
 }
 
 func (s *Server) checkCoachingReferral(w http.ResponseWriter, r *http.Request) {
@@ -111,5 +125,13 @@ func (s *Server) adminCoachingReferrals(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]any{"referrals": rows})
+	type row struct {
+		db.AdminCoachingReferralOverviewRow
+		ExpiresAt *time.Time `json:"expires_at"`
+	}
+	out := make([]row, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, row{r, referralExpiry(r.ExpiresAt)})
+	}
+	JSON(w, http.StatusOK, map[string]any{"referrals": out})
 }

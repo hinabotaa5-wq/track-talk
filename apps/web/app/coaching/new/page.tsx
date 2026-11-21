@@ -80,6 +80,7 @@ export default function NewReviewRequestPage() {
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
   const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
+  const [useCoupon, setUseCoupon] = useState(false);
   const [method, setMethod] = useState<ReviewPayMethod | "tickets">("card");
   // チケットの内訳（通常／無料。本体 #687）。種別が分からない古い API では null のまま（従来どおり自動）。
   const [ticketKind, setTicketKind] = useState<TicketKind | null>(null);
@@ -93,20 +94,22 @@ export default function NewReviewRequestPage() {
   const appliedCoachRef = useRef("");
   const coach = coaches.find((c) => c.id === coachID);
   const totalPrice = estimate?.price_yen ?? reviewPriceYen;
-  const cashPrice = method === "tickets" ? 0 : totalPrice;
+  const cashPrice = method === "tickets" || useCoupon ? 0 : totalPrice;
+  const couponCount = ticketSummary?.coupon?.count ?? 0;
+  const couponExpiry = ticketSummary?.coupon?.earliest_expires_at ?? null;
   // チケットが1枚（添削1回分）以上残っている人にだけ、チケットで払う選択肢を出す。
   const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 1;
   const kindCounts = ticketKindCounts(ticketSummary);
-  const chosenKind = method === "tickets" ? ticketKind : null;
-  const chosenExpiry = ticketExpiryFor(ticketSummary, chosenKind);
+  const chosenKind = !useCoupon && method === "tickets" ? ticketKind : null;
+  const chosenExpiry = useCoupon ? couponExpiry : ticketExpiryFor(ticketSummary, chosenKind);
   const cashPayment = !!estimate?.payments && cashPrice > 0;
   // 18歳未満が自分で払うときだけ、宣言のチェックを出して必須にする。
-  const needsDeclaration = cashPayment;
+  const needsDeclaration = cashPayment || useCoupon;
   // 申し込めるか。古い API（review_open を返さない）では、これまでどおり招待コードの有無で見る。
   const reviewOpen = !!(me?.review_open ?? me?.demo);
   // 最終確認を出しているか。お金かチケットが動く申込みだけ確認を挟む（デモ版はそのまま送る）。
   const [confirming, setConfirming] = useState(false);
-  const needsConfirm = cashPayment || method === "tickets";
+  const needsConfirm = needsDeclaration || method === "tickets";
   // 確認画面を開いた時点で取っておいた動画の署名（本体 #917）。確定後の往復を1つ減らす。1回使ったら捨てる。
   const prefetchedSignature = useRef<PrefetchedSignature | null>(null);
 
@@ -280,7 +283,11 @@ export default function NewReviewRequestPage() {
       setError(L("100MB以内の動画にしてください"));
       return false;
     }
-    if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < 1) {
+    if (useCoupon && couponCount < 1) {
+      setError(L("使える紹介特典クーポンがありません。お支払い方法を選び直してください"));
+      return false;
+    }
+    if (!useCoupon && method === "tickets" && (ticketSummary?.balance.available ?? 0) < 1) {
       setError(L("チケットが不足しています。先にチケットを購入してください。"));
       return false;
     }
@@ -320,7 +327,10 @@ export default function NewReviewRequestPage() {
         method: "POST",
         token,
         body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: videoPublicID,
-          method, use_tickets: method === "tickets", ticket_kind: chosenKind ?? undefined, referral_code: cashPayment ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
+          ...(useCoupon ? { use_coupon: true } : {
+            method, use_tickets: method === "tickets", ticket_kind: chosenKind ?? undefined,
+            referral_code: cashPayment ? referralCode : undefined,
+          }), requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
       });
       if (created.checkout_url) {
         window.location.assign(created.checkout_url);
@@ -329,7 +339,7 @@ export default function NewReviewRequestPage() {
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : L("送信に失敗しました")));
-      if (err instanceof ApiRequestError && ["ticket_kind_unavailable", "insufficient_tickets"].includes(err.code)) {
+      if (err instanceof ApiRequestError && ["ticket_kind_unavailable", "insufficient_tickets", "coupon_unavailable"].includes(err.code)) {
         // 残りを読み直す。選んだ種別は他に切り替えない（0枚の側は選べない表示になる）。
         try { setTicketSummary(await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })); } catch { /* 元のエラーを表示する。 */ }
       }
@@ -367,11 +377,12 @@ export default function NewReviewRequestPage() {
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
-            confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ")}
+            rows={reviewConfirmRows({ method, useCoupon, priceYen: totalPrice, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
+            confirmLabel={useCoupon ? L("確定して特典クーポンで送る") : chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ")}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
+            showPendingOverlay={!useCoupon}
             pendingLabel={cashPayment ? L("お支払い画面へ移動しています") : undefined}
           >
             {cashPayment ? <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
@@ -379,7 +390,7 @@ export default function NewReviewRequestPage() {
             <Link href="/legal/commerce" className="inline-block text-xs text-slate-200 underline">
               {L("特定商取引法に基づく表記")}
             </Link>
-            {method === "tickets" ? (
+            {!useCoupon && method === "tickets" ? (
               <p className="text-xs text-slate-300">{L("当社・コーチ都合で受けられなかった場合の返金は、利用規約第6条のとおりです。")}</p>
             ) : null}
           </PurchaseConfirm>
@@ -440,15 +451,15 @@ export default function NewReviewRequestPage() {
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">{L("料金と受付状況を確認しています。表示されない場合はページを開き直してください。")}</p> : null}
-          {estimate?.payments || ticketsUsable ? (
+          {estimate?.payments || ticketsUsable || couponCount > 0 ? (
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
               <div className="flex flex-wrap gap-2">
-                <button type="button" aria-pressed={method === "card"} onClick={() => setMethod("card")} className={chip(method === "card")}>
+                <button type="button" aria-pressed={!useCoupon && method === "card"} onClick={() => { setUseCoupon(false); setMethod("card"); }} className={chip(!useCoupon && method === "card")}>
                   {L("単発 {v0}／回", { v0: formatYen(totalPrice) })}
                 </button>
                 {ticketsUsable ? (
-                  <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>
+                  <button type="button" aria-pressed={!useCoupon && method === "tickets"} onClick={() => { setUseCoupon(false); setMethod("tickets"); }} className={chip(!useCoupon && method === "tickets")}>
                     {L("チケット（6枚）{v0}", { v0: formatYen(ticketPackPriceYen) })}
                   </button>
                 ) : ticketSummary?.can_purchase ? (
@@ -456,11 +467,18 @@ export default function NewReviewRequestPage() {
                     {L("チケット（6枚）{v0}", { v0: formatYen(ticketPackPriceYen) })}
                   </Link>
                 ) : null}
+                {couponCount > 0 ? (
+                  <button type="button" aria-pressed={useCoupon} onClick={() => setUseCoupon(true)} className={chip(useCoupon)}>
+                    {couponExpiry
+                      ? L("紹介特典クーポン（残り {n} 枚・いちばん早い有効期限 {expiry}）", { n: couponCount, expiry: formatDateTime(couponExpiry) })
+                      : L("紹介特典クーポン（残り {n} 枚）", { n: couponCount })}
+                  </button>
+                ) : null}
               </div>
-              {method === "card" ? (
+              {!useCoupon && method === "card" ? (
                 <p className="text-xs text-slate-300">{reviewPayMethodLabels.card}</p>
               ) : null}
-              {method === "tickets" && ticketsUsable && ticketSummary ? (
+              {!useCoupon && method === "tickets" && ticketsUsable && ticketSummary ? (
                 <div className="space-y-2 text-sm">
                   {kindCounts ? (
                     <div className="flex flex-wrap gap-2" role="group" aria-label={L("使うチケット")}>
@@ -497,7 +515,7 @@ export default function NewReviewRequestPage() {
               {L("申し込みが確定してから24時間以内に回答が来ます。")}
             </p>
           ) : null}
-          {coachID ? <p className="text-xs text-slate-300">{L("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
+          {coachID && !useCoupon ? <p className="text-xs text-slate-300">{L("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
           <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? L("送っています") : needsConfirm ? L("申込み内容を確認する") : L("送る")}

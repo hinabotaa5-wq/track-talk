@@ -85,7 +85,7 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"due_at":             rr.DueAt,
 		"created_at":         rr.CreatedAt,
 		"requested_coach_id": rr.RequestedCoachID, "requested_coach_name": rr.RequestedCoachName,
-		"base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets,
+		"base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets, "used_coupon": false,
 		"total_price_yen": rr.BasePriceYen, "cash_price_yen": reviewCashPrice(rr),
 		"video_url":     reviewVideoURL(rr, s.cloud.CoachingPlaybackURL),
 		"thumbnail_url": reviewVideoURL(rr, s.cloud.CoachingThumbnailURL),
@@ -97,6 +97,15 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"question_en":     nil,
 		"info_request_ja": nil,
 	}
+}
+
+func (s *Server) attachReviewCoupon(ctx context.Context, out map[string]any, id uuid.UUID) error {
+	used, err := s.q.ReviewUsedReferralCoupon(ctx, &id)
+	if err != nil {
+		return err
+	}
+	out["used_coupon"] = used
+	return nil
 }
 
 // reviewVideoURL は、依頼の動画の URL。保持期間を過ぎて消した後は nil。
@@ -257,6 +266,7 @@ type reviewRequestReq struct {
 	// 支払い方法（reviewPaymentMethods のどれか。今は card のみ）。Stripe の鍵があるときだけ使う。
 	Method     string `json:"method"`
 	UseTickets bool   `json:"use_tickets"`
+	UseCoupon  bool   `json:"use_coupon"`
 	// チケットで払うときの種別（normal＝通常チケット／reward＝無料チケット。本体 #687）。
 	// 空なら従来どおり種別を区別せず失効の早いものから使う。
 	TicketKind   string `json:"ticket_kind"`
@@ -316,6 +326,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
 	useTickets := req.Method == "tickets" || req.UseTickets
+	if req.UseCoupon && (useTickets || req.Method != "" || req.TicketKind != "") {
+		Error(w, http.StatusBadRequest, "validation_error", "紹介特典クーポンと他のお支払い方法は同時に選べません")
+		return
+	}
 	if !validTicketKind(req.TicketKind) || (req.TicketKind != "" && !useTickets) {
 		fields["ticket_kind"] = "チケットの種類を選び直してください"
 	}
@@ -340,7 +354,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !useTickets {
 		cashPrice = reviewPriceYen
 	}
-	payments := s.stripe.Configured() && cashPrice > 0
+	payments := !req.UseCoupon && s.stripe.Configured() && cashPrice > 0
 	if payments && !validReviewPayMethod(req.Method) {
 		fields["method"] = "支払い方法を選んでください"
 	}
@@ -348,7 +362,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	if err := requirePurchaseNotice(payments, req.GuardianPermission); err != nil {
+	if err := requirePurchaseNotice(payments || req.UseCoupon, req.GuardianPermission); err != nil {
 		writeCheckoutError(w, err)
 		return
 	}
@@ -391,7 +405,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if useTickets {
+	if useTickets || req.UseCoupon {
 		// 同時に送られた2本が、どちらも「まだ0本」と読んで作られないように、ロックを取ってから確かめ直す。
 		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
 			MapDBError(w, err)
@@ -432,6 +446,17 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if useTickets {
 		if err := s.reserveReviewTickets(r.Context(), q, p, rr, req.TicketKind); err != nil {
+			writeCheckoutError(w, err)
+			return
+		}
+	}
+	if req.UseCoupon {
+		if err := reserveReviewCoupon(r.Context(), q, p, rr); err != nil {
+			writeCheckoutError(w, err)
+			return
+		}
+		notice := minorPurchase{refType: "review", refID: rr.ID, amount: reviewCashPrice(rr), coachID: rr.RequestedCoachID}
+		if err := recordPurchaseNotice(r.Context(), q, p, notice, req.minorDeclarationReq); err != nil {
 			writeCheckoutError(w, err)
 			return
 		}
@@ -477,6 +502,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		s.translateReviewAfterWrite(r.Context(), rr, true, false, false)
 	}
 	out := s.reviewRequestJSON(rr)
+	out["used_coupon"] = req.UseCoupon
 	s.withReviewTranslations(r.Context(), out, rr)
 	JSON(w, http.StatusCreated, out)
 }
@@ -499,7 +525,12 @@ func (s *Server) listMyReviewRequests(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, rr := range rows {
-		out = append(out, s.reviewRequestJSON(rr))
+		item := s.reviewRequestJSON(rr)
+		if err := s.attachReviewCoupon(r.Context(), item, rr.ID); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		out = append(out, item)
 	}
 	JSON(w, http.StatusOK, map[string]any{"requests": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }
