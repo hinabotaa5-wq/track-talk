@@ -42,7 +42,8 @@ AND (c.status IN ('offered','in_review') OR (c.status='answered' AND c.clarify_r
 ORDER BY c.created_at LIMIT 100;
 
 -- name: SubmitTicketConsultation :one
-UPDATE coaching_consultations SET status='offered',respond_by=now()+interval '24 hours',updated_at=now()
+UPDATE coaching_consultations
+SET status='offered',respond_by=now()+interval '24 hours',offered_at=COALESCE(offered_at,now()),updated_at=now()
 WHERE id=$1 AND status='draft' AND expires_at>now() RETURNING *;
 
 -- name: StartCashConsultationPayment :one
@@ -62,6 +63,10 @@ UPDATE coaching_consultations SET payment_state='paid',payment_intent_id=$2,paid
 status=CASE WHEN status='awaiting_payment' AND expires_at>now() THEN 'offered' ELSE 'expired' END,
 respond_by=now()+interval '24 hours',closed_at=CASE WHEN status='awaiting_payment' AND expires_at>now() THEN NULL ELSE now() END,updated_at=now()
 WHERE id=$1 AND payment_state='unpaid' RETURNING *;
+
+-- name: RecordCashConsultationOffer :exec
+UPDATE coaching_consultations SET offered_at=COALESCE(offered_at,now())
+WHERE id=$1 AND funding='cash' AND status='offered';
 
 -- name: AcceptConsultation :one
 UPDATE coaching_consultations SET status='in_review',answer_by=now()+interval '12 hours',updated_at=now()

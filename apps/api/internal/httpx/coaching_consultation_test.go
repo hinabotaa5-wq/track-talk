@@ -375,10 +375,20 @@ func TestConsultationCashSnapshotWebhookAndRefund(t *testing.T) {
 	if code := payConsultation(t, h, c.ID, 1200); code != 200 {
 		t.Fatalf("pay %d", code)
 	}
+	var offeredAt *time.Time
+	queryRowArgs(t, `SELECT offered_at FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &offeredAt)
+	if offeredAt == nil {
+		t.Fatal("successful payment did not record delivery")
+	}
 	if code := payConsultation(t, h, c.ID, 1200); code != 200 {
 		t.Fatalf("repeat %d", code)
 	}
 	consultationAction(t, h, coach, c.ID, "decline", nil)
+	var afterDecline *time.Time
+	queryRowArgs(t, `SELECT offered_at FROM coaching_consultations WHERE id=$1`, []any{c.ID}, &afterDecline)
+	if afterDecline == nil || !afterDecline.Equal(*offeredAt) {
+		t.Fatalf("delivery changed after repeat and decline: %v -> %v", offeredAt, afterDecline)
+	}
 	for i := 0; i < 2; i++ {
 		if r := tick(t, h, "tick-secret"); r.Code != 200 {
 			t.Fatal(r.Body.String())
