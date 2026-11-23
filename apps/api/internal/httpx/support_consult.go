@@ -381,7 +381,8 @@ func (s *Server) getPublicCoachConsult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	entry, found := entries[id]
-	if !found {
+	// 特集モードで外したコーチは、入口がないときと同じ応答にする（本体 #985）。
+	if !found || s.coachHiddenByFeature(id) {
 		JSON(w, http.StatusOK, map[string]any{"consult": nil})
 		return
 	}

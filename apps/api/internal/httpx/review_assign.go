@@ -55,6 +55,10 @@ func (s *Server) assignReview(ctx context.Context, q *db.Queries, rr db.ReviewRe
 		if err != nil {
 			return rr, err
 		}
+		// 特集モードでは、おまかせでも特集コーチ以外には割り当てない（本体 #985）。
+		if s.coachHiddenByFeature(coachID) {
+			return rr, nil
+		}
 	}
 	assigned, err := q.AssignReviewRequest(ctx, db.AssignReviewRequestParams{ID: rr.ID, CoachID: coachID})
 	if errors.Is(err, pgx.ErrNoRows) {

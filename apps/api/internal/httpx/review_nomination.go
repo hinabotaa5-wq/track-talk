@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,11 +17,16 @@ func reviewCashPrice(rr db.ReviewRequest) int32 {
 	return rr.BasePriceYen
 }
 
+// 指名候補の一覧と、申込み時の指名の確認の両方がここを通る。特集モードでは特集コーチ以外を候補から外す（本体 #985）。
 func (s *Server) reviewNominees(ctx context.Context, q *db.Queries, requester uuid.UUID, event string, coach *uuid.UUID) ([]db.ListReviewNomineesRow, error) {
-	return q.ListReviewNominees(ctx, db.ListReviewNomineesParams{
+	rows, err := q.ListReviewNominees(ctx, db.ListReviewNomineesParams{
 		Payments: s.stripe.Configured(), Tier: "coach", Event: event, RequesterID: requester,
 		RequestedCoachID: coach, DayStart: dayStart(time.Now()),
 	})
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(rows, func(c db.ListReviewNomineesRow) bool { return s.coachHiddenByFeature(c.ProfileID) }), nil
 }
 
 func (s *Server) listReviewNominees(w http.ResponseWriter, r *http.Request) {

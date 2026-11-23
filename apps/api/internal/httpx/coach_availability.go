@@ -43,7 +43,8 @@ func (s *Server) getPublicCoachAvailability(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	today := availabilityToday(time.Now())
-	if !visible {
+	// 特集モードで外したコーチは、公開プランがないときと同じ空の応答にする（本体 #985）。
+	if !visible || s.coachHiddenByFeature(id) {
 		JSON(w, http.StatusOK, availabilityJSON(today, nil))
 		return
 	}

@@ -44,6 +44,8 @@ func (s *Server) listSupportPlanCoaches(w http.ResponseWriter, r *http.Request) 
 		MapDBError(w, err)
 		return
 	}
+	// 特集モードでは特集コーチ以外を出さない（本体 #985）。
+	rows = slices.DeleteFunc(rows, func(c db.ListPublicCoachesRow) bool { return s.coachHiddenByFeature(c.ProfileID) })
 	plans, err := s.q.ListPublicCoachingPlans(ctx, db.ListPublicCoachingPlansParams{PledgeVersion: coachPledgeListedVersion})
 	if err != nil {
 		MapDBError(w, err)
