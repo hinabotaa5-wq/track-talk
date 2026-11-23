@@ -143,25 +143,26 @@ it("同じタブのクリックは何もしない", async () => {
   expect(fetchCount("/v1/coaches")).toBe(1);
 });
 
-it("種目チップで絞り込んだ状態が、タブを行き来しても保持される", async () => {
+// 本体 #991：1回プランの一覧から種目チップを外したので、チップは継続プラン一覧の側だけにある。
+it("種目チップで絞り込んだ状態が、タブを行き来しても保持される（継続プラン一覧）", async () => {
   await render();
-  const target = chip("100m");
+  // 1回プランの一覧には種目チップを出さない。
+  expect(container.querySelector('[role="radio"]')).toBeNull();
+  await act(async () => switchLink("継続プラン")!.click());
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  const target = chip("100m", panels()[1]);
   expect(target?.getAttribute("aria-checked")).toBe("false");
   await act(async () => { target!.click(); });
   // 同一ノードの属性が変わる（選び直しではなくその場で切り替わる）。
   expect(target!.getAttribute("aria-checked")).toBe("true");
-  await act(async () => switchLink("継続プラン")!.click());
-  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   await act(async () => switchLink("1回プラン")!.click());
-  // フォーム添削の一覧は破棄されていないので、選んだチップのノードも選択も残る。
-  expect(panels()[0].hidden).toBe(false);
-  const panel = panels()[0];
-  expect(
-    panel.contains(target!),
-    `radios=${container.querySelectorAll('[role="radio"]').length} panels=${panels().length} hidden=${panels().map((p) => p.hidden)} tab=${container.querySelector('[role="tabpanel"]')?.textContent?.slice(0, 160)}`,
-  ).toBe(true);
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  await act(async () => switchLink("継続プラン")!.click());
+  // 継続プランの一覧は破棄されていないので、選んだチップのノードも選択も残る。
+  expect(panels()[1].hidden).toBe(false);
+  expect(panels()[1].contains(target!)).toBe(true);
   expect(target!.getAttribute("aria-checked")).toBe("true");
-  expect(fetchCount("/v1/coaches")).toBe(1);
+  expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
 });
 
 it("継続プラン側のURLは共有できる（今いるルートのままクエリだけが付く）", async () => {

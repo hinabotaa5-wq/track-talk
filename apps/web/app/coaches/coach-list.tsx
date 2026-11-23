@@ -4,7 +4,6 @@ import { L } from "@/lib/i18n";
 import { PageLoading } from "@/components/page-loading";
 
 import { CoachAvatar } from "@/components/coach-photo";
-import { CoachEventChips, CoachEventEmpty, filterCoachesByEvent, type CoachEventFilter } from "@/components/coach-event-filter";
 import { apiFetch } from "@/lib/api";
 import { rememberCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { formatYen } from "@/lib/format";
@@ -25,7 +24,6 @@ function coachPrice(coach: PublicCoach): string | null {
 export function CoachList({ onSettled }: { onSettled?: () => void }) {
   const [result, setResult] = useState<{ coaches: PublicCoach[]; fetchedAt: number } | null>(null);
   const [error, setError] = useState("");
-  const [event, setEvent] = useState<CoachEventFilter>("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -49,14 +47,12 @@ export function CoachList({ onSettled }: { onSettled?: () => void }) {
 
   if (error) return <p role="alert" className="text-sm text-red-400">{error}</p>;
   if (!result) return <PageLoading screen label={L("読み込み中...")} />;
-  // 並びは API の公平なローテーションのまま。種目で絞っても並べ替えない。
-  const shown = filterCoachesByEvent(result.coaches, event);
+  // 並びは API の公平なローテーションのまま。種目の絞り込みは置かない（本体 #991）。
+  const shown = result.coaches;
 
   return (
     <div className="space-y-3">
-      <CoachEventChips value={event} onChange={setEvent} />
-      {shown.length === 0 && event === "all" ? <p className="text-sm text-slate-200">{L("まだいません")}</p> : null}
-      {shown.length === 0 && event !== "all" ? <CoachEventEmpty onReset={() => setEvent("all")} /> : null}
+      {shown.length === 0 ? <p className="text-sm text-slate-200">{L("まだいません")}</p> : null}
       {shown.length > 0 ? (
         <ul className="grid grid-cols-2 gap-3">
           {shown.map((c) => {

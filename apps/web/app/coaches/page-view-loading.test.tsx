@@ -98,7 +98,9 @@ it("読み込み完了後はバナー・タブ切り替え・一覧が出て、�
   expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると");
   expect(container.textContent).toContain("1回プラン");
   expect(container.textContent).toContain("継続プラン");
-  expect(container.querySelector('[role="radio"]')).not.toBeNull();
+  expect(container.querySelector('[role="group"][aria-label="コーチの一覧を切り替える"]')).not.toBeNull();
+  // 1回プランの一覧には種目チップを出さない（本体 #991）。
+  expect(container.querySelector('[role="radio"]')).toBeNull();
   expect(apiFetch.mock.calls.filter(([path]) => path === "/v1/coaches")).toHaveLength(1);
 });
 

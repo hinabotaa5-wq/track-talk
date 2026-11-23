@@ -91,12 +91,14 @@ it("開始の告知がある間も、閉じているときだけ告知と準備�
 });
 
 // 特集モード（本体 #985）：一覧の代わりに特集ページを出し、一覧 API は取らない。切ると一覧に戻る。
-it("特集モードでは一覧・切り替えの代わりに特集ページを出す", async () => {
+it("特集モードでは一覧の代わりに特集ページを出す", async () => {
   flags.coaching = true;
   flags.list = true;
   flags.featured = "c-featured";
   await render();
-  expect(container.querySelector("h1")?.textContent).toBe("特集コーチ");
+  // 特集ページ（本体 #991）：ヒーローの h1 は無く、「コーチについて」の見出しに名前が出る。
+  expect(container.querySelector("h1")).toBeNull();
+  expect(container.querySelector("#featured-about")?.textContent).toBe("特集コーチについて");
   expect(container.querySelector('[role="tabpanel"]')).toBeNull();
   expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/c-featured"]);
 });
