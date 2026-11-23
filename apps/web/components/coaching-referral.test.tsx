@@ -101,7 +101,7 @@ it("compact は見出し・ID・コピー・状態だけでコピー結果も表
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   mocks.api.mockResolvedValue({ referral: { code: "ABC123", active: true, friend_count: 1, granted_at: null, expires_at: null } });
   await act(async () => root.render(<LoadedReferralCard token="test" variant="compact" />));
-  expect(container.querySelector("h2")?.textContent).toBe("友達2人に紹介すると、1回分(500円)無料！");
+  expect(container.querySelector("h2")?.textContent).toBe("友達2人に紹介すると、1回分(1,000円)無料！");
   expect(container.querySelector("h2")?.classList).toContain("text-sm");
   expect(container.querySelector("section")?.classList).toContain("p-3");
   expect(container.textContent).toContain("あなたの紹介ID ABC123");

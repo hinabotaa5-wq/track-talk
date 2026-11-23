@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// 売るのは6枚つづり2,500円だけ（本体 #569）。旧商品（1枚・5枚）は出さず、買えない。
-// 単発の料金（500円）と1回あたりの枚数（1枚）・有効期限（6か月）も一緒に返す。
-func TestTicketProductsAreSixForTwentyFiveHundred(t *testing.T) {
+// 売るのは6枚つづり5,000円だけ（本体 #569、価格は #983）。旧商品（1枚・5枚）は出さず、買えない。
+// 単発の料金（1,000円）と1回あたりの枚数（1枚）・有効期限（6か月）も一緒に返す。
+func TestTicketProductsAreSixForFiveThousand(t *testing.T) {
 	h, _ := setupStripe(t)
 	_, owner := demoRequester(t, h, adminToken(t, h))
 	summary := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", owner, nil).Body.String()
-	for _, want := range []string{`"products":[{"id":"six","title":"チケット6枚","quantity":6,"amount_yen":2500`, `"single_price_yen":500`, `"review_units":1`, `"validity_months":6`} {
+	for _, want := range []string{`"products":[{"id":"six","title":"チケット6枚","quantity":6,"amount_yen":5000`, `"single_price_yen":1000`, `"review_units":1`, `"validity_months":6`} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary %s missing %s", summary, want)
 		}
@@ -30,13 +30,13 @@ func TestTicketProductsAreSixForTwentyFiveHundred(t *testing.T) {
 func TestTicketPriceChangePreservesPurchaseSnapshot(t *testing.T) {
 	h, _ := setupStripe(t)
 	_, owner := demoRequester(t, h, adminToken(t, h))
-	execSQLArgs(t, `UPDATE coaching_ticket_products SET amount_yen=2400 WHERE id='six'`)
-	defer execSQLArgs(t, `UPDATE coaching_ticket_products SET amount_yen=2500 WHERE id='six'`)
+	execSQLArgs(t, `UPDATE coaching_ticket_products SET amount_yen=4800 WHERE id='six'`)
+	defer execSQLArgs(t, `UPDATE coaching_ticket_products SET amount_yen=5000 WHERE id='six'`)
 	old := startTicketPurchase(t, h, owner, "six", uuid.NewString(), "/coaching/new")
-	execSQLArgs(t, `UPDATE coaching_ticket_products SET amount_yen=2500 WHERE id='six'`)
+	execSQLArgs(t, `UPDATE coaching_ticket_products SET amount_yen=5000 WHERE id='six'`)
 	current := startTicketPurchase(t, h, owner, "six", uuid.NewString(), "/coaching/new")
-	payTicketPurchase(t, h, old, 2400)
-	payTicketPurchase(t, h, current, 2500)
+	payTicketPurchase(t, h, old, 4800)
+	payTicketPurchase(t, h, current, 5000)
 	state := ticketSummary(t, h, owner)
 	if state.Balance.Available != 12 {
 		t.Fatalf("balance: %+v", state.Balance)
@@ -45,7 +45,7 @@ func TestTicketPriceChangePreservesPurchaseSnapshot(t *testing.T) {
 	for _, purchase := range state.Purchases {
 		amounts[purchase.AmountYen] = true
 	}
-	if !amounts[2400] || !amounts[2500] {
+	if !amounts[4800] || !amounts[5000] {
 		t.Fatalf("purchase snapshots: %+v", state.Purchases)
 	}
 }

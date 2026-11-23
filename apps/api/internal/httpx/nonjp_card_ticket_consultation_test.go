@@ -170,7 +170,7 @@ func TestTicketPurchaseNonJPCardOnReturnSync(t *testing.T) {
 	queryRowArgs(t, `SELECT checkout_session_id FROM coaching_ticket_purchases WHERE id=$1`, []any{id}, &session)
 	intent := "pi_nonjp_sync_" + id
 	f.setCheckoutState(session, map[string]any{"status": "complete", "payment_status": "paid", "payment_intent": intent,
-		"client_reference_id": id, "amount_total": 2500, "currency": "jpy", "metadata": map[string]any{"kind": "tickets", "purchase_id": id}})
+		"client_reference_id": id, "amount_total": 5000, "currency": "jpy", "metadata": map[string]any{"kind": "tickets", "purchase_id": id}})
 	rec := doJSON(t, h, http.MethodGet, "/v1/coaching/tickets/purchases/"+id, tu, nil)
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "card_country_not_supported") {
 		t.Fatalf("purchase %d %s", rec.Code, rec.Body.String())

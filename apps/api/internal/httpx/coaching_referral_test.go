@@ -35,7 +35,7 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
 			t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
 		}
-		payTicketPurchase(t, h, data.ID, 2500)
+		payTicketPurchase(t, h, data.ID, 5000)
 		return data.ID
 	}
 	assertCount := func(want int) {
@@ -50,7 +50,7 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 	checkout(buyer, "INVALID")
 	assertCount(0)
 	pack := checkout(buyer, "  "+strings.ToLower(code)+"  ")
-	payTicketPurchase(t, h, pack, 2500)
+	payTicketPurchase(t, h, pack, 5000)
 	checkout(buyer, code)
 	assertCount(1)
 

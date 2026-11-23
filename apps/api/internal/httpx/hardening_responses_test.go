@@ -56,7 +56,7 @@ func TestTicketLedgerResponseOmitsInternalKeys(t *testing.T) {
 	h, _ := setupStripe(t)
 	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
 	id := startTicketPurchase(t, h, tu, "six", uuid.NewString(), "")
-	payTicketPurchase(t, h, id, 2500)
+	payTicketPurchase(t, h, id, 5000)
 	r := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", tu, nil)
 	if r.Code != 200 {
 		t.Fatalf("tickets %d", r.Code)

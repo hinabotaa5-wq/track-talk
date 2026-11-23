@@ -79,7 +79,7 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(container.querySelector("h2#coach-video-review")?.textContent).toBe("フォーム添削や競技に関する悩み");
   expect(container.textContent).not.toContain("1回プラン（フォーム添削や競技に関する悩み）");
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
-  expect(entry("card")?.textContent).toBe("単発500円");
+  expect(entry("card")?.textContent).toBe("単発1,000円");
   expect(entryLink("card")).toBe(reviewHref("card"));
   // 枚数が分からないときは枚数を出さず、申込画面へ進める。
   expect(entry("normal")?.textContent).toBe("通常チケット");
@@ -87,7 +87,7 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(entry("reward")?.textContent).toBe("無料チケット");
   expect(entryLink("reward")).toBe(reviewHref("reward"));
   expect(container.textContent).not.toContain("残り");
-  expect(container.textContent).toContain("500円");
+  expect(container.textContent).toContain("1,000円");
   expect(container.textContent).toContain("選択して下さい");
   expect(container.textContent).not.toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   expect(container.textContent).not.toContain("チケットも使えます");
@@ -95,7 +95,7 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(mocks.api.mock.calls).toEqual([[`/v1/coaches/${coachID}`]]);
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("チケット");
-  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で2,500円です。1回プランの申込み1件につき1枚消費します。");
+  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で5,000円です。1回プランの申込み1件につき1枚消費します。");
   expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   const purchaseClass = tickets?.querySelector("a")?.className ?? "";
   expect(purchaseClass).toContain("bg-blue-600");
@@ -178,7 +178,7 @@ it("ログイン済みで受付中なら3つの入口を有効にする", async 
 it("種別ごとの残り枚数を出し、それぞれの支払い方式で申込画面へ進む", async () => {
   withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
   await render();
-  expect(entry("card")?.textContent).toBe("単発500円");
+  expect(entry("card")?.textContent).toBe("単発1,000円");
   expect(entry("normal")?.textContent).toBe("通常チケット残り 2 枚");
   expect(entry("reward")?.textContent).toBe("無料チケット残り 1 枚");
   expect(entryLink("card")).toBe(reviewHref("card"));
@@ -299,7 +299,7 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
     throw new Error(`unexpected ${path}`);
   });
   await render();
-  expect(entry("card")?.textContent).toBe("One-time¥500");
+  expect(entry("card")?.textContent).toBe("One-time¥1,000");
   expect(entry("normal")?.textContent).toBe("Regular ticket");
   expect(entry("reward")?.textContent).toBe("Free ticket");
   expect(container.textContent).toContain("Not accepting requests right now");
@@ -311,7 +311,7 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(container.textContent).not.toContain("You can also pay with tickets");
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("Tickets");
-  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥2,500. One ticket is used per One-time Plan.");
+  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥5,000. One ticket is used per One-time Plan.");
   expect(tickets?.querySelector("a")?.textContent).toBe("Buy");
 });
 

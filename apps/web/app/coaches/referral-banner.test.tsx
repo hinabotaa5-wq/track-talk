@@ -31,12 +31,12 @@ const { ReferralBanner } = await import("./referral-banner");
 const { CoachesView } = await import("./page-view");
 
 // 本体 #949：バナーだけ短い見出しにし、説明ページ・紹介カードの見出しは維持する。
-const HEADLINE_JA = "2人に紹介すると、1回(500円)無料！";
-const DETAIL_HEADLINE_JA = "友達2人に紹介すると、1回分(500円)無料！";
+const HEADLINE_JA = "2人に紹介すると、1回(1000円)無料！";
+const DETAIL_HEADLINE_JA = "友達2人に紹介すると、1回分(1,000円)無料！";
 const OLD_HEADLINE_JA = "友達2人に紹介すると、1回無料！";
 const BODY_JA = "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。";
-const HEADLINE_EN = "Refer 2 people, get 1 free (¥500)!";
-const DETAIL_HEADLINE_EN = "Refer two friends and get one free review (¥500)!";
+const HEADLINE_EN = "Refer 2 people, get 1 free (¥1,000)!";
+const DETAIL_HEADLINE_EN = "Refer two friends and get one free review (¥1,000)!";
 const OLD_HEADLINE_EN = "Refer two friends and get a free review!";
 const BODY_EN = "A referral code is issued when you make a purchase. When two friends purchase using that code, the person who referred them receives a free ticket.";
 

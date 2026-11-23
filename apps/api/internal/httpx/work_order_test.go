@@ -39,7 +39,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 6 || accepted.WorkOrder.Terms.AmountYen != 350 || len(accepted.WorkOrder.Terms.Items) != 8 {
+	if accepted.WorkOrder.TermsVersion != 6 || accepted.WorkOrder.Terms.AmountYen != 700 || len(accepted.WorkOrder.Terms.Items) != 8 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
@@ -50,7 +50,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if got := terms.Items[2]; got.Label != "内容" || got.Value != "動画1本の添削（100m）。相談に答えて文章で返却" {
 		t.Fatalf("review content terms: %+v", got)
 	}
-	if got := terms.Items[6]; got.Label != "報酬" || got.Value != "¥350" {
+	if got := terms.Items[6]; got.Label != "報酬" || got.Value != "¥700" {
 		t.Fatalf("reward terms: %+v", got)
 	}
 	if got := terms.Items[7]; got.Label != "支払" || !strings.Contains(got.Value, "累積") {
@@ -63,7 +63,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 			Terms workOrderTermsView `json:"terms"`
 		} `json:"work_order"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 350 {
+	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 700 {
 		t.Fatalf("detail %d %s", rec.Code, rec.Body.String())
 	}
 	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "1回プランの依頼が届きました")

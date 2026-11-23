@@ -866,7 +866,7 @@ it("対応中は相談文1つだけで空の返答カードを出さず、見出
 it("Stripeからの支払い同期後も状態・支払い文は出さず、紹介をcompactにする", async () => {
   searchState.paid = true;
   let synced = false;
-  const paid = baseRequest({ response: null, extra: { status: "in_review", started_at: null, due_at: new Date(Date.now() + 86400000).toISOString(), payment: { method: "card", status: "captured", amount_yen: 500 }, requested_coach_id: "c1", requested_coach_name: "指名コーチ", tickets: { quantity: 1, status: "consumed" } } });
+  const paid = baseRequest({ response: null, extra: { status: "in_review", started_at: null, due_at: new Date(Date.now() + 86400000).toISOString(), payment: { method: "card", status: "captured", amount_yen: 1000 }, requested_coach_id: "c1", requested_coach_name: "指名コーチ", tickets: { quantity: 1, status: "consumed" } } });
   apiFetch.mockImplementation(async (path: string) => {
     if (path.endsWith("/payment/sync")) { synced = true; return paid; }
     if (path.endsWith("/referral")) return { referral: { code: "ABC123", active: false, friend_count: 2, granted_at: "2026-11-14T09:00:00Z", expires_at: "2027-05-14T09:00:00Z" } };

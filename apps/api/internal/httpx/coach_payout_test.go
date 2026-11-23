@@ -272,7 +272,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 	if rec := tick(t, h, "tick-secret"); !strings.Contains(rec.Body.String(), `"earnings_recorded":0`) {
 		t.Fatalf("tick again %s", rec.Body.String())
 	}
-	if e := coachEarnings(t, h, trc); e.ThisMonthYen != 350 || e.UnpaidYen != 350 || len(e.Earnings) != 1 || e.Earnings[0].Source != "review" || e.Earnings[0].SharePercent != 70 {
+	if e := coachEarnings(t, h, trc); e.ThisMonthYen != 700 || e.UnpaidYen != 700 || len(e.Earnings) != 1 || e.Earnings[0].Source != "review" || e.Earnings[0].SharePercent != 70 {
 		t.Fatalf("review earnings %+v", e)
 	}
 	if e := coachEarnings(t, h, tc); e.UnpaidYen != 6000 || len(e.Earnings) != 1 || e.Earnings[0].GrossYen != 8000 || e.Earnings[0].SharePercent != 75 {
@@ -285,14 +285,14 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		t.Fatalf("run this month %d %s", rec.Code, rec.Body.String())
 	}
 
-	// 前の月の分になったら送る。3,000円に届かない添削の350円は繰り越す。
+	// 前の月の分になったら送る。3,000円に届かない添削の700円は繰り越す。
 	execSQLArgs(t, `UPDATE coach_earnings SET confirmed_at = `+lastMonthJST)
 	f.failNextTransfers(1)
 	rec = doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", tadmin, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1,"paid":0,"failed":1`) {
 		t.Fatalf("run failed %d %s", rec.Code, rec.Body.String())
 	}
-	if e := coachEarnings(t, h, trc); e.UnpaidYen != 350 || len(e.Payouts) != 0 || e.Earnings[0].Paid {
+	if e := coachEarnings(t, h, trc); e.UnpaidYen != 700 || len(e.Payouts) != 0 || e.Earnings[0].Paid {
 		t.Fatalf("carried over %+v", e)
 	}
 	// 1回目は Stripe が断り、次に押したときにやり直す。繰り越した分が3,000円に届いたら一緒に送る。
@@ -309,7 +309,7 @@ func TestCoachEarningsAndMonthlyPayout(t *testing.T) {
 		}
 		got[tr.Get("destination")] = tr.Get("amount")
 	}
-	if got["acct_"+reviewCoach.String()] != "3500" || got["acct_"+personalCoach] != "6000" || len(got) != 2 {
+	if got["acct_"+reviewCoach.String()] != "7000" || got["acct_"+personalCoach] != "6000" || len(got) != 2 {
 		t.Fatalf("transfers %v", got)
 	}
 	// 済んだものは送り直さない。
@@ -554,7 +554,7 @@ func TestCoachPayoutUsesConfirmationMonth(t *testing.T) {
 	for _, tc := range []struct {
 		token string
 		total int
-	}{{coach, 1050}, {personalCoach, 6000}} {
+	}{{coach, 2100}, {personalCoach, 6000}} {
 		view := coachEarnings(t, h, tc.token)
 		if view.ThisMonthYen != 0 || view.UnpaidYen != tc.total || len(view.Earnings) == 0 {
 			t.Fatalf("earnings %+v", view)
@@ -567,7 +567,7 @@ func TestCoachPayoutUsesConfirmationMonth(t *testing.T) {
 			}
 		}
 	}
-	// 添削3本の1,050円（350円×3）は3,000円に届かないので繰り越し、サポートプランの分だけ送る。
+	// 添削3本の2,100円（700円×3）は3,000円に届かないので繰り越し、サポートプランの分だけ送る。
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/payouts/run", admin, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"created":1,"paid":1`) {
 		t.Fatalf("run: %d %s", rec.Code, rec.Body.String())
 	}

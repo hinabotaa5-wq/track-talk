@@ -59,11 +59,11 @@ func payTicketPurchase(t *testing.T, h http.Handler, id string, amount int) {
 	}
 }
 
-// buySixTickets は、6枚つづり（2,500円）を買って支払いまで済ませる（本体 #569）。
+// buySixTickets は、6枚つづり（5,000円）を買って支払いまで済ませる（本体 #569）。
 func buySixTickets(t *testing.T, h http.Handler, tok string) string {
 	t.Helper()
 	id := startTicketPurchase(t, h, tok, "six", uuid.NewString(), "/coaching/new")
-	payTicketPurchase(t, h, id, 2500)
+	payTicketPurchase(t, h, id, 5000)
 	return id
 }
 func ticketReview(t *testing.T, h http.Handler, tok string) string {
@@ -120,8 +120,8 @@ func TestTicketPurchaseOnlyCreditsVerifiedWebhookOnce(t *testing.T) {
 	if rec.Code != 500 || ticketSummary(t, h, tu).Balance.Available != 0 {
 		t.Fatalf("incorrect amount credited: %d", rec.Code)
 	}
-	payTicketPurchase(t, h, id, 2500)
-	payTicketPurchase(t, h, id, 2500)
+	payTicketPurchase(t, h, id, 5000)
+	payTicketPurchase(t, h, id, 5000)
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 6 {
 		t.Fatalf("credit %d", got)
 	}
@@ -155,7 +155,7 @@ func TestTicketPurchaseKeepsCoachDetailReturnPath(t *testing.T) {
 	if len(f.sessions) != 1 || !strings.Contains(f.sessions[0].Get("cancel_url"), "return_to="+strings.ReplaceAll(coachPath, "/", "%2F")) {
 		t.Fatalf("checkout sessions %v", f.sessions)
 	}
-	payTicketPurchase(t, h, id, 2500)
+	payTicketPurchase(t, h, id, 5000)
 	r := doJSON(t, h, http.MethodGet, "/v1/coaching/tickets/purchases/"+id, tu, nil)
 	var out struct {
 		Status     string `json:"status"`
@@ -201,8 +201,8 @@ func TestTicketsReservedConsumedAndReleasedWithFixedEarnings(t *testing.T) {
 	}
 	var gross, earnings int
 	queryRowArgs(t, `SELECT gross_yen,amount_yen FROM coach_earnings WHERE review_request_id=$1 AND coach_id=$2`, []any{id, coach}, &gross, &earnings)
-	// まとめ買いの割引は運営が負担し、報酬は単発と同じ350円（500円の70%）に固定する。
-	if gross != 500 || earnings != 350 {
+	// まとめ買いの割引は運営が負担し、報酬は単発と同じ700円（1,000円の70%）に固定する。
+	if gross != 1000 || earnings != 700 {
 		t.Fatalf("discount affected earnings %d %d", gross, earnings)
 	}
 	if len(f.captured) != 0 || len(f.refunds) != 0 {
@@ -305,7 +305,7 @@ func TestTicketUnusedRefundAndCrashRecovery(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state = ticketSummary(t, h, tu)
-	if len(f.refunds) != 1 || state.Purchases[0].RefundedYen != 2083 {
+	if len(f.refunds) != 1 || state.Purchases[0].RefundedYen != 4167 {
 		t.Fatalf("duplicate refund %+v remote %v", state, f.refunds)
 	}
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 422 {
@@ -338,11 +338,11 @@ func TestTicketMinorPurchaseRequiresDeclaration(t *testing.T) {
 			ID string `json:"purchase_id"`
 		}
 		_ = json.Unmarshal(rec.Body.Bytes(), &out)
-		payTicketPurchase(t, h, out.ID, 2500)
+		payTicketPurchase(t, h, out.ID, 5000)
 	}
 	var declarations, amount int
 	queryRowArgs(t, `SELECT count(*),COALESCE(max(amount_yen),0) FROM minor_purchase_declarations WHERE minor_id=$1 AND ref_type='ticket_purchase'`, []any{minor}, &declarations, &amount)
-	if declarations != 2 || amount != 2500 {
+	if declarations != 2 || amount != 5000 {
 		t.Fatalf("declarations %d amount %d", declarations, amount)
 	}
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 12 {
@@ -363,7 +363,7 @@ func TestTicketRefundExcludesReservedAndCanRefundAfterRelease(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state := ticketSummary(t, h, tu)
-	if state.Balance.Reserved != 1 || state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2083 {
+	if state.Balance.Reserved != 1 || state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 4167 {
 		t.Fatalf("reserved refund %+v", state)
 	}
 	execSQLArgs(t, `UPDATE review_requests SET due_at=now()-interval '1 minute' WHERE id=$1`, review)
@@ -374,7 +374,7 @@ func TestTicketRefundExcludesReservedAndCanRefundAfterRelease(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state = ticketSummary(t, h, tu)
-	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2500 || state.Purchases[0].Status != "refunded" || len(f.refunds) != 2 {
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 5000 || state.Purchases[0].Status != "refunded" || len(f.refunds) != 2 {
 		t.Fatalf("full refund %+v", state)
 	}
 	assertTicketAccounting(t, h, admin)
@@ -392,7 +392,7 @@ func TestTicketLatePaymentAfterAccountDeletionIsRefunded(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodDelete, "/v1/me", tu, map[string]any{"confirm": "退会する"}); rec.Code != 200 {
 		t.Fatalf("delete %d %s", rec.Code, rec.Body.String())
 	}
-	payTicketPurchase(t, h, purchase, 2500)
+	payTicketPurchase(t, h, purchase, 5000)
 	if rec := tick(t, h, "tick-secret"); rec.Code != 200 {
 		t.Fatal(rec.Body.String())
 	}
@@ -401,7 +401,7 @@ func TestTicketLatePaymentAfterAccountDeletionIsRefunded(t *testing.T) {
 	if status != "refunded" || len(f.refunds) != 1 {
 		t.Fatalf("orphan payment %s %v", status, f.refunds)
 	}
-	payTicketPurchase(t, h, purchase, 2500)
+	payTicketPurchase(t, h, purchase, 5000)
 	if len(f.refunds) != 1 {
 		t.Fatal("duplicate orphan refund")
 	}
@@ -409,7 +409,7 @@ func TestTicketLatePaymentAfterAccountDeletionIsRefunded(t *testing.T) {
 }
 
 // 失効後の返金（本体 #572 項目7）。運営者またはコーチの都合で有効期限内に受けられなかったことが
-// 確認できた失効済みチケットは、申出ベースで1枚500円を元の決済へ返金し、1枚ずつ記録する。
+// 確認できた失効済みチケットは、申出ベースで1枚1,000円を元の決済へ返金し、1枚ずつ記録する。
 func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupStripe(t)
@@ -430,10 +430,10 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 422 || !strings.Contains(rec.Body.String(), "tickets_expired") {
 		t.Fatalf("legacy expired refund %d %s", rec.Code, rec.Body.String())
 	}
-	// 失効後の返金は1枚500円に相当する額を返し、台帳には1枚ずつ記録する。
-	// 全6枚では3,000円で元の決済額（2,500円）を超えるので、Stripe へは2,500円、残りの500円は Stripe の外で返す（運営者決定 2026-11-12）。
+	// 失効後の返金は1枚1,000円に相当する額を返し、台帳には1枚ずつ記録する。
+	// 全6枚では6,000円で元の決済額（5,000円）を超えるので、Stripe へは5,000円、残りの1,000円は Stripe の外で返す（運営者決定 2026-11-12）。
 	res := postExpiryRefund(t, h, admin, purchase, 6, 200)
-	if res.AmountYen != 3000 || res.StripeYen != 2500 || res.ManualYen != 500 || res.Status != "succeeded" {
+	if res.AmountYen != 6000 || res.StripeYen != 5000 || res.ManualYen != 1000 || res.Status != "succeeded" {
 		t.Fatalf("post-expiry split %+v", res)
 	}
 	if len(f.refundList()) != 1 {
@@ -443,12 +443,12 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if amount != 2500 {
+	if amount != 5000 {
 		t.Fatalf("remote refund total %d", amount)
 	}
 	// 購入の返金済み額は Stripe 分＋Stripe 外の分（000162 の上限の判定に含める）。
 	state := ticketSummary(t, h, tu)
-	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 3000 || state.Purchases[0].Status != "refunded" {
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 6000 || state.Purchases[0].Status != "refunded" {
 		t.Fatalf("post-expiry %+v", state)
 	}
 	var available, expired, refunded int
@@ -463,7 +463,7 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 	}
 	// 管理画面では Stripe 外の分が支払い待ちとして見える。
 	attention := ticketAttentionRefunds(t, h, admin)
-	if len(attention) != 1 || attention[0].ManualYen != 500 || attention[0].AmountYen != 3000 || attention[0].ManualCompletedAt != nil {
+	if len(attention) != 1 || attention[0].ManualYen != 1000 || attention[0].AmountYen != 6000 || attention[0].ManualCompletedAt != nil {
 		t.Fatalf("attention %+v", attention)
 	}
 	// 運営者が振込などで返した後、支払方法と日付を記録して完了にする。
@@ -485,7 +485,7 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/refunds/"+res.RefundID+"/manual-complete", admin, map[string]any{"method": "銀行振込", "paid_on": "2026-11-12"}); rec.Code != 422 {
 		t.Fatalf("double manual %d %s", rec.Code, rec.Body.String())
 	}
-	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 3000 {
+	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 6000 {
 		t.Fatalf("refunded after manual %d", got)
 	}
 	// 返し切った分はもう返金できない。
@@ -519,8 +519,8 @@ func TestTicketServiceEndRefundRoundsHalfUp(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 202 {
 		t.Fatalf("refund %d %s", rec.Code, rec.Body.String())
 	}
-	// 2500 ÷ 6 × 1 = 416.66… → 四捨五入で417。
-	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 417 {
+	// 5000 ÷ 6 × 1 = 833.33… → 四捨五入で833。
+	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 833 {
 		t.Fatalf("rounded refund %d", got)
 	}
 	// 有効期限の前は失効後の返金を使えない。
@@ -562,7 +562,7 @@ func TestTicketPendingRefundFailureRestoresBalance(t *testing.T) {
 		t.Fatal(rec.Body.String())
 	}
 	state = ticketSummary(t, h, tu)
-	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2500 || len(f.refunds) != 2 {
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 5000 || len(f.refunds) != 2 {
 		t.Fatalf("retry refund %+v", state)
 	}
 	assertTicketAccounting(t, h, admin)
@@ -612,7 +612,7 @@ func ticketAttentionRefunds(t *testing.T, h http.Handler, admin string) []ticket
 	return out.Attention
 }
 
-// 5枚（2,500円）までは元の決済額に収まるので全額を Stripe で返し、Stripe 外の分は0。
+// 5枚（5,000円）までは元の決済額に収まるので全額を Stripe で返し、Stripe 外の分は0。
 // 残りの1枚は Stripe の残りが0なので、Stripe へは送らずに全額を Stripe 外で返す（本体 #572）。
 func TestPostExpiryTicketRefundWithinChargeIsAllStripe(t *testing.T) {
 	h, f := setupStripe(t)
@@ -621,17 +621,17 @@ func TestPostExpiryTicketRefundWithinChargeIsAllStripe(t *testing.T) {
 	purchase := buySixTickets(t, h, tu)
 	execSQLArgs(t, `UPDATE coaching_ticket_lots SET expires_at=now()-interval '1 minute' WHERE purchase_id=$1`, purchase)
 	res := postExpiryRefund(t, h, admin, purchase, 5, 200)
-	if res.StripeYen != 2500 || res.ManualYen != 0 || len(f.refundList()) != 1 || f.refundList()[0].Get("amount") != "2500" {
+	if res.StripeYen != 5000 || res.ManualYen != 0 || len(f.refundList()) != 1 || f.refundList()[0].Get("amount") != "5000" {
 		t.Fatalf("five tickets %+v %v", res, f.refundList())
 	}
 	if attention := ticketAttentionRefunds(t, h, admin); len(attention) != 0 {
 		t.Fatalf("attention %+v", attention)
 	}
 	res = postExpiryRefund(t, h, admin, purchase, 1, 200)
-	if res.StripeYen != 0 || res.ManualYen != 500 || len(f.refundList()) != 1 {
+	if res.StripeYen != 0 || res.ManualYen != 1000 || len(f.refundList()) != 1 {
 		t.Fatalf("sixth ticket %+v %v", res, f.refundList())
 	}
-	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 3000 {
+	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 6000 {
 		t.Fatalf("refunded %d", got)
 	}
 	assertTicketAccounting(t, h, admin)
@@ -645,12 +645,12 @@ func TestPostExpiryTicketRefundAfterOtherRefundUsesRemainingCharge(t *testing.T)
 	onDutyCoach(t, h, admin)
 	_, tu := demoRequester(t, h, admin)
 	purchase := buySixTickets(t, h, tu)
-	// 1枚を申込みで確保したまま、残りの5枚を期限前の通常の返金で返す（2500 ÷ 6 × 5 = 2083.33… → 2083円）。
+	// 1枚を申込みで確保したまま、残りの5枚を期限前の通常の返金で返す（5000 ÷ 6 × 5 = 4166.66… → 4167円）。
 	request := ticketReview(t, h, tu)
 	if rec := doJSON(t, h, http.MethodPost, "/v1/admin/coaching/tickets/"+purchase+"/refund", admin, nil); rec.Code != 202 {
 		t.Fatalf("refund %d %s", rec.Code, rec.Body.String())
 	}
-	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 2083 {
+	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 4167 {
 		t.Fatalf("normal refund %d", got)
 	}
 	// 期限を過ぎてから申込みが引き受けられずに終わり、確保していた1枚は tick で失効に回る。
@@ -664,16 +664,16 @@ func TestPostExpiryTicketRefundAfterOtherRefundUsesRemainingCharge(t *testing.T)
 	if expired != 1 {
 		t.Fatalf("expired %d", expired)
 	}
-	// 失効後の返金500円のうち、Stripe へは残りの417円（2500 − 2083）、83円は Stripe 外で返す。
+	// 失効後の返金1,000円のうち、Stripe へは残りの833円（5000 − 4167）、167円は Stripe 外で返す。
 	res := postExpiryRefund(t, h, admin, purchase, 1, 200)
-	if res.AmountYen != 500 || res.StripeYen != 417 || res.ManualYen != 83 {
+	if res.AmountYen != 1000 || res.StripeYen != 833 || res.ManualYen != 167 {
 		t.Fatalf("split after other refund %+v", res)
 	}
 	remote := f.refundList()
-	if len(remote) != 2 || remote[1].Get("amount") != "417" {
+	if len(remote) != 2 || remote[1].Get("amount") != "833" {
 		t.Fatalf("remote %v", remote)
 	}
-	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 2583 {
+	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 5167 {
 		t.Fatalf("refunded %d", got)
 	}
 	assertTicketAccounting(t, h, admin)
@@ -717,10 +717,10 @@ func TestPostExpiryTicketRefundRejectedByStripeStopsRetrying(t *testing.T) {
 	}
 	var manual int
 	queryRowArgs(t, `SELECT status, manual_yen FROM coaching_ticket_refunds WHERE id=$1`, []any{res.RefundID}, &status, &manual)
-	if status != "succeeded" || manual != 2500 {
+	if status != "succeeded" || manual != 5000 {
 		t.Fatalf("converted %s %d", status, manual)
 	}
-	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 2500 {
+	if got := ticketSummary(t, h, tu).Purchases[0].RefundedYen; got != 5000 {
 		t.Fatalf("refunded after manual %d", got)
 	}
 	assertTicketAccounting(t, h, admin)

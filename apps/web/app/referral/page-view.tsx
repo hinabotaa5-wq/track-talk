@@ -60,7 +60,7 @@ export function ReferralGuideView() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">{L("友達2人に紹介すると、1回分(500円)無料！")}</h1>
+        <h1 className="text-2xl font-bold">{L("友達2人に紹介すると、1回分(1,000円)無料！")}</h1>
       </div>
 
       <section className="space-y-3">

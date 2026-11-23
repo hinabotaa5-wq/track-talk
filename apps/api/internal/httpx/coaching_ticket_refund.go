@@ -79,7 +79,7 @@ func reserveTicketRefund(ctx context.Context, q *db.Queries, id uuid.UUID) (db.C
 
 // preparePostExpiryTicketRefund は、失効後の返金（本体 #572 項目7）を用意する。
 // 運営者またはコーチの都合で有効期限内に添削を受けられなかったことが確認できた失効済みチケットを、
-// 申出ベースで返金する（1枚あたり単発価格500円に相当する額。自動判定はしない）。
+// 申出ベースで返金する（1枚あたり単発価格（reviewPriceYen、1,000円）に相当する額。自動判定はしない）。
 // tick の失効処理を待たず、期限を過ぎた未使用分はここで失効に回す。
 // 失効から返金への移動は台帳に1枚ずつ記録する（行も台帳も消さない）。
 // 確保中（返却待ち）の分は触らず、返却・終了のときに失効へ回る（settleReviewTickets）。
@@ -119,7 +119,7 @@ func (s *Server) preparePostExpiryTicketRefund(ctx context.Context, id uuid.UUID
 		if quantity < 1 || quantity > expired {
 			return &ticketRuleError{"invalid_refund_quantity", "返金できる枚数を確認してください"}
 		}
-		// 1枚500円の約束は変えない。ただし Stripe は元の決済額を超えて返金できないので、
+		// 1枚あたり単発価格（1,000円）の約束は変えない。ただし Stripe は元の決済額を超えて返金できないので、
 		// Stripe へはこの決済の返金できる残り（決済額 − Stripe で返し終えた額）までとし、
 		// 超えた分は運営者が Stripe の外（銀行振込など）で返す（運営者決定 2026-11-12）。
 		requested := reviewPriceYen * quantity

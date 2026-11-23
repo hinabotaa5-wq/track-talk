@@ -56,8 +56,8 @@ func TestAcceptanceClosedPreservesExistingFulfillmentAndLatePayments(t *testing.
 		}
 	}
 	// 停止前に開いた決済の遅延通知と再送を受け付ける。
-	payTicketPurchase(t, closed, late, 2500)
-	payTicketPurchase(t, closed, late, 2500)
+	payTicketPurchase(t, closed, late, 5000)
+	payTicketPurchase(t, closed, late, 5000)
 	if got := ticketSummary(t, closed, owner).Balance.Available; got != 11 {
 		t.Fatalf("balance %d", got)
 	}
