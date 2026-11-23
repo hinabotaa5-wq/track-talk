@@ -57,6 +57,9 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
   </div>;
 }
 
+// 共有ボタンで送る、紹介の流れの公開ページ（本体 #996）。
+const REFERRAL_SHARE_URL = "https://track-talk.netlify.app/referral";
+
 const referralHeadline = () => L("友達2人に紹介すると、1回分(1,000円)無料！");
 const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
 
@@ -83,6 +86,24 @@ function ReferralCard({ referral, variant = "full" }: { referral: Referral; vari
           setCopyStatus(L("紹介IDを選択してコピーしてください"));
         }
       }}>{L("コピー")}</Button> : null}
+      {active ? <Button type="button" variant="secondary" onClick={async () => {
+        const text = L("TrackTalkでコーチにフォーム添削してもらえるよ。購入のときに紹介ID「{v0}」を入れてね。", { v0: code });
+        if (typeof navigator.share === "function") {
+          try {
+            await navigator.share({ text, url: REFERRAL_SHARE_URL });
+            return;
+          } catch (error) {
+            // 利用者が共有シートを閉じたときは何もしない（本体 #996）。
+            if ((error as { name?: unknown } | null)?.name === "AbortError") return;
+          }
+        }
+        try {
+          await navigator.clipboard.writeText(`${text}\n${REFERRAL_SHARE_URL}`);
+          setCopyStatus(L("共有文をコピーしました"));
+        } catch {
+          setCopyStatus(L("共有できませんでした"));
+        }
+      }}>{L("共有")}</Button> : null}
     </div>
     {copyStatus ? <p role="status" className="text-xs">{copyStatus}</p> : null}
     {granted_at ? <p className="text-sm font-semibold">{L("無料チケットをプレゼントしました")}</p>
