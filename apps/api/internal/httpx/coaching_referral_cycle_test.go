@@ -57,7 +57,7 @@ func buySixWithReferral(t *testing.T, h http.Handler, tok, code string) string {
 	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
 		t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
 	}
-	payTicketPurchase(t, h, data.ID, 2500)
+	payTicketPurchase(t, h, data.ID, 5000)
 	return data.ID
 }
 
@@ -192,7 +192,7 @@ func TestCoachingReferralDisputeCancelsCountAndReward(t *testing.T) {
 	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{ownerID}, &lot)
 
 	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{
-		"id": "dp_referral", "amount": 2500, "reason": "fraudulent", "payment_intent": "pi_ticket_" + disputed,
+		"id": "dp_referral", "amount": 5000, "reason": "fraudulent", "payment_intent": "pi_ticket_" + disputed,
 	}); rec.Code != 200 {
 		t.Fatalf("dispute %d %s", rec.Code, rec.Body.String())
 	}

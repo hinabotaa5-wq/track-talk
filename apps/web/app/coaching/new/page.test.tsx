@@ -150,7 +150,7 @@ it("チケットを持っている人には、申込画面に残りの枚数と�
   expect(container.textContent).toContain("チケットの残り 2枚");
   expect(container.textContent).toContain("いちばん早い有効期限");
   expect(container.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]')?.textContent).toContain("コーチングチケット");
-  expect(container.textContent).toContain("チケット（6枚）2,500円");
+  expect(container.textContent).toContain("チケット（6枚）5,000円");
   expect(container.textContent).not.toContain("チケット（1枚）");
 });
 
@@ -213,7 +213,7 @@ it("チケットがなく販売中なら、お支払い方法に単発とチケ�
   expect(single.textContent).toBe("単発 500円／回");
   expect(single.getAttribute("aria-pressed")).toBe("true");
   const link = payment?.querySelector('a[href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew"]');
-  expect(link?.textContent).toContain("チケット（6枚）2,500円");
+  expect(link?.textContent).toContain("チケット（6枚）5,000円");
   // チケット単価の説明文は出さない（本体 #841）。
   expect(container.textContent).not.toContain("1回あたり約417円（1回ずつ払うと500円）");
   expect(container.textContent).not.toContain("有効期限は決済から6か月");

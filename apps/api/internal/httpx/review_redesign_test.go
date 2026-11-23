@@ -96,7 +96,7 @@ func TestTicketReservedBeforeExpiryIsConsumedOnReturn(t *testing.T) {
 	queryRowArgs(t, `SELECT consumed FROM coaching_ticket_lots WHERE purchase_id=$1`, []any{purchase}, &consumed)
 	var earnings int
 	queryRowArgs(t, `SELECT amount_yen FROM coach_earnings WHERE review_request_id=$1 AND coach_id=$2`, []any{review, coach}, &earnings)
-	if consumed != 1 || earnings != 350 {
+	if consumed != 1 || earnings != 700 {
 		t.Fatalf("consumed %d earnings %d", consumed, earnings)
 	}
 	assertTicketAccounting(t, h, admin)
@@ -182,11 +182,11 @@ func TestTicketPurchaseSyncUsesStripeState(t *testing.T) {
 		t.Fatalf("open %s", body)
 	}
 	f.setCheckoutState(session, map[string]any{"status": "complete", "payment_status": "paid", "payment_intent": "pi_ticket_sync", "client_reference_id": id,
-		"amount_total": 2500, "currency": "jpy", "metadata": map[string]string{"kind": "tickets", "purchase_id": id}})
+		"amount_total": 5000, "currency": "jpy", "metadata": map[string]string{"kind": "tickets", "purchase_id": id}})
 	if body := read(); !strings.Contains(body, `"status":"paid"`) || strings.Contains(body, `"expires_at":null`) {
 		t.Fatalf("paid %s", body)
 	}
-	payTicketPurchase(t, h, id, 2500)
+	payTicketPurchase(t, h, id, 5000)
 	read()
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 6 {
 		t.Fatalf("balance %d", got)

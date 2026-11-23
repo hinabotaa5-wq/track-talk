@@ -8,7 +8,7 @@ import (
 
 // Update both API and Web versions whenever a document is revised, to require fresh consent.
 const (
-	termsDocumentVersion      = "terms-2026-11-18"
+	termsDocumentVersion      = "terms-2026-11-23"
 	guidelinesDocumentVersion = "guidelines-2026-11-15"
 	privacyDocumentVersion    = "privacy-2026-11-18"
 	// Provisional retention approved in #953; replace here after legal confirmation.

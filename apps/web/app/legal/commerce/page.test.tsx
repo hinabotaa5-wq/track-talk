@@ -23,8 +23,8 @@ it("コーチングのフラグが閉じていても表示し、住所・電話�
 it("公開文面に開発中の注記や販売を終えた追加相談を表示しない", () => {
   const html = renderToStaticMarkup(<CommercePage />);
   expect(html).not.toMatch(/たたき台|下書き|未確定|要確認|TODO|確定していません|確定後|追加相談/);
-  expect(html).toContain("1回プラン 1回 500円（税込）");
-  expect(html).toContain("1回プランのチケット 6枚 2,500円（税込）");
+  expect(html).toContain("1回プラン 1回 1,000円（税込）");
+  expect(html).toContain("1回プランのチケット 6枚 5,000円（税込）");
   // 追加質問（1回500円・都度払いのみ・チケット不可）の販売価格・支払時期・提供時期・返金。
   expect(html).toContain("1回プランの追加質問 1回 500円（税込）");
   expect(html).toContain("返却された1回プラン1件につき1回まで購入でき、都度払いのみで、チケットは使えません。");
@@ -51,10 +51,10 @@ it("公開文面に開発中の注記や販売を終えた追加相談を表示�
   expect(html).toContain("（2）法令に基づき契約の取消し・解除ができるとき");
   expect(html).toContain("（3）運営者またはコーチの責めに帰すべき事由によって1回プランを受けられなかったとき");
   expect(html).toContain("（4）運営者またはコーチの都合により有効期限内に1回プランを受けられなかったチケットは、失効後であっても");
-  // 計算式は（1）の提供終了にだけかかり、（3）（4）の運営・コーチ都合は500円（利用規約第6条第5項。本体 #715）。
+  // 計算式は（1）の提供終了にだけかかり、（3）（4）の運営・コーチ都合は1,000円（利用規約第6条第5項。本体 #715）。
   expect(html).toContain("終了の時点で未使用のチケット（有効期限にかかわらず）について、購入金額を6で割った額に未使用の枚数を掛けた額（1円未満の端数は四捨五入します）を払い戻します");
-  expect(html).toContain("1回プランの1回分の価格（500円）に相当する額を返金します");
-  expect(html).toContain("購入金額を6で割って計算するのは（1）の場合だけで、（3）と（4）の返金はこの計算によらず、受けられなかった1回プラン1回（チケット1枚）につき500円です");
+  expect(html).toContain("1回プランの1回分の価格（1,000円）に相当する額を返金します");
+  expect(html).toContain("購入金額を6で割って計算するのは（1）の場合だけで、（3）と（4）の返金はこの計算によらず、受けられなかった1回プラン1回（チケット1枚）につき1,000円です");
   expect(html).toContain("返金は購入時の支払方法への返金を原則としますが、返金の合計額が購入時の決済額を超えるときは、その決済で返金できる額までを購入時の支払方法で返金し、超える分は運営者が別途指定する方法（銀行振込など）で支払います（お問い合わせで案内します）。");
   expect(html).not.toContain("払戻しの額は購入金額を6で割った額");
   // 「チケットを戻す」は依頼終了時の1枚返還の場面に限り、購入チケットの払戻し額とは混ぜない。
@@ -112,11 +112,15 @@ it("掲載料金を API の決済用定数とチケットの商品に一致さ�
   const api = path.resolve(process.cwd(), "../api");
   const review = readFileSync(path.join(api, "internal/httpx/review_payment.go"), "utf8");
   const migration = readFileSync(path.join(api, "migrations/000159_review_ticket_redesign.up.sql"), "utf8");
+  // 6枚の価格は 000189（本体 #983）で改定した。枚数は 000159 のまま。
+  const repriced = readFileSync(path.join(api, "migrations/000189_review_price_1000.up.sql"), "utf8");
   const html = renderToStaticMarkup(<CommercePage />);
   const price = review.match(/const reviewPriceYen int32 = (\d+)/);
   expect(price).not.toBeNull();
   expect(html).toContain(`1回プラン 1回 ${Number(price![1]).toLocaleString("ja-JP")}円（税込）`);
   const six = migration.match(/\('six', '[^']*', (\d+), (\d+), true\)/);
   expect(six).not.toBeNull();
-  expect(html).toContain(`1回プランのチケット ${six![1]}枚 ${Number(six![2]).toLocaleString("ja-JP")}円（税込）`);
+  const sixPrice = repriced.match(/SET amount_yen = (\d+) WHERE id = 'six'/);
+  expect(sixPrice).not.toBeNull();
+  expect(html).toContain(`1回プランのチケット ${six![1]}枚 ${Number(sixPrice![1]).toLocaleString("ja-JP")}円（税込）`);
 });

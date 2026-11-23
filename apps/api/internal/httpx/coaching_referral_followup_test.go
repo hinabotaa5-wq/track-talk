@@ -126,7 +126,7 @@ func TestCoachingReferralConsumedRewardSurvivesRefund(t *testing.T) {
 		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
 			t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
 		}
-		payTicketPurchase(t, h, data.ID, 2500)
+		payTicketPurchase(t, h, data.ID, 5000)
 		return data.ID
 	}
 	_, buyer1 := demoRequester(t, h, admin)
@@ -234,7 +234,7 @@ func grantRewardLot(t *testing.T, h http.Handler, admin string) (uuid.UUID, stri
 		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
 			t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
 		}
-		payTicketPurchase(t, h, data.ID, 2500)
+		payTicketPurchase(t, h, data.ID, 5000)
 	}
 	var lotID string
 	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{referrerID}, &lotID)
@@ -334,13 +334,13 @@ func TestCoachingReferralRewardLotCountsAsBalanceAndSettles(t *testing.T) {
 	if reservation != "consumed" {
 		t.Fatalf("reward usage reservation = %q, want consumed", reservation)
 	}
-	// 通常の決済経路でコーチに350円（単発500円の70%）が計上される。
+	// 通常の決済経路でコーチに700円（単発1,000円の70%）が計上される。
 	var gross, share, earnings int
 	var source string
 	queryRowArgs(t, `SELECT gross_yen, share_percent, amount_yen, source FROM coach_earnings WHERE review_request_id=$1`, []any{reviewID},
 		&gross, &share, &earnings, &source)
-	if source != "review" || gross != 500 || share != 70 || earnings != 350 {
-		t.Fatalf("reward earning = %s %d/%d/%d, want review 500/70/350", source, gross, share, earnings)
+	if source != "review" || gross != 1000 || share != 70 || earnings != 700 {
+		t.Fatalf("reward earning = %s %d/%d/%d, want review 1000/70/700", source, gross, share, earnings)
 	}
 	var ownerCheck int
 	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_purchases WHERE owner_id=$1`, []any{referrerID}, &ownerCheck)

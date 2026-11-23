@@ -45,7 +45,7 @@ func TestMinorDeclarationRecordsEvidence(t *testing.T) {
 	queryRowArgs(t, `SELECT count(*),
 			count(*) FILTER (WHERE declaration_text = '未成年の方は保護者に許可を取ってください'
 				AND notice_text IS NULL
-				AND amount_yen = 500 AND coach_id = $3 AND declared_birth_month IS NULL AND $4::text IS NOT NULL),
+				AND amount_yen = 1000 AND coach_id = $3 AND declared_birth_month IS NULL AND $4::text IS NOT NULL),
 			count(*) FILTER (WHERE client_shown_at = $5 AND client_checked_at = $6),
 			count(*) FILTER (WHERE (client_shown_at IS NULL) <> (client_checked_at IS NULL))
 		FROM minor_purchase_declarations WHERE minor_id = $1 AND ref_type = 'review' AND ref_id = $2`,

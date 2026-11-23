@@ -21,7 +21,7 @@ import (
 // （チケットは添削本体専用）。コーチの取り分は coach_payout.go の reviewSharePercent（70%）で決まる。
 const reviewConsultationPriceYen int32 = 500
 
-// 動画添削はチケット1枚で1回（本体 #569）。コーチの報酬は単発と同じく reviewPriceYen の70%（350円）に固定し、
+// 動画添削はチケット1枚で1回（本体 #569）。コーチの報酬は単発と同じく reviewPriceYen の70%（700円）に固定し、
 // まとめ買いの割引分は運営が負担する。
 const reviewTicketUnits int32 = 1
 
@@ -483,7 +483,7 @@ func (s *Server) completeTicketCheckout(ctx context.Context, sess stripe.Checkou
 }
 
 // 呼び出し側は利用者のロックを持つ。依頼作成と予約を同じトランザクションにする。
-// 1回の添削にチケット1枚。報酬の元になる額（nominal_yen）は単発の料金と同じにし、報酬は350円に固定する。
+// 1回の添削にチケット1枚。報酬の元になる額（nominal_yen）は単発の料金と同じにし、報酬は700円に固定する。
 // 予約で使える枚数から外し（申込み時点で残高が減る）、返却で消費・報酬を計上し、返却されずに終わったら戻す。
 // kind（normal／reward）を指定したら、その種別のロットだけから確保する。足りなくても他の種別では代用しない（本体 #687）。
 // ロットは失効の早いものから使う（ListTicketLots の並び）。

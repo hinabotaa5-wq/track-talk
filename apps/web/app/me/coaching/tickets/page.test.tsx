@@ -12,9 +12,9 @@ vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; chil
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ token: "test", loading: false, session: { user: { id: "athlete" } } }) }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => mocks.api(...args) }));
 const initial: TicketSummary = {
-  balance: { available: 0, reserved: 0 }, products: [{ id: "six", title: "チケット6枚", quantity: 6, amount_yen: 2500 }],
-  purchases: [], ledger: [], can_purchase: true, purchase_block_reason: "", unit_yen: 500,
-  single_price_yen: 500, review_units: 1, validity_months: 6, is_minor: false, next_expiry: null,
+  balance: { available: 0, reserved: 0 }, products: [{ id: "six", title: "チケット6枚", quantity: 6, amount_yen: 5000 }],
+  purchases: [], ledger: [], can_purchase: true, purchase_block_reason: "", unit_yen: 1000,
+  single_price_yen: 1000, review_units: 1, validity_months: 6, is_minor: false, next_expiry: null,
 };
 let container: HTMLDivElement;
 let root: Root;
@@ -85,13 +85,13 @@ it("不正な戻り先は API に渡さず、購入画面を戻り先にする",
   expect(body.return_path).toBe("/me/coaching/tickets");
 });
 
-it("6枚2,500円の購入カードは商品名・価格・1行・ボタンだけで、条件の説明文を置かない", async () => {
+it("6枚5,000円の購入カードは商品名・価格・1行・ボタンだけで、条件の説明文を置かない", async () => {
   mocks.api.mockResolvedValue(initial);
   await render();
   const card = reviewButton()?.parentElement;
   expect(card?.textContent).toContain("チケット6枚");
-  expect(card?.textContent).toContain("2,500円（税込）");
-  expect(card?.textContent).toContain("1回あたり約417円・有効期限6か月");
+  expect(card?.textContent).toContain("5,000円（税込）");
+  expect(card?.textContent).toContain("1回あたり約833円・有効期限6か月");
   expect(card?.textContent).not.toContain("1回ずつ払うと");
   expect(card?.querySelector("ul, li")).toBeNull();
   for (const old of ["1枚で1回プラン1件を申し込めます", "有効期限は購入から6か月。過ぎると失効し、延長はしません", "購入した本人だけが使えます。譲渡はできません", "原則、購入者都合の払戻しはしません。"]) {
@@ -110,7 +110,7 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   await act(async () => reviewButton()!.click());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
   expect(confirm.textContent).toContain("1回プランのチケット6枚（1枚で1回プラン1件）。購入した本人だけが使えます。譲ることはできません。");
-  expect(confirm.textContent).toContain("2,500円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
+  expect(confirm.textContent).toContain("5,000円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
   expect(confirm.textContent).toContain("2027/05/20 10:00");
   // 最終確認にも例外4項目を番号付きで出す（本体 #572）。
   expect(confirm.textContent).toContain("購入者の都合による払戻しは原則として行いません");
@@ -118,8 +118,8 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   expect(confirm.textContent).toContain("（2）法令で認められる取消し・解除は");
   const refund = Array.from(confirm.querySelectorAll("dt")).find((label) => label.textContent === "払戻し")?.nextElementSibling;
   expect(refund?.textContent).toContain("確保したチケット1枚を戻します。これは確保の解除で、金銭の払戻しには当たりません。");
-  expect(refund?.textContent).toContain("（3）運営者またはコーチの責めに帰すべき事由で1回プランを受けられなかった場合、または運営者の都合で提供が著しく遅れた場合は、チケット1枚につき500円を返金します。");
-  expect(refund?.textContent).toContain("（4）運営者またはコーチの都合で有効期限内に1回プランを受けられなかったチケットは、失効後でも1枚につき500円を返金します。");
+  expect(refund?.textContent).toContain("（3）運営者またはコーチの責めに帰すべき事由で1回プランを受けられなかった場合、または運営者の都合で提供が著しく遅れた場合は、チケット1枚につき1,000円を返金します。");
+  expect(refund?.textContent).toContain("（4）運営者またはコーチの都合で有効期限内に1回プランを受けられなかったチケットは、失効後でも1枚につき1,000円を返金します。");
   expect(refund?.textContent).not.toMatch(/当社|チケットを戻すか返金/);
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });

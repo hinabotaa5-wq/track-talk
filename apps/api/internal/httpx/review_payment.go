@@ -21,9 +21,9 @@ import (
 // PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する（今は受け付けていない。reviewPaymentMethods）。
 
 // 動画添削の料金（単発1回）。どのコーチを選んでも同じ（コーチごとの価格差はつくらない）。
-// 報酬はこの70%（350円）。チケット（6枚2,500円）で払った回も報酬は同じ350円（本体 #569）。
+// 報酬はこの70%（700円）。チケット（6枚5,000円）で払った回も報酬は同じ700円（本体 #569、価格は #983）。
 // 変えるときは migrations の review_requests.base_price_yen の既定値と、画面の lib/review-pricing.ts も揃える。
-const reviewPriceYen int32 = 500
+const reviewPriceYen int32 = 1000
 
 // 保護者が同意していない18歳未満の、保護者が払う契約の上限（design-review.md「18歳未満の支払い」）。
 // 本人が自分で払う動画添削・追加相談は、この上限ではなく購入のたびの宣言で確かめる（minor_purchase.go）。

@@ -15,7 +15,7 @@ import (
 )
 
 func documentVersions() map[string]string {
-	return map[string]string{"terms": "terms-2026-11-18", "guidelines": "guidelines-2026-11-15", "privacy": "privacy-2026-11-18"}
+	return map[string]string{"terms": "terms-2026-11-23", "guidelines": "guidelines-2026-11-15", "privacy": "privacy-2026-11-18"}
 }
 
 func TestDocumentConsentHistoryAndGate(t *testing.T) {
@@ -138,7 +138,7 @@ func TestDocumentConsentMigrationRoundTrip(t *testing.T) {
 		t.Fatalf("FKs %d %v", fks, err)
 	}
 	src, err := os.ReadFile("../../../../deploy/cloud-run/payment-counts/counts.py")
-	if err != nil || !strings.Contains(string(src), "EXPECTED_MIGRATION = 188") {
+	if err != nil || !strings.Contains(string(src), "EXPECTED_MIGRATION = 189") {
 		t.Fatalf("expected migration: %v", err)
 	}
 }

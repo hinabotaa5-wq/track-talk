@@ -53,7 +53,7 @@ type fakeStripe struct {
 	// 支払い画面（Checkout Session）を読んだときに返す中身。入っていなければ支払い中（open）として答える。
 	checkoutStates map[string]map[string]any
 	// PaymentIntent ごとの決済額。Stripe と同じく、1つの決済への返金の累計がこの額を超える返金は断る（本体 #572）。
-	// 入っていないチケットの決済（pi_ticket_…）は6枚つづりの2,500円として扱う。
+	// 入っていないチケットの決済（pi_ticket_…）は6枚つづりの5,000円として扱う（本体 #983）。
 	chargeAmounts map[string]int
 	// 失敗・取り消しとして答えた返金（refunds の位置）。決済額の判定の累計に入れない。
 	failedRefunds map[int]bool
@@ -65,7 +65,7 @@ func (f *fakeStripe) chargeCap(intent string) int {
 		return v
 	}
 	if strings.HasPrefix(intent, "pi_ticket_") {
-		return 2500
+		return 5000
 	}
 	return 0
 }
