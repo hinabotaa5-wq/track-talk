@@ -68,6 +68,10 @@ type Config struct {
 	// ReviewRandomAssign が false の間は、動画添削の「おまかせ」(運営が受付中のコーチへ順番に割り当てる)を止め、
 	// 選手が選んだコーチにだけ依頼を届ける。既定は停止。割り当てのコードと過去の打診・割り当ての記録は残す。
 	ReviewRandomAssign bool
+	// FeaturedCoachID が空でない間は「特集モード」（本体 #985）。公開面（コーチ一覧・詳細・継続プランの一覧・
+	// 指名候補・おまかせの割当て）をこのコーチ（プロフィール ID）だけに絞る。空に戻すと従来の一覧に戻る。
+	// ID として読めない値のときは、誰も出さない（他のコーチが出てしまう側には倒さない）。
+	FeaturedCoachID string
 	// IdentityReaderURL and IdentityReaderToken authorize only publication reads.
 	IdentityReaderURL   string
 	IdentityReaderToken string
@@ -170,6 +174,7 @@ func Load() (Config, error) {
 		CoachingCoachList:              enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
 		CoachingTicketSales:            enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		ReviewRandomAssign:             enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
+		FeaturedCoachID:                strings.TrimSpace(os.Getenv("COACHING_FEATURED_COACH_ID")),
 		IdentityReaderURL:              os.Getenv("IDENTITY_READER_URL"),
 		IdentityReaderToken:            os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"),
 		IdentityEndToken:               os.Getenv("IDENTITY_END_TOKEN"),

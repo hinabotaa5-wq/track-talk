@@ -7,13 +7,14 @@ import CoachingPage, { metadata } from "./page";
 // /coaching はカードメニューではなく、/coaches と同じ一覧画面を出す（本体 #641）。
 // 旧ハブの文言（カード・利用中の方・準備中の説明）は一覧側に出さない。
 const apiFetch = vi.fn();
-const flags = { coaching: false, list: false, supportList: true };
+const flags = vi.hoisted(() => ({ coaching: false, list: false, supportList: true, featured: null as string | null }));
 const navigation = { tab: null as string | null };
 vi.mock("@/lib/features", async (original) => ({
   ...await original<typeof import("@/lib/features")>(),
   get coachingEnabled() { return flags.coaching; },
   get coachingCoachListEnabled() { return flags.list; },
   get supportPlanListEnabled() { return flags.supportList; },
+  get featuredCoachID() { return flags.featured; },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -31,12 +32,13 @@ let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
-  flags.coaching = false; flags.list = false; flags.supportList = true;
+  flags.coaching = false; flags.list = false; flags.supportList = true; flags.featured = null;
   navigation.tab = null;
   apiFetch.mockReset();
   apiFetch.mockImplementation(async (path: string) => {
     if (path === "/v1/coaches") return { coaches: [] };
     if (path === "/v1/coaches/support-plan") return { coaches: [] };
+    if (path === "/v1/coaches/c-featured") return { id: "c-featured", nickname: "特集", photo_url: "", events: ["100m"], best_record: "", achievements: "", hitokoto: "", sns_urls: [], on_duty: true, plans: [] };
     throw new Error(`unexpected ${path}`);
   });
 });
@@ -86,4 +88,23 @@ it("開始の告知がある間も、閉じているときだけ告知と準備�
   await render();
   expect(container.textContent).toContain("11/14(土)に開始します！");
   expect(container.textContent).toContain("ただいま準備中です");
+});
+
+// 特集モード（本体 #985）：一覧の代わりに特集ページを出し、一覧 API は取らない。切ると一覧に戻る。
+it("特集モードでは一覧・切り替えの代わりに特集ページを出す", async () => {
+  flags.coaching = true;
+  flags.list = true;
+  flags.featured = "c-featured";
+  await render();
+  expect(container.querySelector("h1")?.textContent).toBe("特集コーチ");
+  expect(container.querySelector('[role="tabpanel"]')).toBeNull();
+  expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/c-featured"]);
+});
+
+it("特集モードを切ると従来の一覧に戻る", async () => {
+  flags.coaching = true;
+  flags.list = true;
+  await render();
+  expect(container.querySelector('[role="tabpanel"]')).not.toBeNull();
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches")).toBe(true);
 });

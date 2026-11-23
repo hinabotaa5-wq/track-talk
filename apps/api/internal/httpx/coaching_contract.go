@@ -48,7 +48,8 @@ func (s *Server) getPublicCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := s.q.GetPublicCoachingPlan(r.Context(), db.GetPublicCoachingPlanParams{ID: id, PledgeVersion: coachPledgeListedVersion})
-	if errors.Is(err, pgx.ErrNoRows) {
+	// 特集モードで外したコーチのプランは、申し込めないプランと同じ 404 にする（本体 #985）。
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && s.coachHiddenByFeature(p.CoachID)) {
 		Error(w, http.StatusNotFound, "not_found", "このプランはいま申し込めません")
 		return
 	}

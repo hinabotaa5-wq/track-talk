@@ -21,7 +21,12 @@ type coachRequestsView struct {
 // approvedReviewCoach は、動画添削に必要な承認と振込先を設定する。
 func approvedReviewCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string) {
 	t.Helper()
-	id := uuid.New()
+	return approvedReviewCoachID(t, h, tadmin, uuid.New())
+}
+
+// approvedReviewCoachID は approvedReviewCoach の ID を先に決める版（特集モードのテストで使う）。
+func approvedReviewCoachID(t *testing.T, h http.Handler, tadmin string, id uuid.UUID) (uuid.UUID, string) {
+	t.Helper()
 	tc := token(t, id)
 	body := coachApplicationBody()
 	body["tier"] = "coach"
@@ -40,7 +45,13 @@ func approvedReviewCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID
 // onDutyCoach は、承認済みで受付中のコーチ（枠はコーチ、種目は110mハードルを含む）を作る。
 func onDutyCoach(t *testing.T, h http.Handler, tadmin string) (uuid.UUID, string) {
 	t.Helper()
-	id, tc := approvedReviewCoach(t, h, tadmin)
+	return onDutyCoachID(t, h, tadmin, uuid.New())
+}
+
+// onDutyCoachID は onDutyCoach の ID を先に決める版（特集モードのテストで使う）。
+func onDutyCoachID(t *testing.T, h http.Handler, tadmin string, want uuid.UUID) (uuid.UUID, string) {
+	t.Helper()
+	id, tc := approvedReviewCoachID(t, h, tadmin, want)
 	execSQLArgs(t, `INSERT INTO push_subscriptions (id, profile_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, 'key', 'auth')`,
 		uuid.New(), id, "https://push.example.com/"+uuid.NewString())
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/coach/me", tc, map[string]any{"on_duty": true}); rec.Code != http.StatusOK {

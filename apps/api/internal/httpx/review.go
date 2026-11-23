@@ -319,6 +319,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !validTicketKind(req.TicketKind) || (req.TicketKind != "" && !useTickets) {
 		fields["ticket_kind"] = "チケットの種類を選び直してください"
 	}
+	// 特集モードでは、コーチを選ばずに送った依頼も特集コーチへの指名として扱う（本体 #985）。指名の確認は下の候補で行う。
+	if featured, on := s.featuredCoach(); on && req.RequestedCoachID == nil {
+		req.RequestedCoachID = &featured
+	}
 	if req.RequestedCoachID == nil && !s.cfg.ReviewRandomAssign {
 		fields["requested_coach_id"] = "コーチを選んでください"
 	}

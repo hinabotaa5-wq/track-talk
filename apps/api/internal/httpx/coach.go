@@ -793,6 +793,8 @@ func (s *Server) publicCoaches(ctx context.Context, coachID *uuid.UUID) ([]map[s
 	if err != nil {
 		return nil, err
 	}
+	// 特集モードでは特集コーチ以外を一覧にも詳細（直URL）にも出さない（本体 #985）。
+	rows = slices.DeleteFunc(rows, func(c db.ListPublicCoachesRow) bool { return s.coachHiddenByFeature(c.ProfileID) })
 	out := make([]map[string]any, 0, len(rows))
 	if len(rows) == 0 {
 		return out, nil
