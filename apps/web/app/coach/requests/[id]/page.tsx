@@ -17,7 +17,7 @@ import { coachEventLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { coachingMessagingEnabled } from "@/lib/features";
 import { athleteText, originalTextClass } from "@/lib/coaching-display";
-import { formatChatDateTime, formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { t, type Locale, L } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import {
@@ -218,28 +218,25 @@ export default function CoachReviewRequestPage() {
         ) : null}
       </div>
 
-      {request.video_url ? (
-        <div className="flex justify-start">
-          <div className="max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2">
-            <video
-              src={request.video_url}
-              poster={request.thumbnail_url || undefined}
-              controls
-              playsInline
-              preload="metadata"
-              className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
-            />
-          </div>
-        </div>
-      ) : null}
-
-      <div className="flex justify-start">
-        <div className="max-w-[85%] rounded-xl rounded-bl-sm bg-white/10 px-3 py-2">
-          <time dateTime={request.created_at} className="text-xs text-slate-300">{formatChatDateTime(request.created_at)}</time>
+      <section aria-label={L("依頼内容")} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/5 p-4">
+        <h2 className="text-sm font-semibold text-slate-300">{L("依頼内容")}</h2>
+        {request.video_url ? (
+          <video
+            src={request.video_url}
+            poster={request.thumbnail_url || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
+          />
+        ) : null}
+        <div className="space-y-1">
+          <h3 className="text-xs font-semibold text-slate-300">{L("相談内容")}</h3>
           <p className="whitespace-pre-wrap break-words text-sm">{question ? question.text : reviewQuestionText(request)}</p>
           {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
+          <p className="text-xs text-slate-300"><time dateTime={request.created_at}>{formatDateTime(request.created_at)}</time></p>
         </div>
-      </div>
+      </section>
 
       {sent === "info" && request.info_request ? <SentBanner text={t(locale, "coach.detail.infoSent")} /> : null}
 
@@ -266,6 +263,7 @@ export default function CoachReviewRequestPage() {
 
       {response ? <ReviewResponseView response={response} viewer="coach" /> : null}
 
+      {/* 追加質問は販売を終了した（本体 #984）。販売終了前に購入された分だけ、受諾・回答のために出る。 */}
       {response && id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
 
       {request.work_order ? <WorkOrderView order={request.work_order} /> : null}

@@ -76,6 +76,9 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		CoachingMessaging:     true,
 		// 動画添削のあとの追加質問の送信も、確かめるテストが多いので開けておく。閉じたときの動きは coaching_consultation_test.go で確かめる。
 		CoachingConsultation: true,
+		// 1回プランの追加質問は販売終了（本番はつねに false）。購入済みの分の流れを確かめるテストが多いので、
+		// テストでは新規作成も開けておく。終了後の動きは review_consultation_sales_ended_test.go で確かめる。
+		ReviewConsultationSales: true,
 		// コーチ一覧も、一覧の中身を確かめるテストが多いので開けておく。閉じたときの動きは coach_list_flag_test.go で確かめる。
 		CoachingCoachList: true,
 		// 本番はチケットの新規販売を止めている（空が既定）。購入済みチケットの消費・返金を確かめる

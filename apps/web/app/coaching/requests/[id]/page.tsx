@@ -16,8 +16,8 @@ import { ReviewResponseView } from "@/components/review-response";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatChatDateTime, formatDateTime } from "@/lib/format";
-import { coachingCoachListEnabled } from "@/lib/features";
+import { formatDateTime } from "@/lib/format";
+import { coachingCoachListEnabled, supportPlanListEnabled } from "@/lib/features";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewVideosPurgedNote } from "@/lib/review";
@@ -96,6 +96,22 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
         <button type="button" onClick={() => void report()} disabled={pending} className="text-xs text-slate-300 underline">{L("この返答を通報する")}</button>
       )}
     </div>
+  );
+}
+
+// 完了した1回プランのあとの導線は「新しい動画で依頼する」と「継続プランを見る」の2つだけ（本体 #984）。
+// 継続プランの一覧が閉じている間は開始通知の登録機能が無いので、押せない「準備中」の表示に留める。
+function CompletedNextSteps({ coachID }: { coachID: string | null }) {
+  const again = coachID ? `/coaching/new?coach=${encodeURIComponent(coachID)}` : "/coaching/new";
+  return (
+    <nav aria-label={L("次の依頼")} className="grid gap-2">
+      <Link href={again} className="block min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-pure-white transition active:scale-[0.98]">{L("新しい動画で依頼する")}</Link>
+      {supportPlanListEnabled ? (
+        <Link href="/coaching?tab=support" className="block min-h-11 w-full rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-blue-300 transition active:scale-[0.98]">{L("継続プランを見る")}</Link>
+      ) : (
+        <p aria-disabled="true" className="min-h-11 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-center text-sm text-slate-300">{L("継続プランは準備中です")}</p>
+      )}
+    </nav>
   );
 }
 
@@ -310,37 +326,36 @@ function ReviewRequestView() {
       {request.info_request ? <ReviewInfoHistory info={request.info_request} viewer="requester" body={coachText(request.info_request.body, request.info_request_ja, { mine: false })} /> : null}
       {request.status === "needs_info" ? <ResubmitForm request={request} token={token} onChange={setRequest} /> : null}
 
-      {request.video_url ? (
-        <div className="flex justify-end">
-          <div className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2">
-            <video
-              src={request.video_url}
-              poster={request.thumbnail_url || undefined}
-              controls
-              playsInline
-              preload="metadata"
-              className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
-            />
-          </div>
-        </div>
-      ) : request.videos_purged ? (
-        <div className="flex justify-end"><p className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2 text-sm text-slate-200">{reviewVideosPurgedNote()}</p></div>
-      ) : null}
-
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-xl rounded-br-sm bg-blue-500/25 px-3 py-2">
-          <time dateTime={request.created_at} className="text-xs text-slate-300">{formatChatDateTime(request.created_at)}</time>
+      <section aria-label={L("依頼内容")} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/5 p-4">
+        <h2 className="text-sm font-semibold text-slate-300">{L("依頼内容")}</h2>
+        {request.video_url ? (
+          <video
+            src={request.video_url}
+            poster={request.thumbnail_url || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
+          />
+        ) : request.videos_purged ? (
+          <p className="text-sm text-slate-200">{reviewVideosPurgedNote()}</p>
+        ) : null}
+        <div className="space-y-1">
+          <h3 className="text-xs font-semibold text-slate-300">{L("相談内容")}</h3>
           <p className="whitespace-pre-wrap break-words text-sm">{reviewQuestionText(request)}</p>
         </div>
-      </div>
+      </section>
 
       {request.response ? (
         <>
-          <ReviewResponseView response={request.response} viewer="requester" />
+          <ReviewResponseView response={request.response} viewer="requester" coach={request.coach} />
           <ResponseActions request={request} token={token} onChange={setRequest} />
+          {/* 追加質問は販売を終了した（本体 #984）。販売終了前に購入した分だけを記録として出す（新規の購入・入力欄は出さない）。 */}
           {id ? <CoachingConsultations rootID={id} kind="review" token={token} /> : null}
         </>
       ) : null}
+
+      {request.status === "returned" ? <CompletedNextSteps coachID={request.coach?.id ?? null} /> : null}
 
       <Link href="/me/coaching/requests" className="block min-h-11 w-full rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-blue-300 transition active:scale-[0.98]">{L("依頼の一覧へ")}</Link>
     </div>
