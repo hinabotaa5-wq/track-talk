@@ -288,29 +288,26 @@ it("B4: 英訳が null なら、en でも原文だけ", async () => {
   expect(container.querySelector("p[lang='ja']")).toBeNull();
 });
 
-it("依頼動画→相談文は左・白系で、自分の返答は右・青で表示し、末尾リンクを出さない", async () => {
+it("依頼内容（動画→相談文）は吹き出しにせず上にまとめ、自分の回答は1枚のドキュメントで出し、末尾リンクを出さない（本体 #984）", async () => {
   apiFetch.mockImplementation(async (path: string) => path.includes("/consultations") ? emptyRoom : { ...responded, status: "returned", video_url: "https://example.com/run.mp4", thumbnail_url: "https://example.com/run.jpg" });
   await renderPage();
   const question = [...container.querySelectorAll("p")].find((p) => p.textContent === base.question)!;
-  const bubble = question.parentElement!;
-  expect(bubble.classList).toContain("bg-white/10");
-  expect(bubble.parentElement?.classList).toContain("justify-start");
-  expect(bubble.querySelector("time")?.textContent).toBe("11/13 12:00");
-  expect(bubble.textContent).not.toContain("2026");
+  const request = question.closest('section[aria-label="依頼内容"]')!;
+  expect(request).not.toBeNull();
+  expect(request.querySelector("time")?.getAttribute("datetime")).toBe(base.created_at);
+  expect(container.querySelector(".justify-start, .justify-end")).toBeNull();
   expect(container.querySelector("h1")?.parentElement?.textContent).not.toContain(base.question);
   const video = container.querySelector("video")!;
+  expect(video.closest("section")).toBe(request);
   expect(video.controls).toBe(true);
   expect(video.playsInline).toBe(true);
   expect(video.getAttribute("poster")).toBe("https://example.com/run.jpg");
   expect(video.classList).toContain("max-w-[260px]");
   expect(video.classList).toContain("max-h-[300px]");
-  expect(video.closest("div.flex")?.classList).toContain("justify-start");
-  expect(video.parentElement?.classList).toContain("bg-white/10");
   expect(video.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  const response = [...container.querySelectorAll("h2")].find((h) => h.textContent === "良い点")!.closest("section")!;
+  const response = [...container.querySelectorAll("h3")].find((h) => h.textContent === "良い点")!.closest("article")!;
   expect(question.compareDocumentPosition(response) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(response.firstElementChild?.classList).toContain("self-end");
-  expect(response.firstElementChild?.classList).toContain("bg-blue-500/25");
+  expect(response.querySelector("h2")?.textContent).toBe("あなたの回答");
   expect(container.textContent).not.toContain("コーチ画面へ");
   expect(container.querySelector('a[href="/coach"]')).toBeNull();
 });
@@ -319,7 +316,7 @@ it("返答前は空の返答を出さず、期限とフォームを従来どお�
   apiFetch.mockResolvedValue(base);
   await renderPage();
   expect(container.querySelectorAll("time")).toHaveLength(1);
-  expect(container.querySelector("section h2")).toBeNull();
+  expect(container.querySelector("article")).toBeNull();
   expect(container.textContent).toContain("返却期限");
   expect(responseForm()).toBeTruthy();
   expect(container.textContent).not.toContain("コーチ画面へ");

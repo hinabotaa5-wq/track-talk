@@ -21,8 +21,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 // 下書きはサーバーに保存してから購入へ進む。購入後も同じ部屋で再開できる。
-// 動画添削のあとの追加質問（kind="review"）は、1つの添削につき質問1回・回答1回の一方通行（1回500円の都度払いのみ、チケット不可）で、回答への確認・補足はない。
-// 送る欄は専用のゲート（coachingConsultationEnabled）で、サポートプランの相談はやりとりのゲートで出し分ける。
+// 動画添削のあとの追加質問（kind="review"）は販売を終了した（本体 #984）。販売終了前に購入された分（1つの添削につき質問1回・回答1回の
+// 一方通行、1回500円の都度払い）を記録として出し、コーチの受諾・回答だけを残す。新しい質問の入力欄・購入導線は出さない。
+// サポートプランの相談（kind="contract"）はやりとりのゲートで出し分ける（従来どおり）。
 export function CoachingConsultations({ rootID, kind, token, guardianToken }: { rootID: string; kind: "review" | "contract"; token: string | null; guardianToken?: string }) {
   const base = guardianToken ? `/v1/guardian/${encodeURIComponent(guardianToken)}` : "/v1/coaching";
   const roomPath = `${base}/${kind === "review" ? (guardianToken ? "reviews" : "requests") : "contracts"}/${rootID}/consultations`;
@@ -42,7 +43,8 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   }, [roomPath, token, kind]);
   if (!data) return error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null;
   // ゲートが閉じている間は、過去の相談がある添削だけ記録として出す（送る欄は出さない）。
-  if (kind === "review" && !coachingConsultationEnabled && data.consultations.every((c) => c.status === "draft")) return null;
+  // 追加質問は販売終了なので、購入済み（下書き以外）が無い添削では枠ごと出さない。
+  if (kind === "review" && data.consultations.every((c) => c.status === "draft")) return null;
   // コーチは添削の担当本人なので、動画添削のあとの追加質問の選手向け説明は出さない。
   // 選手から質問が届くまで（相談なし・選手の下書きだけ）は枠ごと出さない。届いたあとは受諾・回答のためにカードだけを出す。
   const coachReview = kind === "review" && data.role === "coach";
@@ -51,24 +53,19 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   const draft = data.consultations.find((c) => c.status === "draft" && !c.purged);
   const sendEnabled = kind === "review" ? coachingConsultationEnabled : coachingMessagingEnabled;
   const heading = kind === "review" ? L("追加質問") : L("追加相談");
-  const showReviewIntro = kind === "review" && data.role === "requester" && sendEnabled
-    && data.consultations.every((c) => c.status === "draft") && (draft || data.can_purchase && !open);
+  // 新しい質問を作れるのは継続プランの追加相談だけ。
+  const canCompose = kind === "contract" && sendEnabled && data.role === "requester";
   return <section className="space-y-4 rounded-2xl border border-white/20 bg-white/5 p-4" aria-label={heading}>
     <h2 className="font-bold">{heading}</h2>
-    {showReviewIntro ? <div className="flex justify-start">
-      <div className="max-w-[85%] space-y-1 rounded-xl rounded-bl-sm bg-slate-500/20 px-3 py-2">
-        <p className="text-xs font-semibold text-slate-300">TrackTalk</p>
-        <p className="text-xs text-slate-300">{L("この添削について、担当コーチに1回だけ質問できます。受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。")}</p>
-      </div>
-    </div> : null}
-    {kind === "contract" || data.role === "guardian" ? <>
-    <p className="text-sm text-slate-200">{kind === "review" ? L("この添削について質問を1回送ると、担当コーチが1回回答します。回答のあとに追加のやりとりはできません。") : L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
-    <p className="text-xs text-slate-300">{kind === "review" ? L("コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れは全額返金します。やりとりは終了後1年間保存します。") : L("コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
+    {kind === "review" ? <p className="text-xs text-slate-300">{L("追加質問の販売は終了しました。販売終了前に購入した追加質問は、購入時の条件のとおり扱います。")}</p> : null}
+    {kind === "contract" ? <>
+    <p className="text-sm text-slate-200">{L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
+    <p className="text-xs text-slate-300">{L("コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
     </> : null}
     {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash"} />)}
     {!sendEnabled ? <p className="text-xs text-slate-300">{kind === "review" ? L(consultationClosedNote) : L(messagingClosedNote)}</p> : null}
-    {sendEnabled && data.role === "requester" && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} reload={load} /> : null}
-    {sendEnabled && !data.can_purchase && data.role === "requester" && !draft && !open ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
+    {canCompose && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} reload={load} /> : null}
+    {canCompose && !data.can_purchase && !draft && !open ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </section>;
 }
@@ -233,8 +230,8 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
         {reply ? <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs">{L("実践動画（30秒・100MB以内、任意）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label> : null}
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? L("回答を送る") : clarify ? L("回答について確認する（1回無料）") : L("補足を送る")}</Button>
       </div> : null}
-      {c.status === "awaiting_payment" && role === c.payer ? <>
-        {kind === "review" && c.funding === "cash" ? <ReviewPayNotice /> : null}
+      {/* 追加質問（review）は販売終了なので、支払い前のものは支払いに進めず、取り下げだけができる（本体 #984）。 */}
+      {c.status === "awaiting_payment" && role === c.payer && kind === "contract" ? <>
         {needsDeclaration && role === "requester" ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
         <Button disabled={pending || (needsDeclaration && role === "requester" && !declared)} onClick={() => void act("checkout")}>{L("お支払いへ")}</Button>
       </> : null}
