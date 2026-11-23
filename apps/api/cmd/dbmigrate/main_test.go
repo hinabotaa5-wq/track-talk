@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -121,8 +123,9 @@ func TestApplyIsIdempotentAndGrantsOnlyBoundaryReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 版153から最新版まで（以降の migration が増えても通るように、件数は最新版から求める）。
-	if out["before_version"] != float64(153) || out["pending"] != float64(latest-153) || out["result"] != "ok" {
+	// 版153より後の migration の数（以降の migration が増えても通るように、埋め込みのファイルから数える。
+	// 000187 は #979 の revert で欠番なので、最新版からの引き算では数えない）。
+	if out["before_version"] != float64(153) || out["pending"] != float64(embeddedAfter(t, 153)) || out["result"] != "ok" {
 		t.Fatalf("check output %v", out)
 	}
 	var version int
@@ -135,7 +138,7 @@ func TestApplyIsIdempotentAndGrantsOnlyBoundaryReader(t *testing.T) {
 		t.Fatalf("apply exit %d: %s", code, buf.String())
 	}
 	out = decode(t, &buf)
-	if out["after_version"] != float64(latest) || out["after_dirty"] != false || out["applied"] != float64(latest-153) || out["result"] != "ok" {
+	if out["after_version"] != float64(latest) || out["after_dirty"] != false || out["applied"] != float64(embeddedAfter(t, 153)) || out["result"] != "ok" {
 		t.Fatalf("apply output %v", out)
 	}
 	checks := out["checks"].(map[string]any)
@@ -342,4 +345,28 @@ func TestCheckURL(t *testing.T) {
 	if code := run("drop", "postgres://u:p@127.0.0.1/x", &buf); code != 2 || strings.Contains(buf.String(), "u:p") {
 		t.Fatalf("unknown mode: %d %s", code, buf.String())
 	}
+}
+
+// embeddedAfter は、埋め込みの migration のうち版が after より大きいものの数を返す（欠番は数えない）。
+func embeddedAfter(t *testing.T, after uint64) int {
+	t.Helper()
+	entries, err := fs.ReadDir(migrations.FS, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasSuffix(name, ".up.sql") {
+			continue
+		}
+		v, err := strconv.ParseUint(strings.SplitN(name, "_", 2)[0], 10, 64)
+		if err != nil {
+			t.Fatalf("migration name %q: %v", name, err)
+		}
+		if v > after {
+			n++
+		}
+	}
+	return n
 }
