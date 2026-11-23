@@ -133,7 +133,8 @@ describe("DeleteAccountPage", () => {
     expect(text).toContain("終わっていないときは退会できません");
     expect(text).toContain("対応が終わったあとに退会すると、あなたの指導の契約とやりとりも削除されます");
     expect(text).toContain("取引に関する記録はプライバシーポリシーに定める期間は退会後も保管します");
-    expect(text).toContain("取引条件の明示（継続プランの契約ごとに示した取引条件の記録）と精算記録は、取引に関する記録として退会後も保管します。");
+    expect(text).toContain("取引条件の明示（継続プランの契約ごとに示した取引条件の記録）と精算記録は、取引に関する記録として退会後も保管し、作成した年の翌年3月16日から数えて7年と、契約が終わった日から数えて7年のうち、遅い方を過ぎたら削除します。");
+    expect(text).not.toContain("取引に関する記録として退会後も保管します。");
     const paragraphs = Array.from(view.div.querySelectorAll("p"), (p) => p.textContent ?? "");
     expect(paragraphs.find((p) => p.includes("23歳になる月の末日まで"))).toContain("従来の購入の都度の申告の記録");
     const purchaseNotice = paragraphs.find((p) => p.includes("新しい購入前チェックの記録"));
@@ -154,7 +155,8 @@ describe("DeleteAccountPage", () => {
       expect(text).toContain("you cannot delete your account until they are done");
       expect(text).toContain("deleting your account also deletes your coaching contracts and messages");
       expect(text).toContain("Transaction records are kept after deletion");
-      expect(text).toContain("The statement of transaction terms (the terms shown for each ongoing coaching contract) and settlement records are kept as transaction records after account deletion");
+      expect(text).toContain("The statement of transaction terms (the terms shown for each ongoing coaching contract) and settlement records are kept as transaction records after account deletion, and are deleted once the later of the following periods has passed: seven years from March 16 of the year following their creation, and seven years from the day the contract ended.");
+      expect(text).not.toContain("settlement records are kept as transaction records after account deletion.");
       const paragraphs = Array.from(view.div.querySelectorAll("p"), (p) => p.textContent ?? "");
       expect(paragraphs.find((p) => p.includes("until the last day of the month you turn 23"))).toContain("past per-purchase declarations");
       const purchaseNotice = paragraphs.find((p) => p.includes("the new pre-purchase check records"));
