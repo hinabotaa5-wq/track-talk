@@ -187,7 +187,7 @@ function FeaturedContent({ result, showTickets }: { result: Loaded; showTickets:
           {open ? null : <p className="text-center text-xs font-semibold text-red-400">{L("現在は受付を停止しています")}</p>}
           <div className="flex gap-2">
             {open ? (
-              <Link href={`/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`} className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-blue-600 px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]">
+              <Link href={`/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`} className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]">
                 {L("動画添削を依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
               </Link>
             ) : (

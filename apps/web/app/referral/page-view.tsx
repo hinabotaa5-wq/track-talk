@@ -29,15 +29,6 @@ function StepCard({ step, index, children }: { step: Step; index: number; childr
   );
 }
 
-function ReferralCodeMock() {
-  return (
-    <div className="mt-3 rounded-lg border border-dashed border-slate-500/50 p-3">
-      <p className="text-sm">{L("紹介ID")}</p>
-      <p className="mt-1 rounded-lg border border-slate-500/40 px-3 py-2 font-mono tracking-wider text-slate-400">K7M3QX</p>
-    </div>
-  );
-}
-
 const steps: Step[] = [
   { icon: Ticket, title: "購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。" },
   { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで紹介IDをコピーできます。" },
@@ -66,11 +57,7 @@ export function ReferralGuideView() {
       <section className="space-y-3">
         <h2 className="text-lg font-bold">{L("紹介の流れ")}</h2>
         <ol className="space-y-3">
-          {steps.map((step, index) => (
-            <StepCard key={step.title} step={step} index={index}>
-              {index === 3 ? <ReferralCodeMock /> : null}
-            </StepCard>
-          ))}
+          {steps.map((step, index) => <StepCard key={step.title} step={step} index={index} />)}
         </ol>
       </section>
 
