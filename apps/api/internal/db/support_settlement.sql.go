@@ -100,7 +100,7 @@ func (q *Queries) EndSupportWithoutRefund(ctx context.Context, id uuid.UUID) (Co
 }
 
 const getContractStatement = `-- name: GetContractStatement :one
-SELECT contract_id, coach_id, body, issued_at, id FROM support_contract_statements WHERE contract_id = $1
+SELECT contract_id, coach_id, body, issued_at, id, contract_end_on FROM support_contract_statements WHERE contract_id = $1
 `
 
 func (q *Queries) GetContractStatement(ctx context.Context, contractID *uuid.UUID) (SupportContractStatement, error) {
@@ -112,12 +112,13 @@ func (q *Queries) GetContractStatement(ctx context.Context, contractID *uuid.UUI
 		&i.Body,
 		&i.IssuedAt,
 		&i.ID,
+		&i.ContractEndOn,
 	)
 	return i, err
 }
 
 const getFaultDetermination = `-- name: GetFaultDetermination :one
-SELECT contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id FROM support_fault_determinations WHERE contract_id = $1
+SELECT contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id, contract_end_on FROM support_fault_determinations WHERE contract_id = $1
 `
 
 func (q *Queries) GetFaultDetermination(ctx context.Context, contractID *uuid.UUID) (SupportFaultDetermination, error) {
@@ -136,6 +137,7 @@ func (q *Queries) GetFaultDetermination(ctx context.Context, contractID *uuid.UU
 		&i.ReviewedBy,
 		&i.ReviewedAt,
 		&i.ID,
+		&i.ContractEndOn,
 	)
 	return i, err
 }
@@ -162,7 +164,7 @@ func (q *Queries) GetSupportPaid(ctx context.Context, contractID *uuid.UUID) (Ge
 }
 
 const getSupportSettlement = `-- name: GetSupportSettlement :one
-SELECT contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at, id FROM support_coach_settlements WHERE contract_id = $1
+SELECT contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at, id, contract_end_on FROM support_coach_settlements WHERE contract_id = $1
 `
 
 func (q *Queries) GetSupportSettlement(ctx context.Context, contractID *uuid.UUID) (SupportCoachSettlement, error) {
@@ -176,6 +178,7 @@ func (q *Queries) GetSupportSettlement(ctx context.Context, contractID *uuid.UUI
 		&i.ClawbackYen,
 		&i.CreatedAt,
 		&i.ID,
+		&i.ContractEndOn,
 	)
 	return i, err
 }
@@ -199,7 +202,7 @@ func (q *Queries) InsertContractStatement(ctx context.Context, arg InsertContrac
 const insertFaultDetermination = `-- name: InsertFaultDetermination :one
 INSERT INTO support_fault_determinations (contract_id, decision, reason, decided_by)
 VALUES ($1, $2, $3, $4)
-RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id
+RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id, contract_end_on
 `
 
 type InsertFaultDeterminationParams struct {
@@ -230,6 +233,7 @@ func (q *Queries) InsertFaultDetermination(ctx context.Context, arg InsertFaultD
 		&i.ReviewedBy,
 		&i.ReviewedAt,
 		&i.ID,
+		&i.ContractEndOn,
 	)
 	return i, err
 }
@@ -352,7 +356,7 @@ const insertSupportSettlement = `-- name: InsertSupportSettlement :one
 INSERT INTO support_coach_settlements (contract_id, earned_yen, advances_yen, final_yen, clawback_yen)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT DO NOTHING
-RETURNING contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at, id
+RETURNING contract_id, earned_yen, advances_yen, final_yen, clawback_yen, created_at, id, contract_end_on
 `
 
 type InsertSupportSettlementParams struct {
@@ -380,6 +384,7 @@ func (q *Queries) InsertSupportSettlement(ctx context.Context, arg InsertSupport
 		&i.ClawbackYen,
 		&i.CreatedAt,
 		&i.ID,
+		&i.ContractEndOn,
 	)
 	return i, err
 }
@@ -645,7 +650,7 @@ const objectFaultDetermination = `-- name: ObjectFaultDetermination :one
 UPDATE support_fault_determinations d SET objection = $1, objected_at = now()
 WHERE d.contract_id = $2 AND d.decision = 'coach_fault' AND d.objected_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM support_coach_settlements s WHERE s.contract_id = d.contract_id)
-RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id
+RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id, contract_end_on
 `
 
 type ObjectFaultDeterminationParams struct {
@@ -670,6 +675,7 @@ func (q *Queries) ObjectFaultDetermination(ctx context.Context, arg ObjectFaultD
 		&i.ReviewedBy,
 		&i.ReviewedAt,
 		&i.ID,
+		&i.ContractEndOn,
 	)
 	return i, err
 }
@@ -758,7 +764,7 @@ const reviewFaultDetermination = `-- name: ReviewFaultDetermination :one
 UPDATE support_fault_determinations SET review_decision = $1, review_reason = $2,
     reviewed_by = $3, reviewed_at = now()
 WHERE contract_id = $4 AND objected_at IS NOT NULL AND reviewed_at IS NULL
-RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id
+RETURNING contract_id, decision, reason, decided_by, notified_at, objection, objected_at, review_decision, review_reason, reviewed_by, reviewed_at, id, contract_end_on
 `
 
 type ReviewFaultDeterminationParams struct {
@@ -789,6 +795,7 @@ func (q *Queries) ReviewFaultDetermination(ctx context.Context, arg ReviewFaultD
 		&i.ReviewedBy,
 		&i.ReviewedAt,
 		&i.ID,
+		&i.ContractEndOn,
 	)
 	return i, err
 }

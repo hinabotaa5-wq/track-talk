@@ -23,9 +23,14 @@ type storageCleanupResult struct {
 	GuardianRecord   int64 `json:"guardian_records_deleted"`
 	// 退会した未成年の、購入のたびの宣言の記録（保護者同意の記録と同じく、本人が23歳になる月の終わりまで）。
 	MinorDeclaration int64 `json:"minor_purchase_declarations_deleted"`
-	Consultations    int   `json:"consultations_purged"`
-	Messages         int   `json:"message_rooms_purged"`
-	Assets           int   `json:"unused_assets_deleted"`
+	// 契約が消えたあとの取引条件の明示と精算記録（仮払い・確定・帰責判定）のうち、保存期限を過ぎたもの（本体 #981）。
+	SupportContractStatements  int64 `json:"support_contract_statements_deleted"`
+	SupportCoachSettlements    int64 `json:"support_coach_settlements_deleted"`
+	SupportCoachAdvances       int64 `json:"support_coach_advances_deleted"`
+	SupportFaultDeterminations int64 `json:"support_fault_determinations_deleted"`
+	Consultations              int   `json:"consultations_purged"`
+	Messages                   int   `json:"message_rooms_purged"`
+	Assets                     int   `json:"unused_assets_deleted"`
 	// 縮めずに保存していた動画のうち、縮めた版へ置き換えた数（本体 #497）。
 	Originals int `json:"original_videos_replaced"`
 	// 保持期間（動画添削7日・サポートプラン30日）を過ぎて消した動画ファイル（本体 #506）。
@@ -89,6 +94,21 @@ func (s *Server) runStorageCleanup(ctx context.Context) (storageCleanupResult, e
 	}
 	if out.DocumentConsents, err = s.q.DeleteExpiredDocumentConsents(ctx, now.AddDate(-documentConsentRetentionYears, 0, 0)); err != nil {
 		return out, err
+	}
+	// 取引条件の明示と精算記録は、契約が消えたものだけを、作成年の税務期限と契約終了＋7年の遅い方を過ぎてから消す。
+	// 外部ストレージに依存しないので、Cloudinary の設定に関係なく動かす。
+	for _, target := range []struct {
+		count *int64
+		run   func(context.Context, time.Time) (int64, error)
+	}{
+		{&out.SupportContractStatements, s.q.DeleteExpiredSupportContractStatements},
+		{&out.SupportCoachSettlements, s.q.DeleteExpiredSupportCoachSettlements},
+		{&out.SupportCoachAdvances, s.q.DeleteExpiredSupportCoachAdvances},
+		{&out.SupportFaultDeterminations, s.q.DeleteExpiredSupportFaultDeterminations},
+	} {
+		if *target.count, err = target.run(ctx, now); err != nil {
+			return out, err
+		}
 	}
 	// 外部ストレージを消せない設定では文章も消さない。
 	if !s.cloud.Configured() {

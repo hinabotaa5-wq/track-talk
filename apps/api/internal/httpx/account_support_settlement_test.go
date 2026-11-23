@@ -29,6 +29,7 @@ func supportSettlementKeys(t *testing.T, contract string) settlementKeys {
 
 // settlementSnapshot は、キーで選んだ行の中身（契約とコーチへの参照を除く）と、件数・契約に付いたままの件数を返す。
 // コーチへの参照（coach_refund_adjustments.coach_id）は、もとからコーチの退会で SET NULL になるので比べない。
+// 契約終了日の控え（contract_end_on）は、契約が消える時に書き写す列なので比べない（本体 #981。書き写しは support_record_retention_test.go で確かめる）。
 type settlementSnapshot struct {
 	body                        string
 	rows, attached, adjustCount int
@@ -39,9 +40,9 @@ func supportSettlementSnapshot(t *testing.T, k settlementKeys) settlementSnapsho
 	var s settlementSnapshot
 	queryRowArgs(t, `SELECT
 		jsonb_build_array(
-			COALESCE((SELECT jsonb_agg(to_jsonb(a) - 'contract_id' ORDER BY a.earning_id) FROM support_coach_advances a WHERE a.earning_id::text = ANY($1)), '[]'),
-			COALESCE((SELECT jsonb_agg(to_jsonb(s) - 'contract_id' ORDER BY s.id) FROM support_coach_settlements s WHERE s.id::text = ANY($2)), '[]'),
-			COALESCE((SELECT jsonb_agg(to_jsonb(d) - 'contract_id' ORDER BY d.id) FROM support_fault_determinations d WHERE d.id::text = ANY($3)), '[]'),
+			COALESCE((SELECT jsonb_agg(to_jsonb(a) - 'contract_id' - 'contract_end_on' ORDER BY a.earning_id) FROM support_coach_advances a WHERE a.earning_id::text = ANY($1)), '[]'),
+			COALESCE((SELECT jsonb_agg(to_jsonb(s) - 'contract_id' - 'contract_end_on' ORDER BY s.id) FROM support_coach_settlements s WHERE s.id::text = ANY($2)), '[]'),
+			COALESCE((SELECT jsonb_agg(to_jsonb(d) - 'contract_id' - 'contract_end_on' ORDER BY d.id) FROM support_fault_determinations d WHERE d.id::text = ANY($3)), '[]'),
 			COALESCE((SELECT jsonb_agg(to_jsonb(j) - 'contract_id' - 'coach_id' ORDER BY j.id) FROM coach_refund_adjustments j WHERE j.id::text = ANY($4)), '[]')
 		)::text,
 		(SELECT count(*) FROM support_coach_advances WHERE earning_id::text = ANY($1))::int
