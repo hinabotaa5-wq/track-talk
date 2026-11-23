@@ -291,9 +291,9 @@ it("表示言語の項目はマイページの設定一覧に出さない（運�
 });
 
 it.each([
-  { friends: 0, granted: false, label: "あと2人で無料クーポン" },
-  { friends: 1, granted: false, label: "あと1人で無料クーポン" },
-  { friends: 2, granted: true, label: "無料クーポンをプレゼントしました" },
+  { friends: 0, granted: false, label: "あと2人で無料チケット" },
+  { friends: 1, granted: false, label: "あと1人で無料チケット" },
+  { friends: 2, granted: true, label: "無料チケットをプレゼントしました" },
 ])("マイページに紹介IDと進捗を表示する ($friends人)", async ({ friends, granted, label }) => {
   mock.referral.mockResolvedValue({ referral: {
     code: "K7M3QX", active: !granted, friend_count: friends,
@@ -306,10 +306,10 @@ it.each([
   if (granted) {
     expect(container.textContent).toContain("付与日");
     expect(container.textContent).toContain("有効期限");
-    expect(container.textContent).toContain("付与された本人だけが次回の購入で使えます／払戻しはできません");
+    expect(container.textContent).toContain("付与された本人だけが使えます／払戻しはできません");
     expect(container.textContent).toContain("このIDは終了しました。紹介IDを使わずに購入すると、新しい紹介IDが発行されます。");
   }
-  expect(container.textContent).toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に次回の動画添削1回分が無料になるクーポンをプレゼントします。");
+  expect(container.textContent).toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
   // 本体 #909：見出しは「1回分(500円)無料」。
   expect(container.textContent).toContain("友達2人に紹介すると、1回分(500円)無料！");
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");

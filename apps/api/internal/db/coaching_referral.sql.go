@@ -17,14 +17,13 @@ SELECT c.code, p.id AS owner_id, p.nickname, c.issued_at, c.closed_at,
     ARRAY(SELECT a.buyer_id::text FROM coaching_referral_counts a
           WHERE a.referral_code = c.code AND a.canceled_at IS NULL AND a.buyer_id IS NOT NULL
           ORDER BY a.counted_at)::text[] AS buyers,
-    r.granted_at, r.canceled_at, r.qualifying_refund_at,
-    COALESCE(l.expires_at, cp.expires_at, 'epoch'::timestamptz)::timestamptz AS expires_at
+    r.granted_at, r.canceled_at, r.qualifying_refund_at
 FROM coaching_referral_codes c
 JOIN profiles p ON p.id = c.owner_id
-LEFT JOIN coaching_referral_rewards r ON r.referral_code = c.code AND r.canceled_at IS NULL
-LEFT JOIN coaching_ticket_lots l ON l.id = r.lot_id
-LEFT JOIN coaching_referral_coupons cp ON cp.id = r.coupon_id
-WHERE ($1::text = '' AND (r.lot_id IS NOT NULL OR r.coupon_id IS NOT NULL)) OR c.code = $1::text
+LEFT JOIN coaching_referral_rewards r ON r.lot_id = (
+    SELECT x.lot_id FROM coaching_referral_rewards x WHERE x.referral_code = c.code
+    ORDER BY x.canceled_at IS NULL DESC, x.granted_at DESC LIMIT 1)
+WHERE ($1::text = '' AND r.lot_id IS NOT NULL) OR c.code = $1::text
 ORDER BY r.granted_at DESC NULLS LAST, c.code
 LIMIT 200
 `
@@ -39,7 +38,6 @@ type AdminCoachingReferralOverviewRow struct {
 	GrantedAt          *time.Time `json:"granted_at"`
 	CanceledAt         *time.Time `json:"canceled_at"`
 	QualifyingRefundAt *time.Time `json:"qualifying_refund_at"`
-	ExpiresAt          time.Time  `json:"expires_at"`
 }
 
 func (q *Queries) AdminCoachingReferralOverview(ctx context.Context, code string) ([]AdminCoachingReferralOverviewRow, error) {
@@ -61,7 +59,6 @@ func (q *Queries) AdminCoachingReferralOverview(ctx context.Context, code string
 			&i.GrantedAt,
 			&i.CanceledAt,
 			&i.QualifyingRefundAt,
-			&i.ExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -82,26 +79,13 @@ func (q *Queries) CancelDisputedCoachingReferral(ctx context.Context, dollar_1 s
 	return err
 }
 
-const cancelReleasedReferralCoupon = `-- name: CancelReleasedReferralCoupon :exec
-WITH canceled AS (
-    UPDATE coaching_referral_coupons cp SET canceled_at = now() WHERE cp.id = $1 RETURNING cp.id
-)
-UPDATE coaching_referral_rewards SET canceled_at = now()
-WHERE coupon_id IN (SELECT id FROM canceled) AND canceled_at IS NULL
-`
-
-func (q *Queries) CancelReleasedReferralCoupon(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, cancelReleasedReferralCoupon, id)
-	return err
-}
-
 const cancelReleasedReferralReward = `-- name: CancelReleasedReferralReward :exec
 UPDATE coaching_referral_rewards SET canceled_at = now()
 WHERE lot_id = $1 AND qualifying_refund_at IS NOT NULL AND canceled_at IS NULL
   AND EXISTS (SELECT FROM coaching_ticket_lots l WHERE l.id = coaching_referral_rewards.lot_id AND l.reserved = 0 AND l.consumed = 0)
 `
 
-func (q *Queries) CancelReleasedReferralReward(ctx context.Context, lotID *uuid.UUID) error {
+func (q *Queries) CancelReleasedReferralReward(ctx context.Context, lotID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, cancelReleasedReferralReward, lotID)
 	return err
 }
@@ -128,11 +112,10 @@ const getCoachingReferralProgress = `-- name: GetCoachingReferralProgress :one
 SELECT c.code, (c.closed_at IS NULL)::boolean AS active,
     (SELECT count(*)::int FROM coaching_referral_counts a
      WHERE a.referral_code = c.code AND a.canceled_at IS NULL) AS friend_count,
-    r.granted_at, COALESCE(l.expires_at, cp.expires_at, 'epoch'::timestamptz)::timestamptz AS expires_at
+    r.granted_at, l.expires_at
 FROM coaching_referral_codes c
 LEFT JOIN coaching_referral_rewards r ON r.referral_code = c.code AND r.canceled_at IS NULL
 LEFT JOIN coaching_ticket_lots l ON l.id = r.lot_id
-LEFT JOIN coaching_referral_coupons cp ON cp.id = r.coupon_id
 WHERE c.owner_id = $1
   AND (c.closed_at IS NULL OR c.closed_at > now() - interval '7 days')
 ORDER BY c.closed_at IS NULL DESC, c.issued_at DESC
@@ -144,7 +127,7 @@ type GetCoachingReferralProgressRow struct {
 	Active      bool       `json:"active"`
 	FriendCount int32      `json:"friend_count"`
 	GrantedAt   *time.Time `json:"granted_at"`
-	ExpiresAt   time.Time  `json:"expires_at"`
+	ExpiresAt   *time.Time `json:"expires_at"`
 }
 
 // 有効な周があればそれを、なければ終了から7日未満の周のうち直近の周を返す。進捗は周に所属する。
@@ -196,50 +179,6 @@ func (q *Queries) IssueCoachingReferralOrigin(ctx context.Context, arg IssueCoac
 	return err
 }
 
-const lockAvailableReferralCoupon = `-- name: LockAvailableReferralCoupon :one
-SELECT id FROM coaching_referral_coupons
-WHERE owner_id = $1 AND used_at IS NULL AND canceled_at IS NULL AND expires_at > now()
-ORDER BY expires_at, id LIMIT 1 FOR UPDATE
-`
-
-func (q *Queries) LockAvailableReferralCoupon(ctx context.Context, ownerID uuid.UUID) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, lockAvailableReferralCoupon, ownerID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
-}
-
-const lockReferralCodeForCouponRelease = `-- name: LockReferralCodeForCouponRelease :exec
-SELECT c.code FROM coaching_referral_codes c
-JOIN coaching_referral_rewards r ON r.referral_code = c.code
-JOIN coaching_referral_coupons cp ON cp.id = r.coupon_id
-WHERE cp.used_reservation_id = $1 FOR NO KEY UPDATE OF c
-`
-
-func (q *Queries) LockReferralCodeForCouponRelease(ctx context.Context, usedReservationID *uuid.UUID) error {
-	_, err := q.db.Exec(ctx, lockReferralCodeForCouponRelease, usedReservationID)
-	return err
-}
-
-const lockReferralCouponByReservation = `-- name: LockReferralCouponByReservation :one
-SELECT id, owner_id, granted_at, expires_at, used_at, used_reservation_id, canceled_at FROM coaching_referral_coupons WHERE used_reservation_id = $1 FOR UPDATE
-`
-
-func (q *Queries) LockReferralCouponByReservation(ctx context.Context, usedReservationID *uuid.UUID) (CoachingReferralCoupon, error) {
-	row := q.db.QueryRow(ctx, lockReferralCouponByReservation, usedReservationID)
-	var i CoachingReferralCoupon
-	err := row.Scan(
-		&i.ID,
-		&i.OwnerID,
-		&i.GrantedAt,
-		&i.ExpiresAt,
-		&i.UsedAt,
-		&i.UsedReservationID,
-		&i.CanceledAt,
-	)
-	return i, err
-}
-
 const recordCoachingReferral = `-- name: RecordCoachingReferral :one
 SELECT COALESCE(coaching_record_referral($1::uuid, $2::text,
     $3::uuid, $4::uuid)::text, '')::text AS recipient
@@ -265,92 +204,14 @@ func (q *Queries) RecordCoachingReferral(ctx context.Context, arg RecordCoaching
 	return recipient, err
 }
 
-const referralCouponBalance = `-- name: ReferralCouponBalance :one
-SELECT count(*)::int AS count,
-    COALESCE(min(expires_at), 'epoch'::timestamptz)::timestamptz AS earliest_expires_at
-FROM coaching_referral_coupons
-WHERE owner_id = $1 AND used_at IS NULL AND canceled_at IS NULL AND expires_at > now()
-`
-
-type ReferralCouponBalanceRow struct {
-	Count             int32     `json:"count"`
-	EarliestExpiresAt time.Time `json:"earliest_expires_at"`
-}
-
-func (q *Queries) ReferralCouponBalance(ctx context.Context, ownerID uuid.UUID) (ReferralCouponBalanceRow, error) {
-	row := q.db.QueryRow(ctx, referralCouponBalance, ownerID)
-	var i ReferralCouponBalanceRow
-	err := row.Scan(&i.Count, &i.EarliestExpiresAt)
-	return i, err
-}
-
-const referralCouponHasRefund = `-- name: ReferralCouponHasRefund :one
-SELECT EXISTS (SELECT FROM coaching_referral_rewards
-    WHERE coupon_id = $1 AND qualifying_refund_at IS NOT NULL)::boolean
-`
-
-func (q *Queries) ReferralCouponHasRefund(ctx context.Context, couponID *uuid.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, referralCouponHasRefund, couponID)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const referralRewardHasRefund = `-- name: ReferralRewardHasRefund :one
 SELECT EXISTS(SELECT FROM coaching_referral_rewards
     WHERE lot_id = $1 AND qualifying_refund_at IS NOT NULL)::boolean
 `
 
-func (q *Queries) ReferralRewardHasRefund(ctx context.Context, lotID *uuid.UUID) (bool, error) {
+func (q *Queries) ReferralRewardHasRefund(ctx context.Context, lotID uuid.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, referralRewardHasRefund, lotID)
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const reissueReferralCoupon = `-- name: ReissueReferralCoupon :exec
-INSERT INTO coaching_referral_coupons(owner_id, expires_at) VALUES ($1, now() + interval '6 months')
-`
-
-func (q *Queries) ReissueReferralCoupon(ctx context.Context, ownerID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, reissueReferralCoupon, ownerID)
-	return err
-}
-
-const releaseReferralCoupon = `-- name: ReleaseReferralCoupon :exec
-UPDATE coaching_referral_coupons SET used_at = NULL, used_reservation_id = NULL WHERE id = $1
-`
-
-func (q *Queries) ReleaseReferralCoupon(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, releaseReferralCoupon, id)
-	return err
-}
-
-const reviewUsedReferralCoupon = `-- name: ReviewUsedReferralCoupon :one
-SELECT EXISTS (
-    SELECT FROM coaching_ticket_reservations t
-    JOIN coaching_referral_coupons cp ON cp.used_reservation_id = t.id
-    WHERE t.request_id = $1
-)::boolean
-`
-
-func (q *Queries) ReviewUsedReferralCoupon(ctx context.Context, requestID *uuid.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, reviewUsedReferralCoupon, requestID)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const useReferralCoupon = `-- name: UseReferralCoupon :exec
-UPDATE coaching_referral_coupons SET used_at = now(), used_reservation_id = $2 WHERE id = $1
-`
-
-type UseReferralCouponParams struct {
-	ID                uuid.UUID  `json:"id"`
-	UsedReservationID *uuid.UUID `json:"used_reservation_id"`
-}
-
-func (q *Queries) UseReferralCoupon(ctx context.Context, arg UseReferralCouponParams) error {
-	_, err := q.db.Exec(ctx, useReferralCoupon, arg.ID, arg.UsedReservationID)
-	return err
 }

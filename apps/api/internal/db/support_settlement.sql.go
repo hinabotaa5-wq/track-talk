@@ -263,7 +263,7 @@ func (q *Queries) InsertSupportAdvance(ctx context.Context, arg InsertSupportAdv
 const insertSupportAdvanceEarning = `-- name: InsertSupportAdvanceEarning :one
 INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
 VALUES ($1, $2, 'support_advance', $3, 100, $3, $4)
-RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at, reservation_id
+RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at
 `
 
 type InsertSupportAdvanceEarningParams struct {
@@ -294,7 +294,6 @@ func (q *Queries) InsertSupportAdvanceEarning(ctx context.Context, arg InsertSup
 		&i.CreatedAt,
 		&i.ConsultationID,
 		&i.ConfirmedAt,
-		&i.ReservationID,
 	)
 	return i, err
 }

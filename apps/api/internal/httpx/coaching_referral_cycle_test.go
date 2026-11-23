@@ -188,20 +188,20 @@ func TestCoachingReferralDisputeCancelsCountAndReward(t *testing.T) {
 	code := myReferral(t, h, owner).Code
 	buySixWithReferral(t, h, f1, code)
 	disputed := buySixWithReferral(t, h, f2, code)
-	var coupon uuid.UUID
-	queryRowArgs(t, `SELECT coupon_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{ownerID}, &coupon)
+	var lot uuid.UUID
+	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{ownerID}, &lot)
 
 	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{
 		"id": "dp_referral", "amount": 2500, "reason": "fraudulent", "payment_intent": "pi_ticket_" + disputed,
 	}); rec.Code != 200 {
 		t.Fatalf("dispute %d %s", rec.Code, rec.Body.String())
 	}
+	var available int
 	var canceled bool
-	queryRowArgs(t, `SELECT c.canceled_at IS NOT NULL AND r.canceled_at IS NOT NULL
-        FROM coaching_referral_coupons c JOIN coaching_referral_rewards r ON r.coupon_id=c.id
-        WHERE c.id=$1`, []any{coupon}, &canceled)
-	if !canceled {
-		t.Fatal("disputed reward coupon was not canceled")
+	queryRowArgs(t, `SELECT l.available, r.canceled_at IS NOT NULL FROM coaching_ticket_lots l
+		JOIN coaching_referral_rewards r ON r.lot_id=l.id WHERE l.id=$1`, []any{lot}, &available, &canceled)
+	if available != 0 || !canceled {
+		t.Fatalf("disputed reward available=%d canceled=%v", available, canceled)
 	}
 	r := myReferral(t, h, owner)
 	if r.Code != code || !r.Active || r.FriendCount != 1 {
@@ -363,12 +363,12 @@ func TestCoachingReferralConcurrentSecondCount(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		var rewards, valid, coupons int
+		var rewards, valid, lots int
 		queryRowArgs(t, `SELECT count(*) FROM coaching_referral_rewards WHERE referral_code=$1`, []any{code}, &rewards)
 		queryRowArgs(t, `SELECT count(*) FROM coaching_referral_counts WHERE referral_code=$1 AND canceled_at IS NULL`, []any{code}, &valid)
-		queryRowArgs(t, `SELECT count(*) FROM coaching_referral_coupons WHERE owner_id=$1`, []any{owner}, &coupons)
-		if rewards != 1 || valid != 2 || coupons != 1 {
-			t.Fatalf("round %d: rewards=%d valid counts=%d coupons=%d", round, rewards, valid, coupons)
+		queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_lots WHERE owner_id=$1 AND kind='referral_reward'`, []any{owner}, &lots)
+		if rewards != 1 || valid != 2 || lots != 1 {
+			t.Fatalf("round %d: rewards=%d valid counts=%d lots=%d", round, rewards, valid, lots)
 		}
 	}
 }

@@ -879,7 +879,7 @@ it("Stripeからの支払い同期後も状態・支払い文は出さず、紹�
     expectRemovedSummary(container);
     expect(cancelButton(container)).toBeDefined();
     expect(container.textContent).toContain("あなたの紹介ID ABC123");
-    expect(container.textContent).toContain("無料クーポンをプレゼントしました");
+    expect(container.textContent).toContain("無料チケットをプレゼントしました");
     expect(container.querySelector("section h2")?.classList).toContain("text-sm");
     for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "このIDは終了しました。"]) expect(container.textContent).not.toContain(text);
   } finally { searchState.paid = false; await teardown(root, container); }
@@ -1007,21 +1007,4 @@ it("英語表示では右上リンクに既存の英訳を使う", async () => {
     expect(profile.textContent).toBe("View this coach's profile");
     expect(container.querySelector("h1")!.parentElement!.parentElement!.lastElementChild).toBe(profile);
   } finally { await teardown(root, container); }
-});
-
-it("クーポンで送った依頼には支払い方法と着手前のクーポン返却条件を表示する", async () => {
-  apiFetch.mockImplementation(async () => ({
-    ...unpaidRequest("in_review"),
-    used_coupon: true,
-  }));
-  const { container, root } = await renderPage();
-  try {
-    expect(container.textContent).toContain("お支払い：紹介特典クーポン");
-    await click(cancelButton(container)!);
-    expect(confirmMock).toHaveBeenLastCalledWith(expect.objectContaining({
-      body: "クーポンを戻します。有効期限を過ぎている場合は失効します。",
-    }));
-  } finally {
-    await unmountPage(container, root);
-  }
 });

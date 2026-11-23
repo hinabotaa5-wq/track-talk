@@ -82,7 +82,7 @@ it("特典付与済みで終了した周でも同じ見た目にし、付与済�
   const strong = await renderCard({ code: "K7M3QX", active: false, friend_count: 2, granted_at: "2026-11-14T09:00:00Z", expires_at: "2027-05-14T09:00:00Z" });
   expect(strong.textContent).toBe("K7M3QX");
   for (const c of [...endedClasses, "font-mono", "tracking-wider"]) expect(strong.classList).toContain(c);
-  expect(container.textContent).toContain("無料クーポンをプレゼントしました");
+  expect(container.textContent).toContain("無料チケットをプレゼントしました");
   expect(container.textContent).toContain(endedNotice);
   expect(copyButton()).toBeUndefined();
 });
@@ -105,7 +105,7 @@ it("compact は見出し・ID・コピー・状態だけでコピー結果も表
   expect(container.querySelector("h2")?.classList).toContain("text-sm");
   expect(container.querySelector("section")?.classList).toContain("p-3");
   expect(container.textContent).toContain("あなたの紹介ID ABC123");
-  expect(container.textContent).toContain("あと1人で無料クーポン");
+  expect(container.textContent).toContain("あと1人で無料チケット");
   expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。");
   await act(async () => copyButton()!.click());
   expect(writeText).toHaveBeenCalledWith("ABC123");
@@ -117,8 +117,8 @@ it.each(["full", "compact"] as const)("%s の終了IDは取り消し線・グレ
   await act(async () => root.render(<LoadedReferralCard token="test" variant={variant} />));
   for (const c of endedClasses) expect(container.querySelector("strong")?.classList).toContain(c);
   expect(copyButton()).toBeUndefined();
-  expect(container.textContent).toContain("無料クーポンをプレゼントしました");
-  for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "特典クーポン：", endedNotice]) {
+  expect(container.textContent).toContain("無料チケットをプレゼントしました");
+  for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "特典チケット：", endedNotice]) {
     expect(container.textContent?.includes(text)).toBe(variant === "full");
   }
 });

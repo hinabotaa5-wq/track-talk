@@ -1,5 +1,4 @@
 import json
-import sqlite3
 import unittest
 
 import counts
@@ -26,23 +25,6 @@ class StatementTest(unittest.TestCase):
     def test_every_statement_is_a_count(self):
         for sql in {**counts.ORPHANS, **counts.INFO}.values():
             self.assertEqual(counts.checked(sql), sql)
-
-    def test_review_earning_can_match_retained_reservation_after_withdrawal(self):
-        sql = counts.ORPHANS["review_earning_without_payment_link"]
-        with sqlite3.connect(":memory:") as db:
-            db.executescript("""
-                CREATE TABLE coach_earnings (id INTEGER, source TEXT, review_request_id INTEGER, reservation_id INTEGER);
-                CREATE TABLE review_payment_earning_links (earning_id INTEGER);
-                CREATE TABLE coaching_ticket_reservations (id INTEGER, request_id INTEGER);
-                INSERT INTO coach_earnings VALUES
-                    (1, 'review', 11, 10), (2, 'review', 21, 20), (3, 'review', 31, NULL),
-                    (4, 'review', 41, NULL), (5, 'review', 51, NULL), (6, 'consultation', NULL, NULL);
-                INSERT INTO review_payment_earning_links VALUES (3);
-                INSERT INTO coaching_ticket_reservations VALUES (10, 11), (20, 21), (40, 41);
-            """)
-            self.assertEqual(db.execute(sql).fetchone(), (1,))
-            db.execute("UPDATE coaching_ticket_reservations SET request_id = NULL WHERE id IN (10, 20)")
-            self.assertEqual(db.execute(sql).fetchone(), (1,))
 
     def test_rejects_non_aggregate_statements(self):
         for sql in ("SELECT id FROM review_payments", "SELECT count(*) FROM t; DELETE FROM t",

@@ -175,7 +175,7 @@ func (q *Queries) GetCoachEarningsSummary(ctx context.Context, coachID *uuid.UUI
 }
 
 const getContractEarning = `-- name: GetContractEarning :one
-SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at, reservation_id FROM coach_earnings WHERE contract_id = $1
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at FROM coach_earnings WHERE contract_id = $1
 `
 
 func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID) (CoachEarning, error) {
@@ -194,7 +194,6 @@ func (q *Queries) GetContractEarning(ctx context.Context, contractID *uuid.UUID)
 		&i.CreatedAt,
 		&i.ConsultationID,
 		&i.ConfirmedAt,
-		&i.ReservationID,
 	)
 	return i, err
 }
@@ -222,7 +221,7 @@ FROM (
 WHERE x.gross * x.share / 100 > 0
 LIMIT 100
 ON CONFLICT DO NOTHING
-RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at, reservation_id
+RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at
 `
 
 // 期間が終わった（途中で返金して閉じた）パーソナル指導の、手数料を引いたコーチの取り分を記録する。
@@ -249,7 +248,6 @@ func (q *Queries) InsertPersonalEarnings(ctx context.Context, feePercent int32) 
 			&i.CreatedAt,
 			&i.ConsultationID,
 			&i.ConfirmedAt,
-			&i.ReservationID,
 		); err != nil {
 			return nil, err
 		}
@@ -272,7 +270,7 @@ WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NO
   AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)
 LIMIT 100
 ON CONFLICT DO NOTHING
-RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at, reservation_id
+RETURNING id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at
 `
 
 // 返却して代金が確定した添削の、コーチの取り分を記録する。チケットで払った添削は RecordTicketReviewEarnings で記録する。
@@ -298,7 +296,6 @@ func (q *Queries) InsertReviewEarnings(ctx context.Context, sharePercent int16) 
 			&i.CreatedAt,
 			&i.ConsultationID,
 			&i.ConfirmedAt,
-			&i.ReservationID,
 		); err != nil {
 			return nil, err
 		}
@@ -430,7 +427,7 @@ func (q *Queries) ListPayableCoachEarnings(ctx context.Context, arg ListPayableC
 }
 
 const listRecentCoachEarnings = `-- name: ListRecentCoachEarnings :many
-SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at, reservation_id FROM coach_earnings
+SELECT id, coach_id, source, review_request_id, contract_id, gross_yen, share_percent, amount_yen, payout_id, created_at, consultation_id, confirmed_at FROM coach_earnings
 WHERE coach_id = $1
 ORDER BY confirmed_at DESC
 LIMIT 30
@@ -458,7 +455,6 @@ func (q *Queries) ListRecentCoachEarnings(ctx context.Context, coachID *uuid.UUI
 			&i.CreatedAt,
 			&i.ConsultationID,
 			&i.ConfirmedAt,
-			&i.ReservationID,
 		); err != nil {
 			return nil, err
 		}
