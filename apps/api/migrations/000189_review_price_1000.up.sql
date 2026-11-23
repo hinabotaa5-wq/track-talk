@@ -6,3 +6,9 @@
 ALTER TABLE review_requests ALTER COLUMN base_price_yen SET DEFAULT 1000;
 
 UPDATE coaching_ticket_products SET amount_yen = 5000 WHERE id = 'six';
+
+-- 失効後の返金は1枚あたり単発価格で返すので、返金済み額の上限（000162）も「単発価格 × 枚数」に移す。
+ALTER TABLE coaching_ticket_purchases DROP CONSTRAINT coaching_ticket_purchases_refund_cap_check;
+ALTER TABLE coaching_ticket_purchases
+    ADD CONSTRAINT coaching_ticket_purchases_refund_cap_check
+    CHECK (refunded_yen >= 0 AND refunded_yen <= quantity * 1000);

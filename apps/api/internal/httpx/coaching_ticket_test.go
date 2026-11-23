@@ -295,7 +295,7 @@ func TestTicketUnusedRefundAndCrashRecovery(t *testing.T) {
 		t.Fatalf("refund %d %s", rec.Code, rec.Body.String())
 	}
 	state := ticketSummary(t, h, tu)
-	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 2083 || len(f.refunds) != 1 {
+	if state.Balance.Available != 0 || state.Purchases[0].RefundedYen != 4167 || len(f.refunds) != 1 {
 		t.Fatalf("refund %+v remote %v", state, f.refunds)
 	}
 	// 外部返金後にローカル確定だけ失敗した状態を再現する。操作IDで検索し、2回目の返金を作らない。

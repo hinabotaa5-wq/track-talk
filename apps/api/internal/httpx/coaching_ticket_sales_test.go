@@ -167,7 +167,7 @@ func TestReviewConsultationPayPerUseWithoutTickets(t *testing.T) {
 	}
 	form := f.lastSession()
 	if form.Get("payment_method_types[0]") != "card" || form.Get("payment_method_types[1]") != "" ||
-		form.Get("line_items[0][price_data][unit_amount]") != "1000" || form.Get("success_url") != "https://web.test/coaching/requests/"+root+"?consultation="+c.ID {
+		form.Get("line_items[0][price_data][unit_amount]") != "500" || form.Get("success_url") != "https://web.test/coaching/requests/"+root+"?consultation="+c.ID {
 		t.Fatalf("session %v", form)
 	}
 	// 支払いが届くまでコーチには届かない。届いた知らせが2回来ても1回分。

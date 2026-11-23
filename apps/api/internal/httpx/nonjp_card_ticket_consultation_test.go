@@ -60,7 +60,7 @@ func TestTicketPurchaseJPCardCredits(t *testing.T) {
 	h, f := setupStripe(t)
 	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
 	id := startTicketPurchase(t, h, tu, "six", uuid.NewString(), "/coaching/new")
-	if rec := payTicketPurchaseWith(t, h, id, "pi_ticket_"+id, 2500); rec.Code != 200 {
+	if rec := payTicketPurchaseWith(t, h, id, "pi_ticket_"+id, 5000); rec.Code != 200 {
 		t.Fatalf("pay %d %s", rec.Code, rec.Body.String())
 	}
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 6 {
@@ -104,7 +104,7 @@ func TestTicketPurchaseNonJPCardRefundsWithoutCredit(t *testing.T) {
 
 	intent := "pi_nonjp_ticket_" + id
 	for i := 0; i < 2; i++ {
-		if rec := payTicketPurchaseWith(t, h, id, intent, 2500); rec.Code != 200 {
+		if rec := payTicketPurchaseWith(t, h, id, intent, 5000); rec.Code != 200 {
 			t.Fatalf("pay %d: %d %s", i, rec.Code, rec.Body.String())
 		}
 	}
@@ -113,13 +113,13 @@ func TestTicketPurchaseNonJPCardRefundsWithoutCredit(t *testing.T) {
 		t.Fatalf("credited %+v", state.Balance)
 	}
 	refunds := f.refundList()[before:]
-	if len(refunds) != 1 || refunds[0].Get("payment_intent") != intent || refunds[0].Get("amount") != "2500" {
+	if len(refunds) != 1 || refunds[0].Get("payment_intent") != intent || refunds[0].Get("amount") != "5000" {
 		t.Fatalf("refunds %v", refunds)
 	}
 	var rows, quantity, amount int
 	var status string
 	queryRowArgs(t, `SELECT count(*),COALESCE(sum(quantity),0)::integer,COALESCE(sum(amount_yen),0)::integer FROM coaching_ticket_refunds WHERE purchase_id=$1`, []any{id}, &rows, &quantity, &amount)
-	if rows != 1 || quantity != 6 || amount != 2500 {
+	if rows != 1 || quantity != 6 || amount != 5000 {
 		t.Fatalf("refund rows %d %d %d", rows, quantity, amount)
 	}
 	queryRowArgs(t, `SELECT status FROM coaching_ticket_purchases WHERE id=$1`, []any{id}, &status)
@@ -179,7 +179,7 @@ func TestTicketPurchaseNonJPCardOnReturnSync(t *testing.T) {
 		t.Fatalf("balance %d", got)
 	}
 	// 後から届く Webhook は素通り（二重返金なし）。
-	if rec := payTicketPurchaseWith(t, h, id, intent, 2500); rec.Code != 200 {
+	if rec := payTicketPurchaseWith(t, h, id, intent, 5000); rec.Code != 200 {
 		t.Fatalf("webhook %d %s", rec.Code, rec.Body.String())
 	}
 	if refunds := f.refundList(); len(refunds) != 1 || refunds[0].Get("payment_intent") != intent {
@@ -193,7 +193,7 @@ func TestTicketPurchaseNonJPRefundFailureKeepsTicketsUnusable(t *testing.T) {
 	f.ticketRefundStatus = "failed"
 	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
 	id := startTicketPurchase(t, h, tu, "six", uuid.NewString(), "/coaching/new")
-	if rec := payTicketPurchaseWith(t, h, id, "pi_nonjp_fail_"+id, 2500); rec.Code != 200 {
+	if rec := payTicketPurchaseWith(t, h, id, "pi_nonjp_fail_"+id, 5000); rec.Code != 200 {
 		t.Fatalf("pay %d %s", rec.Code, rec.Body.String())
 	}
 	if r := tick(t, h, "tick-secret"); r.Code != 200 {
@@ -215,7 +215,7 @@ func TestTicketPurchaseUnknownCountryCredits(t *testing.T) {
 	h, f := setupStripe(t)
 	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
 	id := startTicketPurchase(t, h, tu, "six", uuid.NewString(), "/coaching/new")
-	if rec := payTicketPurchaseWith(t, h, id, "pi_unknown_ticket_"+id, 2500); rec.Code != 200 {
+	if rec := payTicketPurchaseWith(t, h, id, "pi_unknown_ticket_"+id, 5000); rec.Code != 200 {
 		t.Fatalf("pay %d %s", rec.Code, rec.Body.String())
 	}
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 6 {
