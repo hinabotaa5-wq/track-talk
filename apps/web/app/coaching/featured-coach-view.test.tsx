@@ -98,8 +98,13 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   // 1回プラン側では継続プランの文言を出さない。
   expect(container.textContent).not.toContain("継続プランは準備中です");
   expect(link("継続プランを見る")).toBeUndefined();
-  expect(link("動画添削を依頼する ¥1,000")?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
-  expect(link("チケットを買う")?.getAttribute("href")).toBe("/me/coaching/tickets?return_to=%2Fcoaches%2F2f6d0a8e-1111-4c2b-9a7e-3c332627b25f");
+  const requestLink = link("動画添削を依頼する ¥1,000");
+  expect(requestLink?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
+  expect(requestLink?.className).toContain("bg-[#EF442D]");
+  expect(requestLink?.className).not.toContain("bg-blue-600");
+  const ticketLink = link("チケットを買う");
+  expect(ticketLink?.getAttribute("href")).toBe("/me/coaching/tickets?return_to=%2Fcoaches%2F2f6d0a8e-1111-4c2b-9a7e-3c332627b25f");
+  expect(ticketLink?.className).toContain("border-blue-400/60");
   // 一覧の部品（種目チップの絞り込み）は出さない。
   expect(container.querySelector('[role="radiogroup"]')).toBeNull();
 });

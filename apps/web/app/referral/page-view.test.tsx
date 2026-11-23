@@ -73,14 +73,15 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
   ]);
 });
 
-it("ステップ4の見本を表示し、実際の input 要素はない", async () => {
+it("ステップ4に紹介ID見本を表示せず、実際の input 要素もない", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralGuideView />));
   const text = container.textContent ?? "";
   expect(text).toContain("紹介ID");
-  expect(text).toContain("K7M3QX");
+  expect(text).not.toContain("K7M3QX");
   const fourth = container.querySelectorAll("ol > li")[3];
-  expect(fourth?.textContent).toContain("K7M3QX");
+  expect(fourth?.textContent).toContain("友達が、購入の手続きで紹介IDを入力して購入を完了する");
+  expect(fourth?.textContent).toContain("「紹介ID」の欄に、受け取ったIDを入力します。");
   expect(container.querySelector("input")).toBeNull();
 });
 
