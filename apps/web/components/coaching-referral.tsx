@@ -58,7 +58,7 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
 }
 
 const referralHeadline = () => L("友達2人に紹介すると、1回分(500円)無料！");
-const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に次回の動画添削1回分が無料になるクーポンをプレゼントします。");
+const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
 
 export function LoadedReferralCard({ token, variant = "full" }: { token: string | null; variant?: "full" | "compact" }) {
   const { referral } = useMyReferral(token);
@@ -85,12 +85,12 @@ function ReferralCard({ referral, variant = "full" }: { referral: Referral; vari
       }}>{L("コピー")}</Button> : null}
     </div>
     {copyStatus ? <p role="status" className="text-xs">{copyStatus}</p> : null}
-    {granted_at ? <p className="text-sm font-semibold">{L("無料クーポンをプレゼントしました")}</p>
-      : active ? <p className="text-sm font-semibold">{friend_count === 1 ? L("あと1人で無料クーポン") : L("あと2人で無料クーポン")}</p> : null}
+    {granted_at ? <p className="text-sm font-semibold">{L("無料チケットをプレゼントしました")}</p>
+      : active ? <p className="text-sm font-semibold">{friend_count === 1 ? L("あと1人で無料チケット") : L("あと2人で無料チケット")}</p> : null}
     {!compact && granted_at && expires_at ? <div className="space-y-1 text-xs">
       <p>{L("付与日 {v0}", { v0: formatDateTime(granted_at) })}</p>
       <p>{L("有効期限 {v0}", { v0: formatDateTime(expires_at) })}</p>
-      <p>{L("特典クーポン：付与日から6か月有効／付与された本人だけが次回の購入で使えます／払戻しはできません")}</p>
+      <p>{L("特典チケット：付与日から6か月有効／付与された本人だけが使えます／払戻しはできません")}</p>
     </div> : null}
     {compact || active ? null : <p className="text-sm">{L("このIDは終了しました。紹介IDを使わずに購入すると、新しい紹介IDが発行されます。")}</p>}
   </section>;

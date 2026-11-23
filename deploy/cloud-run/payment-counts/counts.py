@@ -45,7 +45,7 @@ ORPHANS = {
         "SELECT count(*) FROM review_payments p JOIN review_requests r ON r.id = p.request_id WHERE p.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL AND NOT r.use_tickets AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)",
     # Review earnings without a payment link and without a ticket reservation (candidates only).
     "review_earning_without_payment_link":
-        "SELECT count(*) FROM coach_earnings e WHERE e.source = 'review' AND NOT EXISTS (SELECT 1 FROM review_payment_earning_links l WHERE l.earning_id = e.id) AND NOT EXISTS (SELECT 1 FROM coaching_ticket_reservations t WHERE t.request_id = e.review_request_id OR t.id = e.reservation_id)",
+        "SELECT count(*) FROM coach_earnings e WHERE e.source = 'review' AND NOT EXISTS (SELECT 1 FROM review_payment_earning_links l WHERE l.earning_id = e.id) AND NOT EXISTS (SELECT 1 FROM coaching_ticket_reservations t WHERE t.request_id = e.review_request_id)",
     # coaching_payments.contract_id is ON DELETE SET NULL.
     "coaching_payment_settled_without_contract":
         "SELECT count(*) FROM coaching_payments p WHERE p.status <> 'pending' AND p.contract_id IS NULL",

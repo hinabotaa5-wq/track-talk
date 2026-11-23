@@ -227,11 +227,3 @@ it("A5: 購入画面を開けなかったときは待ち表示が消えてエラ
   expect(pendingStatus()).toBeFalsy();
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("再試行してください");
 });
-
-it("クーポンの枚数と期限をチケット残高とは別に載せる", async () => {
-  mocks.api.mockResolvedValue({ ...initial, coupon: { count: 2, earliest_expires_at: "2026-12-01T00:00:00Z" } });
-  await render();
-  const coupon = [...container.querySelectorAll("section")].find((s) => s.querySelector("h2")?.textContent === "紹介特典クーポン");
-  expect(coupon?.textContent).toContain("残り 2 枚");
-  expect(coupon?.textContent).toContain("2026/12/01");
-});

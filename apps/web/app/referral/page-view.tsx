@@ -5,7 +5,7 @@ import type { ComponentType, ReactNode } from "react";
 import { Copy, Gift, GraduationCap, Keyboard, Ticket } from "lucide-react";
 import { L } from "@/lib/i18n";
 
-// 紹介特典クーポンの説明ページ（本体 #823）。ログイン不要の静的ページで、データ取得はしない。
+// 無料チケットの説明ページ（本体 #823）。ログイン不要の静的ページで、データ取得はしない。
 type Step = { icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>; title: string; body: string };
 
 function StepCard({ step, index, children }: { step: Step; index: number; children?: ReactNode }) {
@@ -43,7 +43,7 @@ const steps: Step[] = [
   { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで紹介IDをコピーできます。" },
   { icon: GraduationCap, title: "友達がコーチを選んで、申し込みに進む", body: "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。" },
   { icon: Keyboard, title: "友達が、購入の手続きで紹介IDを入力して購入を完了する", body: "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。" },
-  { icon: Gift, title: "友達2人が購入すると、次回の動画添削が無料になるクーポンをプレゼント", body: "あと何人かは、マイページで確認できます。" },
+  { icon: Gift, title: "友達2人が購入すると、無料チケットをプレゼント", body: "あと何人かは、マイページで確認できます。" },
 ];
 
 const notes = [
@@ -53,7 +53,7 @@ const notes = [
   "自分の紹介IDは、自分の購入には使えません。",
   "同じ友達は、同じ紹介者には1回だけ数えられます。",
   "対象は1回プランの都度払いとチケット6枚パックです。追加質問は対象外です。",
-  "無料クーポンは、もらった本人だけが次回の1回プランで使えます。払戻しはできません。",
+  "無料チケットは、もらった本人だけが使えます。払戻しはできません。",
 ];
 
 export function ReferralGuideView() {

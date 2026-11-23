@@ -17,13 +17,6 @@ import (
 // このファイルのテストでは setup/setupStripe を直接使わない。
 func setupIsolatedStripe(t *testing.T) http.Handler {
 	t.Helper()
-	isolateReferralDatabase(t)
-	h, _ := setupStripe(t)
-	return h
-}
-
-func isolateReferralDatabase(t *testing.T) {
-	t.Helper()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = "postgres://tracktalk:tracktalk@127.0.0.1:55432/tracktalk?sslmode=disable"
@@ -62,6 +55,8 @@ func isolateReferralDatabase(t *testing.T) {
 	// ポートの直書きはしない（本体 #795：CI の 5432 で SKIP になる原因だった）。
 	t.Setenv("DATABASE_URL", cfg.ConnString())
 	_ = isolated.Close(ctx)
+	h, _ := setupStripe(t)
+	return h
 }
 
 // §12-5: 追加質問（kind=consultation）の購入は、有効な紹介コードが存在しても
@@ -136,15 +131,18 @@ func TestCoachingReferralConsumedRewardSurvivesRefund(t *testing.T) {
 	}
 	_, buyer1 := demoRequester(t, h, admin)
 	_, buyer2 := demoRequester(t, h, admin)
-	pack1 := checkoutWithCode(buyer1, "")
-	pack2 := checkoutWithCode(buyer2, "")
-	lotID := seedLegacyReferralReward(t, referrerID, code, pack1, pack2)
+	pack1 := checkoutWithCode(buyer1, code)
+	checkoutWithCode(buyer2, code)
 	var active int
 	queryRowArgs(t, `SELECT count(*) FROM coaching_referral_counts WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{referrerID}, &active)
 	if active != 2 {
 		t.Fatalf("friend count = %d, want 2", active)
 	}
-
+	var lotID string
+	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{referrerID}, &lotID)
+	if lotID == "" {
+		t.Fatal("no reward granted")
+	}
 	// 6枚つづりを6回使い切ってから、7回目で特典ロットを予約・消費する。
 	_, coach := onDutyCoach(t, h, admin)
 	consumeReview := func() string {
@@ -212,35 +210,38 @@ func TestCoachingReferralConsumedRewardSurvivesRefund(t *testing.T) {
 	assertTicketAccounting(t, h, admin)
 }
 
-// seedLegacyReferralReward prepares the already-issued lot shape on migration 187.
-func seedLegacyReferralReward(t *testing.T, ownerID uuid.UUID, code, first, second string) string {
-	t.Helper()
-	for _, pack := range []string{first, second} {
-		execSQLArgs(t, `INSERT INTO coaching_referral_counts(referrer_id,buyer_id,ticket_purchase_id,referral_code)
-            SELECT $1, owner_id, id, $2 FROM coaching_ticket_purchases WHERE id=$3`, ownerID, code, pack)
-	}
-	lot := uuid.NewString()
-	execSQLArgs(t, `INSERT INTO coaching_ticket_lots(id,owner_id,quantity,available,expires_at,kind)
-        VALUES ($1,$2,1,1,now()+interval '6 months','referral_reward')`, lot, ownerID)
-	execSQLArgs(t, `INSERT INTO coaching_ticket_ledger(id,lot_id,operation_key,kind,available_delta)
-        VALUES (gen_random_uuid(),$1,'referral-grant-'||$1::uuid,'referral_grant',1)`, lot)
-	execSQLArgs(t, `INSERT INTO coaching_referral_rewards(lot_id,referrer_id,first_count_id,second_count_id,referral_code)
-        VALUES ($1,$2,(SELECT id FROM coaching_referral_counts WHERE ticket_purchase_id=$3),
-        (SELECT id FROM coaching_referral_counts WHERE ticket_purchase_id=$4),$5)`, lot, ownerID, first, second, code)
-	execSQLArgs(t, `UPDATE coaching_referral_codes SET closed_at=now() WHERE code=$1`, code)
-	return lot
-}
-
+// grantRewardLot は、購入なしの紹介者に2人ぶんの紹介購入で特典ロットを付与し、
+// 紹介者のID・トークンと特典ロットIDを返す。
 func grantRewardLot(t *testing.T, h http.Handler, admin string) (uuid.UUID, string, string) {
 	t.Helper()
-	ownerID, owner := demoRequester(t, h, admin)
-	execSQLArgs(t, `SELECT coaching_issue_referral($1::uuid, 'purchase')`, ownerID)
-	code := myReferral(t, h, owner).Code
-	_, first := demoRequester(t, h, admin)
-	_, second := demoRequester(t, h, admin)
-	firstPack := buySixWithReferral(t, h, first, "")
-	secondPack := buySixWithReferral(t, h, second, "")
-	return ownerID, owner, seedLegacyReferralReward(t, ownerID, code, firstPack, secondPack)
+	referrerID, referrer := demoRequester(t, h, admin)
+	// 紹介コードは通常は購入完了時に IssueCoachingReferral で発行される。
+	// ここでは紹介者を購入なしのままにしたいため、同じ関数を直接呼ぶ。
+	execSQLArgs(t, `SELECT coaching_issue_referral($1::uuid, 'purchase')`, referrerID)
+	var code string
+	queryRowArgs(t, `SELECT code FROM coaching_referral_codes WHERE owner_id=$1`, []any{referrerID}, &code)
+	if len(code) != 6 {
+		t.Fatalf("referrer has no code: %q", code)
+	}
+	for i := 0; i < 2; i++ {
+		_, buyer := demoRequester(t, h, admin)
+		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", buyer, map[string]any{
+			"product_id": "six", "request_key": uuid.NewString(), "guardian_permission": true, "referral_code": code,
+		})
+		var data struct {
+			ID string `json:"purchase_id"`
+		}
+		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
+			t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
+		}
+		payTicketPurchase(t, h, data.ID, 2500)
+	}
+	var lotID string
+	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{referrerID}, &lotID)
+	if lotID == "" {
+		t.Fatal("no reward granted")
+	}
+	return referrerID, referrer, lotID
 }
 
 // consumeOneTicketReview は、利用者のチケット1枚で動画添削を1件やり切り、
