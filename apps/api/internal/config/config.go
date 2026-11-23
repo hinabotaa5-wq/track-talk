@@ -174,7 +174,7 @@ func Load() (Config, error) {
 		CoachingCoachList:              enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
 		CoachingTicketSales:            enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		ReviewRandomAssign:             enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
-		FeaturedCoachID:                strings.TrimSpace(os.Getenv("FEATURED_COACH_ID")),
+		FeaturedCoachID:                strings.TrimSpace(os.Getenv("COACHING_FEATURED_COACH_ID")),
 		IdentityReaderURL:              os.Getenv("IDENTITY_READER_URL"),
 		IdentityReaderToken:            os.Getenv("IDENTITY_PUBLIC_READER_TOKEN"),
 		IdentityEndToken:               os.Getenv("IDENTITY_END_TOKEN"),

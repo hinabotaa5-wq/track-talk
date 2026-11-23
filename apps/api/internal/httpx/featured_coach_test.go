@@ -9,7 +9,7 @@ import (
 	"github.com/hinata/track-talk/apps/api/internal/config"
 )
 
-// 特集モード（本体 #985）：FEATURED_COACH_ID の間は、一覧・詳細・継続プランの一覧・指名候補・申込みの指名を
+// 特集モード（本体 #985）：COACHING_FEATURED_COACH_ID の間は、一覧・詳細・継続プランの一覧・指名候補・申込みの指名を
 // 特集コーチだけに絞る。
 func TestFeaturedCoachModeHidesOtherCoaches(t *testing.T) {
 	fakeCoachingCloudinary(t)

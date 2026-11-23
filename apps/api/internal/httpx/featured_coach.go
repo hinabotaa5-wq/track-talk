@@ -2,7 +2,7 @@ package httpx
 
 import "github.com/google/uuid"
 
-// 特集モード（本体 #985）。設定 FEATURED_COACH_ID が空でない間は、公開面に出すコーチをその1人だけにする。
+// 特集モード（本体 #985）。設定 COACHING_FEATURED_COACH_ID が空でない間は、公開面に出すコーチをその1人だけにする。
 // 見た目の出し分けだけに頼らず、一覧・詳細・指名候補・割当ての API の応答で絞る。
 
 // featuredCoach は、特集モードのときに特集するコーチの ID と true を返す。

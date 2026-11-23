@@ -38,6 +38,6 @@ export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUM
 export const supportPlanListEnabled = flagEnabled(process.env.NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED);
 
 // コーチタブの特集モード（本体 #985）。空でない間は、/coaching をこのコーチ（プロフィール ID）の特集ページにし、
-// ほかのコーチの詳細（/coaches/[id]）は特集ページへ戻す。API の FEATURED_COACH_ID と同じ値にすること。
+// ほかのコーチの詳細（/coaches/[id]）は特集ページへ戻す。API の COACHING_FEATURED_COACH_ID と同じ値にすること。
 // 空に戻すと従来のコーチ一覧に戻る。コードにコーチの名前などは書かない。
-export const featuredCoachID: string | null = (process.env.NEXT_PUBLIC_FEATURED_COACH_ID ?? "").trim() || null;
+export const featuredCoachID: string | null = (process.env.NEXT_PUBLIC_COACHING_FEATURED_COACH_ID ?? "").trim() || null;

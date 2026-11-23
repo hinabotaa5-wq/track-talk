@@ -49,6 +49,7 @@ it("ヒーロー・記録チップ・受付ピル・固定 CTA（¥1,000、特�
   expect(container.querySelector("img")?.getAttribute("src")).toBe(coach.photo_url);
   expect(container.querySelector("h1")?.textContent).toBe("テスト太郎コーチ");
   expect(container.textContent).toContain("福岡のスプリントコーチ");
+  expect(container.textContent).toContain("スタートとフォームの悩みを、動画1本で。");
   const chips = Array.from(container.querySelectorAll('ul[aria-label="記録と対応種目"] li')).map((li) => li.textContent);
   expect(chips).toEqual(["100m 10.76", "400m 47.54", "対応種目 100m・200m・400m"]);
   expect(container.textContent).toContain("受付中");
@@ -98,7 +99,7 @@ it("英語表示では固定文を英語で出す", async () => {
   installEnglish(en);
   setActiveLocale("en");
   await render();
-  expect(container.textContent).toContain("One running video shows you what to fix next.");
+  expect(container.textContent).toContain("Your start and form, reviewed from a single video.");
   expect(container.textContent).toContain("Request video feedback ¥1,000");
   expect(container.textContent).toContain("What feedback you get");
   expect(container.textContent).toContain("FAQ");

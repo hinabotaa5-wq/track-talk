@@ -3096,7 +3096,7 @@ export const en: Readonly<Record<string, string>> = {
   "直す点": "Point to fix",
   "コーチの紹介": "About the coach",
   "{v0}コーチ": "Coach {v0}",
-  "走りの動画1本から、次に直すポイントがわかる。": "One running video shows you what to fix next.",
+  "スタートとフォームの悩みを、動画1本で。": "Your start and form, reviewed from a single video.",
   "記録と対応種目": "Records and events",
   "対応種目 {v0}": "Events: {v0}",
   "どんな添削が返ってくるか": "What feedback you get",

@@ -15,7 +15,7 @@ import { reviewPriceYen } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
 import { ReferralBanner } from "../coaches/referral-banner";
 
-// コーチタブの特集ページ（本体 #985）。特集モード（NEXT_PUBLIC_FEATURED_COACH_ID）の間、/coaching の一覧の代わりに出す。
+// コーチタブの特集ページ（本体 #985）。特集モード（NEXT_PUBLIC_COACHING_FEATURED_COACH_ID）の間、/coaching の一覧の代わりに出す。
 // 名前・写真・記録・種目・紹介文・実績・SNS はプロフィールデータから出し、コードに個人の固定文言を書かない。
 // 固定の文はキャッチコピー・回答の見本・流れ・よくある質問だけ（すべて L() でキー化）。
 // 外すもの：コーチカードの2列一覧・種目チップの絞り込み・1回プラン／継続プランの切り替え。
@@ -85,7 +85,7 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
           </p>
           <h1 className="text-2xl font-bold text-white">{name ? L("{v0}コーチ", { v0: name }) : L("コーチ")}</h1>
           {achievements.length ? <p className="text-sm text-slate-200">{achievements[0]}</p> : null}
-          <p className="text-base font-semibold text-white">{L("走りの動画1本から、次に直すポイントがわかる。")}</p>
+          <p className="text-base font-semibold text-white">{L("スタートとフォームの悩みを、動画1本で。")}</p>
           <ul className="flex flex-wrap gap-1.5" aria-label={L("記録と対応種目")}>
             {records.map((record) => (
               <li key={record} className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-200">{record}</li>
