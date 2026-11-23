@@ -52,6 +52,11 @@ type Config struct {
 	// 契約の追加相談・やりとり欄・添削の確認質問は CoachingMessaging の側に残す。
 	// 開くのは運営者の指示があってから。閉じている間の購入済みの相談の返金・閲覧は止めない。
 	CoachingConsultation bool
+	// ReviewConsultationSales が false の間は、1回プランの追加質問の新規作成（下書き保存・送信・支払い画面）を受け付けない。
+	// 追加質問は運営者決定（2026-11-23、本体 #984）で販売を終了したので、本番では環境変数から読まず、つねに false。
+	// 購入済みの分の閲覧・受諾・回答・返金と、継続プランの追加相談（契約側）には影響しない。
+	// テストだけが、購入済みの追加質問の流れを確かめるために true にする。
+	ReviewConsultationSales bool
 	// CoachingCoachList が false の間は、コーチ一覧 API（GET /v1/coaches）をフラグ OFF のときと同じ 404 にし、
 	// コーチの公開プロフィールを一覧から取れないようにする。CoachingEnabled が false なら値によらず閉じる。
 	// 動画添削の指名候補（GET /v1/coaching/nominees）と申込みは止めない。既定は停止。

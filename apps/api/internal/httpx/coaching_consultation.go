@@ -254,6 +254,10 @@ func reviewConsultationLimit(ctx context.Context, q *db.Queries, reviewID uuid.U
 
 // 期間内の含有分は通常チャットで使う。追加の動画だけは含有回数を使い切った場合に購入できる。
 func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room consultationRoom) (int32, int16, bool, error) {
+	if room.review != nil && !s.cfg.ReviewConsultationSales {
+		// 1回プランの追加質問は販売を終了した（本体 #984）。相談の対象が添削（review）のときだけ止め、継続プランの追加相談（contract）は従来どおり。
+		return 0, 0, false, &ticketRuleError{"consultation_sales_ended", "1回プランの追加質問は販売を終了しました"}
+	}
 	if room.review != nil {
 		if err := reviewConsultationLimit(ctx, q, room.id); err != nil {
 			return 0, 0, false, err

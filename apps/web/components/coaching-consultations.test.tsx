@@ -25,20 +25,18 @@ beforeEach(() => { (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 async function click(text: string) { const b = [...container.querySelectorAll("button")].find((x) => x.textContent === text); if (!b) throw new Error(`missing ${text}`); await act(async () => b.click()); }
 async function render(data: ConsultationRoom = room, guardianToken?: string, kind: "review" | "contract" = guardianToken ? "contract" : "review") { apiFetch.mockResolvedValue(data); await act(async () => root.render(<CoachingConsultations rootID="review-room" kind={kind} token={guardianToken ? null : "token"} guardianToken={guardianToken} />)); }
-it("購入前に下書きを保存し、送信後は同じ部屋で再開できる", async () => {
- await render();
- await check();
+it("継続プランの追加相談は、購入前に下書きを保存し、送信後は同じ部屋で再開できる", async () => {
+ await render(room, undefined, "contract");
  apiFetch.mockImplementation(async (path: string, options?: { method: string }) => { if (!options?.method) return { ...room, consultations: [{ ...draft, question: draft.question }] }; return { consultation: draft }; });
  await click("質問する（500円）");
  const writes = apiFetch.mock.calls.filter(([, opt]) => opt?.method === "POST");
- expect(writes[0][0]).toBe("/v1/coaching/requests/review-room/consultations");
+ expect(writes[0][0]).toBe("/v1/coaching/contracts/review-room/consultations");
  expect(JSON.parse(writes[0][1].body)).toMatchObject({ request_key: "saved-key", body: draft.question });
  expect(writes[1][0]).toBe("/v1/coaching/consultations/consultation/submit");
- expect(JSON.parse(writes[1][1].body)).toMatchObject({ guardian_permission: true });
  expect(container.querySelector("textarea")?.value).toBe(draft.question);
 });
-it("購入から戻ると保存済みの下書きと動画を復元する", async () => {
- await render({ ...room, consultations: [{ ...draft, video_public_id: "coaching/saved" }] });
+it("継続プランの追加相談は、購入から戻ると保存済みの下書きと動画を復元する", async () => {
+ await render({ ...room, consultations: [{ ...draft, video_public_id: "coaching/saved" }] }, undefined, "contract");
  expect(container.querySelector("textarea")?.value).toBe(draft.question);
  expect(container.textContent).toContain("保存済みの動画を添付します");
 });
@@ -57,45 +55,20 @@ it("未成年本人には、保護者が払うパーソナル指導の個別決�
 });
 function button(text: string) { return [...container.querySelectorAll("button")].find((b) => b.textContent === text); }
 async function check() { const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]'); if (!box) throw new Error("missing checkbox"); await act(async () => box.click()); }
-it("未成年本人は、添削のあとの追加質問の支払いを開くたびに、保護者の許可のチェックが要る", async () => {
+// 本体 #984: 1回プランの追加質問は販売終了。支払い前のものは支払いに進めず、取り下げだけができる。
+it("販売終了前に作られた支払い前の追加質問は、支払いへ進めず取り下げだけができる", async () => {
  await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", minor: true, payer: "requester", status: "awaiting_payment" }] });
- expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
- expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
- expect(container.textContent).not.toContain("保護者に、この契約のページから");
- expect(button("お支払いへ")?.disabled).toBe(true);
- await check();
- expect(button("お支払いへ")?.disabled).toBe(false);
- apiFetch.mockImplementation(async (_path: string, options?: { method: string }) => options?.method ? {} : room);
- await click("お支払いへ");
- const call = apiFetch.mock.calls.find(([path]) => path === "/v1/coaching/consultations/consultation/checkout");
- expect(JSON.parse(call?.[1].body)).toEqual({ guardian_permission: true, guardian_permission_shown_at: expect.any(String), guardian_permission_checked_at: expect.any(String) });
+ expect(button("お支払いへ")).toBeUndefined();
+ expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+ expect(button("支払い前の質問を取り下げる")).toBeTruthy();
 });
-it("未成年本人が新しい追加質問をその場で払うときは、チェックしないと送れない", async () => {
- const cashDraft = { ...draft, funding: "cash" as const, minor: true, price_yen: 500 };
- await render({ ...room, funding: "cash", minor: true, consultations: [cashDraft] });
- expect([...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("質問する（"))?.disabled).toBe(true);
- await check();
- apiFetch.mockImplementation(async (path: string, options?: { method: string }) => { if (!options?.method) return room; if (path.endsWith("/submit")) return {}; return { consultation: cashDraft }; });
- await act(async () => [...container.querySelectorAll("button")].find((b) => b.textContent?.startsWith("質問する（"))?.click());
- const submit = apiFetch.mock.calls.find(([path]) => path === "/v1/coaching/consultations/consultation/submit");
- expect(JSON.parse(submit?.[1].body)).toEqual({ guardian_permission: true, guardian_permission_shown_at: expect.any(String), guardian_permission_checked_at: expect.any(String) });
-});
-it("18歳以上にも購入前チェックを出す", async () => {
- await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] });
- expect(container.querySelector('input[type="checkbox"]')).not.toBeNull();
- expect(button("お支払いへ")?.disabled).toBe(true);
-});
-const payNotice = "現在、お支払いはクレジットカードのみとなります。PayPayでのお支払いにも対応予定です（時期は未定です）。対応が整い次第、この画面でご案内します。";
-it("フォーム添削のあとの追加質問をその場で払うときは、カードのみの案内を出す", async () => {
- await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] });
- expect(container.textContent?.split(payNotice).length).toBe(3);
-});
-it("カードのみの案内は、フォーム添削のあとの追加質問の支払いにだけ出し、継続プランには出さない", async () => {
- await render();
- expect(container.textContent).toContain(payNotice);
- await act(async () => root.unmount()); root = createRoot(container);
- await render({ ...room, funding: "cash", consultations: [{ ...draft, funding: "cash", status: "awaiting_payment" }, { ...draft, id: "d2", funding: "cash" }] }, undefined, "contract");
- expect(container.textContent).not.toContain(payNotice);
+it("1回プランの選手画面には、新しい追加質問の入力欄・価格・購入前チェック・支払い案内を出さない", async () => {
+ await render({ ...room, funding: "cash", minor: true, consultations: [{ ...draft, id: "a1", status: "answered", answer: "回答", answered_at: "2026-11-14T02:00:00Z" }] });
+ expect(container.querySelector("textarea")).toBeNull();
+ expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+ expect(container.textContent).not.toContain("質問する（");
+ expect(container.textContent).not.toContain("現在、お支払いはクレジットカードのみとなります。");
+ expect(container.textContent).toContain("追加質問の販売は終了しました。");
 });
 it("保護者は閲覧と支払いができ、新しい有料質問は作れない", async () => {
  await render({ ...room, role: "guardian", funding: "cash", can_purchase: false, consultations: [{ ...draft, funding: "cash", minor: true, payer: "guardian", status: "awaiting_payment" }] }, "guardian-secret");
@@ -128,7 +101,7 @@ it("フォーム添削のあとの相談は一方通行で、回答への確認�
  expect(container.textContent).toContain("補足：以前の補足");
  expect(container.textContent).not.toContain("回答について確認する（1回無料）");
  expect(container.querySelector("textarea")).toBeNull();
- expect(container.textContent).toContain("この添削の追加質問は回答済みです。");
+ expect(container.textContent).not.toContain("この添削の追加質問は回答済みです。");
 });
 it("回答済みの追加質問はチャット風の吹き出しと終了状態を示し、入力欄を出さない", async () => {
  const c = {
@@ -142,7 +115,7 @@ it("回答済みの追加質問はチャット風の吹き出しと終了状態�
  expect(container.textContent).toContain("コーチの回答");
  expect(container.querySelector("video")).not.toBeNull();
  expect(container.querySelector("textarea")).toBeNull();
- expect(container.textContent).toContain("この添削の追加質問は回答済みです。");
+ expect(container.textContent).not.toContain("この添削の追加質問は回答済みです。");
 });
 it("回答待ちの追加質問は質問の吹き出しを示し、追撃の入力欄を出さない", async () => {
  const c = { ...draft, status: "in_review" as const, question: "質問文", answer_by: "2026-11-17T02:00:00Z" };
@@ -159,8 +132,8 @@ it("フォーム添削のあとの相談には、コーチの補足の欄も出�
 it("フォーム添削のあとの相談は専用のゲートで出し分け、届出待ちのゲートには左右されない", async () => {
  flags.messaging = false;
  await render({ ...room, consultations: [] });
- expect(container.textContent).toContain("質問する（500円）");
- expect(container.textContent).not.toContain("メッセージのやりとりは準備中です");
+ // 販売終了（本体 #984）なので、購入済みが無い添削では枠ごと出さない。
+ expect(container.textContent).toBe("");
  await act(async () => root.unmount()); root = createRoot(container);
  flags.messaging = true; flags.consultation = false;
  await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "in_review" }] });
@@ -230,11 +203,11 @@ const reviewTerms = "コーチの受諾は24時間以内、受諾後の回答は
 it("追加質問・追加相談の期限は日本語と英語の両方で受諾24時間・回答12時間", async () => {
  installEnglish(en);
  try {
-  for (const kind of ["review", "contract"] as const) {
+  // 追加質問（review）は販売終了で選手向けの説明を出さないので、継続プランの追加相談だけを確かめる（本体 #984）。
+  for (const kind of ["contract"] as const) {
    setActiveLocale("ja");
    await render(room, undefined, kind);
-   // #930 以降、追加質問（review）の選手向け説明は TrackTalk のシステム吹き出しの簡潔文になった。
-   expect(container.textContent).toContain(kind === "review" ? "受諾は24時間以内、回答は受諾後12時間以内" : "受諾は24時間以内、受諾後の回答は12時間以内");
+   expect(container.textContent).toContain("受諾は24時間以内、受諾後の回答は12時間以内");
    expect(container.textContent).not.toMatch(/48時間|72時間/);
    setActiveLocale("en");
    await render(room, undefined, kind);
@@ -279,19 +252,18 @@ it("A5: 回答済みの追加質問は、質問と回答の吹き出しを見せ
  expect(container.textContent).not.toContain(reviewIntro);
  expect(container.textContent).not.toContain(reviewTerms);
 });
-it("B1: 選手の添削画面は、見出し・システム説明・購入フォームを出す", async () => {
+it("B1: 選手の添削画面は、購入済みの追加質問が無ければ枠ごと出さない（販売終了・本体 #984）", async () => {
  await render();
- expect(container.querySelector("h2")?.textContent).toBe("追加質問");
- expect(container.textContent).not.toContain(reviewIntro);
- expect(container.textContent).not.toContain(reviewTerms);
- expect(container.textContent).toContain(systemIntro);
- expect(container.textContent).toContain("質問する（500円）");
+ expect(container.querySelector("section")).toBeNull();
+ expect(container.textContent).not.toContain(systemIntro);
+ expect(container.textContent).not.toContain("質問する（500円）");
 });
-it("B2: 保護者の添削画面は、見出し・説明を従来どおり出す", async () => {
+it("B2: 保護者の添削画面は、見出しと販売終了の案内を出し、購入時の説明は出さない", async () => {
  await render({ ...room, role: "guardian", can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答", answered_at: "2026-11-14T02:00:00Z" }] }, "guardian-secret", "review");
  expect(container.querySelector("h2")?.textContent).toBe("追加質問");
- expect(container.textContent).toContain(reviewIntro);
- expect(container.textContent).toContain(reviewTerms);
+ expect(container.textContent).toContain("追加質問の販売は終了しました。");
+ expect(container.textContent).not.toContain(reviewIntro);
+ expect(container.textContent).not.toContain(reviewTerms);
 });
 it("B3: 継続プランの相談をコーチが見るときは、説明を従来どおり出す", async () => {
  await render({ ...coachRoom, consultations: [] }, undefined, "contract");
@@ -307,18 +279,11 @@ it("B4: ゲートが閉じている間も、コーチの添削画面では過去
  expect(container.textContent).not.toContain(reviewIntro);
 });
 
-it.each([{ consultations: [] }, { consultations: [draft] }])("送信前の選手にはTrackTalk名義のグレーの簡潔な説明を出す（%j）", async ({ consultations }) => {
+it.each([{ consultations: [] }, { consultations: [draft] }])("送信前の選手には説明・入力欄を出さない（%j）", async ({ consultations }) => {
  await render({ ...room, consultations });
- const name = [...container.querySelectorAll("p")].find((p) => p.textContent === "TrackTalk")!;
- expect(name).toBeTruthy();
- expect(name.parentElement?.classList).toContain("bg-slate-500/20");
- expect(name.parentElement?.parentElement?.classList).toContain("justify-start");
- expect(name.nextElementSibling?.textContent).toBe(systemIntro);
- expect(container.textContent).not.toContain(reviewIntro);
- expect(container.textContent).not.toContain(reviewTerms);
- expect(container.querySelector("textarea")).not.toBeNull();
+ expect(container.textContent).toBe("");
+ expect(container.querySelector("textarea")).toBeNull();
 });
-
 it.each(["awaiting_payment", "offered", "in_review", "answered", "declined", "expired", "cancelled"] as const)("送信後（%s）はシステム説明を出さない", async (status) => {
  await render({ ...room, consultations: [{ ...draft, status }] });
  expect(container.textContent).not.toContain(systemIntro);
@@ -326,12 +291,11 @@ it.each(["awaiting_payment", "offered", "in_review", "answered", "declined", "ex
  expect([...container.querySelectorAll("p")].some((p) => p.textContent === "TrackTalk")).toBe(false);
 });
 
-it("購入不可で下書きもない場合はシステム説明を出さない", async () => {
+it("購入不可で下書きもない場合は、購入できない理由も出さない", async () => {
  await render({ ...room, consultations: [], can_purchase: false, block_reason: "購入できません" });
  expect(container.textContent).not.toContain(systemIntro);
- expect(container.textContent).toContain("購入できません");
+ expect(container.textContent).not.toContain("購入できません");
 });
-
 it.each(["review", "contract"] as const)("%s の両フォームに短い注意書き・枠とボタン付きのファイル入力を出す", async (kind) => {
  const assertFile = () => {
   const file = container.querySelector('input[type="file"]')!;
@@ -342,8 +306,10 @@ it.each(["review", "contract"] as const)("%s の両フォームに短い注意�
   expect(container.textContent).toContain("外部の連絡先（URL・メールアドレス・電話番号・SNSのID）は送れません。");
   expect(container.textContent).not.toContain("規約で禁止されています");
  };
+ // 選手の新しい質問の入力欄は継続プランだけ（追加質問は販売終了・本体 #984）。
  await render(room, undefined, kind);
- assertFile();
+ if (kind === "contract") assertFile();
+ else expect(container.querySelector('input[type="file"]')).toBeNull();
  await act(async () => root.unmount()); root = createRoot(container);
  await render({ ...room, role: "coach", can_purchase: false, consultations: [{ ...draft, status: "in_review" }] }, undefined, kind);
  assertFile();
@@ -405,23 +371,6 @@ it("B4: 訳の項目が null（国内コーチ）のときは、ja／en どち�
  }
 });
 
-const shortReviewTerms = "回答がないまま終わった場合に限り、もう1回だけ購入できます。提供・お支払いは TrackTalk の運営者です（回答はコーチに委託します）。";
-it("#960: 購入前は固定短文だけを表示し、宣言・価格・支払い方法を維持する", async () => {
- await render();
- const paragraphs = [...container.querySelectorAll("p")];
- const terms = paragraphs.find((p) => p.textContent === shortReviewTerms)!;
- expect(terms).toBeTruthy();
- expect(terms.parentElement?.querySelectorAll("p")).toHaveLength(1);
- expect(paragraphs.some((p) => p.textContent === "下書きは7日間保存します。送信後は変更できません。")).toBe(true);
- expect(paragraphs.some((p) => p.textContent === systemIntro)).toBe(true);
- for (const old of ["質問・回答は各1回まで", "やりとりは終了後1年間保存します", "追加質問は、この添削を担当したコーチへの", "提供者とお支払い先は TrackTalk の運営者で", "18歳未満の方は、購入する前に保護者の許可を得てください。"]) expect(container.textContent).not.toContain(old);
- expect(container.textContent?.split("未成年の方は保護者に許可を取ってください")).toHaveLength(2);
- expect(container.textContent).toContain("500円 / 質問1件と回答1件");
- expect(container.textContent).toContain(payNotice);
- expect(button("質問する（500円）")?.disabled).toBe(true);
- await check();
- expect(button("質問する（500円）")?.disabled).toBe(false);
-});
 it("#960: 追加相談の契約説明と下書き注意は全文一致のまま", async () => {
  await render(room, undefined, "contract");
  const paragraphs = [...container.querySelectorAll("p")];
@@ -430,18 +379,6 @@ it("#960: 追加相談の契約説明と下書き注意は全文一致のまま"
  expect(terms).toBeTruthy();
  expect([...terms.parentElement!.querySelectorAll("p")].map((p) => p.textContent)).toEqual([first, "代金を請求する権利はコーチにあり、TrackTalk の運営者はコーチから代理受領の権限を受けて代金を受け取ります。運営者へ支払った時点でコーチへの支払いは済み、コーチから同じ代金を重ねて請求されることはありません。"]);
  expect(paragraphs.some((p) => p.textContent === "購入前に下書きを7日間保存します。送信後は内容を変更できません。18歳未満の方のパーソナル指導の相談は、保護者が支払います。")).toBe(true);
-});
-it("#960: 新文言3件の英訳は指定文と一致する", async () => {
- installEnglish(en);
- setActiveLocale("en");
- try {
-  await render();
-  for (const text of [
-   "You can ask the coach who did this review one question about it. They accept within 24 hours and answer within 12 hours after accepting. If they decline or the time runs out, you get a full refund.",
-   "Only if it ends without an answer can you buy it one more time. TrackTalk's operator provides this and takes your payment (the coach answers on the operator's behalf).",
-   "Drafts are kept for 7 days. You cannot change the content after sending.",
-  ]) expect([...container.querySelectorAll("p")].some((p) => p.textContent === text)).toBe(true);
- } finally { setActiveLocale("ja"); }
 });
 it.each(["review", "contract"] as const)("%s の質問・回答の動画は幅260px・高さ300pxを上限にする", async (kind) => {
  const c = { ...draft, status: "answered" as const, answer: "回答", video_url: "https://example.com/q.mp4", answer_video_url: "https://example.com/a.mp4", answered_at: "2026-11-14T02:00:00Z" };

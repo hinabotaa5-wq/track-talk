@@ -64,42 +64,45 @@ it("B4: 訳の項目が null（国内コーチ）やコーチ本人の画面で�
   expect(container.textContent).not.toContain("訳1");
 });
 
-it.each(["requester", "coach"] as const)("%s は項目ごとに独立したカードで、閲覧者基準の寄せ・色・日時を表示する", async (viewer) => {
-  await act(async () => root.render(<ReviewResponseView viewer={viewer} response={{ ...baseResponse, fix_points: ["接地を直す", "姿勢を保つ"], demo_video_url: "https://example.com/demo.mp4" }} />));
-  const cards = [...container.querySelector("section")!.children];
-  expect(cards.map((c) => c.querySelector("h2")?.textContent)).toEqual(["良い点", "直す点 1", "直す点 2", "おすすめのドリル", "ひとこと", "見本動画"]);
-  for (const card of cards) {
-    expect(card.classList).toContain("max-w-[85%]");
-    expect(card.classList).toContain(viewer === "coach" ? "self-end" : "self-start");
-    expect(card.classList).toContain(viewer === "coach" ? "bg-blue-500/25" : "bg-white/10");
-  }
-  expect(cards[0].querySelector("time")?.textContent).toBe("11/13 13:00");
-  expect(cards[0].querySelector("time")?.getAttribute("datetime")).toBe(baseResponse.created_at);
+// 本体 #984: 1回プランの回答は、項目ごとの吹き出しではなく1枚の回答ドキュメント（コーチ名・顔写真・回答日＋各項目）で出す。
+it.each(["requester", "coach"] as const)("%s には回答を1枚のドキュメントとして、項目の見出し順に出す", async (viewer) => {
+  await act(async () => root.render(<ReviewResponseView viewer={viewer} coach={{ nickname: "テストコーチ", photo_url: "https://example.com/c.jpg" }} response={{ ...baseResponse, fix_points: ["接地を直す", "姿勢を保つ"], demo_video_url: "https://example.com/demo.mp4" }} />));
+  const doc = container.querySelector("article")!;
+  expect(container.children).toHaveLength(1);
+  expect(doc.querySelector("h2")?.textContent).toBe(viewer === "coach" ? "あなたの回答" : "テストコーチコーチの回答");
+  expect(doc.querySelector("img") !== null).toBe(viewer === "requester");
+  expect([...doc.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["良い点", "直す点 1", "直す点 2", "おすすめのドリル", "ひとこと", "見本動画"]);
+  expect(doc.className).not.toContain("max-w-[85%]");
   expect(container.querySelectorAll("time")).toHaveLength(1);
-  expect(cards.slice(1).every((card) => !card.querySelector("time"))).toBe(true);
-  expect(container.textContent).not.toContain("2026");
+  expect(doc.querySelector("time")?.getAttribute("datetime")).toBe(baseResponse.created_at);
+  expect(doc.querySelector("time")?.textContent).toContain("11/13");
   const video = container.querySelector("video")!;
   expect(video.controls).toBe(true);
   expect(video.playsInline).toBe(true);
   expect(video.classList).toContain("max-w-[260px]");
   expect(video.classList).toContain("max-h-[300px]");
-  expect(container.querySelector("button")).toBeNull();
+  expect(container.querySelector("button, textarea, input")).toBeNull();
 });
 
-it("任意項目なしの返答は3枚だけで、直す点に番号を付けない", async () => {
+it("任意項目なしの返答は3項目だけで、直す点に番号を付けない", async () => {
   await act(async () => root.render(<ReviewResponseView response={{ ...baseResponse, hitokoto: null, demo_video_url: null }} />));
-  expect([...container.querySelectorAll("h2")].map((h) => h.textContent)).toEqual(["良い点", "直す点", "おすすめのドリル"]);
-  expect(container.querySelector("section")?.children).toHaveLength(3);
+  expect([...container.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["良い点", "直す点", "おすすめのドリル"]);
   expect(container.querySelector("video")).toBeNull();
+  expect(container.querySelector("h2")?.textContent).toBe("コーチの回答");
 });
 
-it.each([null, "用語の説明です"])("確認質問・補足は最後の1カードに従来の分岐で出る（%s）", async (clarification) => {
+it.each([null, "用語の説明です"])("確認質問・補足はドキュメントの最後の項目に統合して出る（%s）", async (clarification) => {
   await act(async () => root.render(<ReviewResponseView response={{ ...baseResponse, clarify_reason: "term", clarify_body: "用語が分かりません", clarification }} />));
-  const card = container.querySelector("section")!.lastElementChild!;
-  expect(card.textContent).toContain("確認質問：用語が分かりません");
-  expect(card.textContent).toContain(clarification ? "補足（「" : "確認質問（");
-  if (clarification) expect(card.textContent).toContain(clarification);
-  expect(card.querySelector("time")).toBeNull();
+  const last = container.querySelector("article")!.lastElementChild!;
+  expect(last.querySelector("h3")?.textContent).toContain("確認質問（");
+  expect(last.textContent).toContain("用語が分かりません");
+  if (clarification) {
+    expect(last.textContent).toContain("補足（「");
+    expect(last.textContent).toContain(clarification);
+  } else {
+    expect(last.textContent).not.toContain("補足（「");
+  }
+  expect(last.querySelector("time")).toBeNull();
 });
 
 it("非表示の返答は案内1枚だけで本文・日時・動画を出さない", async () => {

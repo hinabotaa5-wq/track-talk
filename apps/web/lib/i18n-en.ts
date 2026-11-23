@@ -2,6 +2,14 @@
 // 英語を選んだ人だけが読み込む。漏れは lib/i18n-coverage.test.ts で検出する。
 // 文言を足したら、ここにも英語を足す（node --experimental-strip-types scripts/i18n-missing.mjs で漏れを一覧できる）。
 export const en: Readonly<Record<string, string>> = {
+  "依頼内容": "Your request",
+  "新しい動画で依頼する": "Request a review of a new video",
+  "継続プランを見る": "See ongoing plans",
+  "次の依頼": "Next request",
+  "あなたの回答": "Your answer",
+  "{v0}コーチの回答": "Answer from Coach {v0}",
+  "回答日": "Answered",
+  "追加質問の販売は終了しました。販売終了前に購入した追加質問は、購入時の条件のとおり扱います。": "Follow-up questions are no longer sold. Follow-up questions bought before sales ended are handled under the terms at purchase.",
   "この添削について、担当コーチに1回だけ質問できます。受諾は24時間以内、回答は受諾後12時間以内。辞退・期限切れは全額返金します。": "You can ask the coach who did this review one question about it. They accept within 24 hours and answer within 12 hours after accepting. If they decline or the time runs out, you get a full refund.",
   "回答がないまま終わった場合に限り、もう1回だけ購入できます。提供・お支払いは TrackTalk の運営者です（回答はコーチに委託します）。": "Only if it ends without an answer can you buy it one more time. TrackTalk's operator provides this and takes your payment (the coach answers on the operator's behalf).",
   "下書きは7日間保存します。送信後は変更できません。": "Drafts are kept for 7 days. You cannot change the content after sending.",

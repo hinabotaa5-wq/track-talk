@@ -154,7 +154,8 @@ async function click(element: Element) {
   });
 }
 
-it("返却後の質問には有料の追加質問だけを表示する", async () => {
+// 本体 #984: 追加質問は販売終了。完了した依頼には入力欄・追加質問の導線を置かず、導線は「新しい動画で依頼する」と「継続プラン」の2つだけ。
+it("返却後は入力欄・追加質問の導線を出さず、次の依頼の導線2つだけを出す", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
@@ -164,10 +165,13 @@ it("返却後の質問には有料の追加質問だけを表示する", async (
   const { container, root } = await renderPage();
   try {
     expect(container.textContent).toContain("腕振り");
-    expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
-    expect(container.textContent).toContain("質問する（500円）");
-    // 入力欄は追加質問の1つだけ。
-    expect(container.querySelectorAll("textarea")).toHaveLength(1);
+    expect(container.querySelector("textarea")).toBeNull();
+    expect(container.textContent).not.toContain("質問する（");
+    expect(container.textContent).not.toContain("追加質問");
+    const next = container.querySelector('nav[aria-label="次の依頼"]')!;
+    expect([...next.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([["新しい動画で依頼する", "/coaching/new"]]);
+    // 継続プランの一覧が閉じている間は、押せない「準備中」の表示に留める。
+    expect(next.textContent).toContain("継続プランは準備中です");
     expect(container.textContent).not.toContain("確認質問を送る（無料）");
   } finally {
     await teardown(root, container);
@@ -233,15 +237,16 @@ it("未評価の返却済み依頼でもコーチのプロフィールへ遷移�
     }
     expect(profile!.classList).not.toContain("underline");
     const question = [...container.querySelectorAll("p")].find((p) => p.textContent === "スタートの姿勢について")!;
-    const response = [...container.querySelectorAll("h2")].find((h) => h.textContent === "良い点")!;
+    const response = [...container.querySelectorAll("h3")].find((h) => h.textContent === "良い点")!;
     for (const element of [container.querySelector("video")!, question, response]) {
       expect(profile!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
-    expect(question.parentElement!.parentElement!.nextElementSibling).toBe(response.closest("section"));
+    // 依頼内容のすぐ後に、1枚の回答ドキュメントが続く（本体 #984）。
+    expect(question.closest("section[aria-label]")!.nextElementSibling).toBe(response.closest("article"));
+    const outside = container.textContent!.replace(response.closest("article")!.textContent!, "").replace(profile!.textContent!, "");
     for (const text of ["テストコーチ", "100m", "10秒台", "実績"]) {
-      expect(container.textContent!.replace(profile!.textContent!, "")).not.toContain(text);
+      expect(outside).not.toContain(text);
     }
-    expect(container.querySelector("img")).toBeNull();
     await click(profile!);
     expect(routerMock.push).toHaveBeenCalledWith("/coaches/coach-1");
   } finally {
@@ -432,7 +437,9 @@ it("返却後＋コーチ情報ありは「選んだコーチ」枠を出さな�
   const { container, root } = await renderPage();
   try {
     expect(container.textContent).not.toContain("選んだコーチ：");
-    expect(container.textContent).not.toContain("デモコーチ");
+    // コーチ名は回答ドキュメントの見出しにだけ出る（本体 #984）。
+    const doc = container.querySelector("article")!;
+    expect(container.textContent!.replace(doc.textContent!, "")).not.toContain("デモコーチ");
   } finally {
     await unmountPage(container, root);
   }
@@ -707,7 +714,9 @@ it("返却後は相談内容を残しコーチの名前と種目は出さない"
     expect(container.textContent).not.toContain("誰に見てもらうか");
     expect(dlTerms(container)).toEqual([]);
     expect(container.textContent).toContain("スタートの姿勢について");
-    expect(container.textContent).not.toContain("テストコーチ");
+    // コーチ名は回答ドキュメントの見出しにだけ出る（本体 #984）。
+    const outside = container.textContent!.replace(container.querySelector("article")?.textContent ?? "", "");
+    expect(outside).not.toContain("テストコーチ");
     expect(container.textContent).not.toContain("100m");
   } finally {
     await teardown(root, container);
@@ -775,7 +784,7 @@ for (const status of ["returned", "clarifying"]) {
         for (const text of [feedbackLabel, feedbackNotice, "感想を送る", "感想を送りました"]) expect(container.textContent).not.toContain(text);
         expect(container.textContent).toContain("腕振り");
         expect(container.textContent).toContain("この返答を通報する");
-        expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).not.toBeNull();
+        expect(container.querySelector('textarea[aria-label="追加質問の質問"]')).toBeNull();
         routerMock.push.mockClear();
         await click(container.querySelector('button[aria-label="戻る"]')!);
         if (submitted) {
@@ -823,36 +832,34 @@ it("C4: 未送信でも依頼一覧リンクと下部タブはそれぞれのリ
   } finally { await teardown(root, container); }
 });
 
-it("依頼動画→相談文は右・青、返答は左の独立カードとして続く", async () => {
+it("依頼内容（動画→相談文）は吹き出しにせず上にまとめ、回答は1枚のドキュメントとして続く（本体 #984）", async () => {
   const { container, root } = await renderWith({ extra: { created_at: "2026-11-17T21:19:00Z", video_url: "https://example.com/run.mp4", thumbnail_url: "https://example.com/run.jpg" } });
   try {
     const question = [...container.querySelectorAll("p")].find((p) => p.textContent === "スタートの姿勢について")!;
-    const bubble = question.parentElement!;
-    expect(bubble.classList).toContain("bg-blue-500/25");
-    expect(bubble.parentElement?.classList).toContain("justify-end");
-    expect(bubble.querySelector("time")?.textContent).toBe("11/18 6:19");
-    expect(bubble.textContent).not.toContain("2026");
+    const request = question.closest('section[aria-label="依頼内容"]')!;
+    expect(request).not.toBeNull();
+    expect(container.querySelector(".bg-blue-500\\/25")).toBeNull();
+    expect(container.querySelector(".justify-end")).toBeNull();
     expect(container.querySelectorAll("dl")).toHaveLength(0);
     const video = container.querySelector("video")!;
+    expect(video.closest("section")).toBe(request);
     expect(video.classList).toContain("max-w-[260px]");
     expect(video.classList).toContain("max-h-[300px]");
     expect(video.controls).toBe(true);
-    expect(video.closest("div.flex")?.classList).toContain("justify-end");
-    expect(video.parentElement?.classList).toContain("bg-blue-500/25");
     expect(video.getAttribute("poster")).toBe("https://example.com/run.jpg");
     expect(video.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const response = [...container.querySelectorAll("h2")].find((h) => h.textContent === "良い点")!.closest("section")!;
-    expect(question.compareDocumentPosition(response) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(response.firstElementChild?.classList).toContain("self-start");
-    expect(response.firstElementChild?.classList).toContain("bg-white/10");
+    const response = [...container.querySelectorAll("h3")].find((h) => h.textContent === "良い点")!.closest("article")!;
+    expect(request.nextElementSibling).toBe(response);
+    expect(response.querySelectorAll("time")).toHaveLength(1);
   } finally { await teardown(root, container); }
 });
 
-it("対応中は相談文1つだけで空の返答カードを出さず、見出し内の期限表示とキャンセル操作を残す", async () => {
+it("対応中は依頼内容だけで空の回答ドキュメントを出さず、見出し内の期限表示とキャンセル操作を残す", async () => {
   const { container, root } = await renderWith({ response: null, extra: { status: "in_review", started_at: null, due_at: new Date(Date.now() + 86400000).toISOString() } });
   try {
-    expect(container.querySelectorAll("time")).toHaveLength(1);
-    expect([...container.querySelectorAll("h2")].some((h) => h.textContent === "良い点")).toBe(false);
+    expect(container.querySelector("article")).toBeNull();
+    expect(container.querySelector('nav[aria-label="次の依頼"]')).toBeNull();
+    expect([...container.querySelectorAll("h3")].some((h) => h.textContent === "良い点")).toBe(false);
     const deadline = [...container.querySelectorAll("p")].find((p) => p.textContent?.startsWith("返却期限:"))!;
     expect(deadline.previousElementSibling?.textContent).toMatch(/^送った日時 /);
     expect(deadline.parentElement?.querySelector("h1")?.textContent).toBe("1回プラン");
