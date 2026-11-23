@@ -2,23 +2,30 @@
 import { L } from "@/lib/i18n";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { MotionConfig } from "motion/react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
+import { CoachAvatar } from "@/components/coach-photo";
 import { PageLoading } from "@/components/page-loading";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
+import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachDisplayText } from "@/lib/coach-display";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { coachTicketPurchaseHref, type TicketSummary } from "@/lib/coaching-tickets";
-import { supportPlanListEnabled } from "@/lib/features";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
+import { CoachSelfButton } from "../coaches/coach-self-button";
 import { ReferralBanner } from "../coaches/referral-banner";
 
-// コーチタブの特集ページ（本体 #985）。特集モード（NEXT_PUBLIC_COACHING_FEATURED_COACH_ID）の間、/coaching の一覧の代わりに出す。
+// コーチタブの特集ページ（本体 #985、表示の手直しは #991）。特集モード（NEXT_PUBLIC_COACHING_FEATURED_COACH_ID）の間、/coaching の一覧の代わりに出す。
 // 名前・写真・記録・種目・紹介文・実績・SNS はプロフィールデータから出し、コードに個人の固定文言を書かない。
-// 固定の文はキャッチコピー・回答の見本・流れ・よくある質問だけ（すべて L() でキー化）。
-// 外すもの：コーチカードの2列一覧・種目チップの絞り込み・1回プラン／継続プランの切り替え。
+// 固定の文は流れ（3ステップ）・よくある質問だけ（すべて L() でキー化）。
+// 並び（#991）：紹介バナー → 1回プラン／継続プランの切り替え＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋下部固定 CTA）。
+// 紹介バナーは切り替えの外に置き、どちらを選んでも出す。「継続プラン」側は特集コンテンツと固定 CTA を出さず「継続プランは準備中です」だけ（SupportPlanList は描かない）。
+// 切り替えの動きは通常一覧（coach-tabs.tsx）に揃える：初回だけ URL の ?tab=support を見て、以後はその場の状態で切り替え、URL は書き換えるだけ。
+// 外すもの：コーチカードの2列一覧・種目チップの絞り込み。
 
 // 記録の欄は自由記入なので、区切り（改行・読点・スラッシュ・全角スラッシュ）でチップに分ける。
 export function recordChips(text: string | null): string[] {
@@ -26,8 +33,22 @@ export function recordChips(text: string | null): string[] {
 }
 
 type Loaded = { coach: PublicCoach | null } | { error: true };
+type Tab = "video" | "support";
 
 export function FeaturedCoachView({ coachID }: { coachID: string }) {
+  return (
+    <Suspense>
+      <FeaturedCoachTabs coachID={coachID} />
+    </Suspense>
+  );
+}
+
+function FeaturedCoachTabs({ coachID }: { coachID: string }) {
+  const params = useSearchParams();
+  const pathname = usePathname();
+  const base = pathname === "/coaches" ? "/coaches" : "/coaching";
+  // 直接リンク・共有 URL で継続プラン側から開けるよう、初回だけ URL を見る。以後はその場の状態が正本。
+  const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "support" ? "support" : "video"));
   const [result, setResult] = useState<Loaded>();
   const { token } = useAuth();
   const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean }>();
@@ -59,10 +80,51 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
     return () => { cancelled = true; };
   }, [token]);
 
-  if (!result) return <PageLoading screen label={L("読み込み中...")} />;
-  if ("error" in result) return <p role="alert" className="mx-auto max-w-md text-sm text-red-400">{L("読み込みに失敗しました")}</p>;
+  // 1回プラン側の初回読み込み中は、通常一覧と同じくストップウォッチだけにする（継続プラン側は取得しないので待たない）。
+  if (tab === "video" && !result) return <PageLoading screen label={L("読み込み中...")} />;
+
+  const views = [
+    { id: "video", label: L("1回プラン") },
+    { id: "support", label: L("継続プラン") },
+  ] as const;
+  function select(next: Tab) {
+    if (next === tab) return;
+    setTab(next);
+    window.history.replaceState(null, "", next === "support" ? `${base}?tab=support` : base);
+  }
+
+  return (
+    <div className={`mx-auto max-w-md space-y-6 ${tab === "video" ? "pb-32" : ""}`}>
+      <ReferralBanner />
+      <MotionConfig reducedMotion="user">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <ViewSwitch
+              label={L("コーチの一覧を切り替える")}
+              layoutId="coach-list-view-pill"
+              initialPillStatic
+              views={views}
+              current={tab}
+              onSelect={select}
+              href={(id) => (id === "support" ? `${base}?tab=support` : base)}
+            />
+          </div>
+          <CoachSelfButton />
+        </div>
+      </MotionConfig>
+      {tab === "support" ? (
+        <p className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-center font-semibold text-slate-100">{L("継続プランは準備中です")}</p>
+      ) : result ? (
+        <FeaturedContent result={result} showTickets={!(ticketSales?.canPurchase === false && ticketSales.token === token)} />
+      ) : null}
+    </div>
+  );
+}
+
+function FeaturedContent({ result, showTickets }: { result: Loaded; showTickets: boolean }) {
+  if ("error" in result) return <p role="alert" className="text-sm text-red-400">{L("読み込みに失敗しました")}</p>;
   const coach = result.coach;
-  if (!coach) return <p className="mx-auto max-w-md text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p>;
+  if (!coach) return <p className="text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p>;
 
   const name = coachDisplayText(coach.nickname, coach.nickname_en);
   const records = recordChips(coachDisplayText(coach.best_record, coach.best_record_en));
@@ -70,61 +132,19 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
   const hitokoto = coachDisplayText(coach.hitokoto, coach.hitokoto_en);
   const events = coach.events.map((event) => coachEventLabels[event]).join(L("・"));
   const open = coach.on_duty;
-  const showTickets = !(ticketSales?.canPurchase === false && ticketSales.token === token);
 
   return (
-    <div className="mx-auto max-w-md space-y-6 pb-32">
-      <section aria-label={L("コーチの紹介")} className="overflow-hidden rounded-2xl border border-white/20 glass bg-white/5">
-        {coach.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={coach.photo_url} alt={name ?? ""} className="aspect-[4/5] w-full object-cover" />
-        ) : null}
-        <div className="space-y-3 p-4">
-          <p className={`w-fit rounded-full px-3 py-0.5 text-xs font-bold ${open ? "bg-blue-500/20 text-blue-300" : "bg-red-500/15 text-red-400"}`}>
-            {open ? L("受付中") : L("受付停止中")}
-          </p>
-          <h1 className="text-2xl font-bold text-white">{name ? L("{v0}コーチ", { v0: name }) : L("コーチ")}</h1>
-          {achievements.length ? <p className="text-sm text-slate-200">{achievements[0]}</p> : null}
-          <p className="text-base font-semibold text-white">{L("スタートとフォームの悩みを、動画1本で。")}</p>
-          <ul className="flex flex-wrap gap-1.5" aria-label={L("記録と対応種目")}>
+    <>
+      <section aria-labelledby="featured-about" className="space-y-3 text-sm">
+        <div className="flex flex-col items-center gap-3">
+          <CoachAvatar url={coach.photo_url} name={name} size={112} />
+          <ul className="flex flex-wrap justify-center gap-1.5" aria-label={L("記録と対応種目")}>
             {records.map((record) => (
               <li key={record} className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-200">{record}</li>
             ))}
             {events ? <li className="rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-200">{L("対応種目 {v0}", { v0: events })}</li> : null}
           </ul>
         </div>
-      </section>
-
-      <ReferralBanner />
-
-      <section aria-labelledby="featured-sample" className="space-y-3 text-sm">
-        <h2 id="featured-sample" className="text-lg font-bold">{L("どんな添削が返ってくるか")}</h2>
-        <ol className="grid grid-cols-3 gap-2 text-center text-xs">
-          {[L("動画を1本送るだけ"), L("コーチが動画を見て回答"), L("24時間以内に返却")].map((step, i) => (
-            <li key={i} className="rounded-xl border border-white/15 bg-white/5 p-2">
-              <span className="block text-base font-bold text-blue-300">{i + 1}</span>
-              {step}
-            </li>
-          ))}
-        </ol>
-        <article aria-label={L("回答の見本")} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/5 p-4">
-          <p className="text-xs text-slate-300">{L("回答の見本（実際の回答も同じ項目で届きます）")}</p>
-          {[
-            { title: L("良い点"), tone: "text-emerald-300", body: L("接地が体の真下に近く、ブレーキが小さい走りです。") },
-            { title: L("直す点"), tone: "text-amber-300", body: L("後半に腕振りが横に流れ、上体が起き上がっています。") },
-            { title: L("おすすめのドリル"), tone: "text-blue-300", body: L("壁押しドリル 10秒×3本で、前傾を保つ感覚をつかみましょう。") },
-            { title: L("ひとこと"), tone: "text-violet-300", body: L("前半の良さを後半まで続けられれば、記録はまだ伸びます。") },
-            { title: L("見本動画"), tone: "text-slate-300", body: L("必要なときは、コーチが動きの見本動画を添えます。") },
-          ].map((item) => (
-            <section key={item.title} className="space-y-1">
-              <h3 className={`text-xs font-semibold ${item.tone}`}>{item.title}</h3>
-              <p className="text-slate-100">{item.body}</p>
-            </section>
-          ))}
-        </article>
-      </section>
-
-      <section aria-labelledby="featured-about" className="space-y-3 text-sm">
         <h2 id="featured-about" className="text-lg font-bold">{name ? L("{v0}コーチについて", { v0: name }) : L("コーチについて")}</h2>
         {hitokoto ? <p className="whitespace-pre-wrap break-words text-slate-100">{hitokoto}</p> : null}
         {achievements.length ? (
@@ -139,9 +159,14 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
         ) : null}
       </section>
 
-      <p className="text-xs text-slate-300">
-        {supportPlanListEnabled ? <Link href={`/coaches/${encodeURIComponent(coach.id)}?tab=support`} className="underline">{L("継続プランを見る")}</Link> : L("継続プランは準備中です")}
-      </p>
+      <ol data-testid="featured-steps" className="grid grid-cols-3 gap-2 text-center text-xs">
+        {[L("動画を1本送るだけ"), L("コーチが動画を見て回答"), L("24時間以内に返却")].map((step, i) => (
+          <li key={i} className="rounded-xl border border-white/15 bg-white/5 p-2">
+            <span className="block text-base font-bold text-blue-300">{i + 1}</span>
+            {step}
+          </li>
+        ))}
+      </ol>
 
       <section aria-labelledby="featured-faq" className="space-y-2 text-sm">
         <h2 id="featured-faq" className="text-base font-bold">{L("よくある質問")}</h2>
@@ -157,7 +182,7 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
         ))}
       </section>
 
-      <div className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div data-testid="featured-cta" className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mx-auto flex max-w-md flex-col gap-2">
           {open ? null : <p className="text-center text-xs font-semibold text-red-400">{L("現在は受付を停止しています")}</p>}
           <div className="flex gap-2">
@@ -178,6 +203,6 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
