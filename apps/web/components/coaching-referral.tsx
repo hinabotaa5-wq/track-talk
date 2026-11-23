@@ -59,6 +59,7 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
 
 const referralHeadline = () => L("友達2人に紹介すると、1回分(1,000円)無料！");
 const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
+const referralShareUrl = "https://track-talk.netlify.app/referral";
 
 export function LoadedReferralCard({ token, variant = "full" }: { token: string | null; variant?: "full" | "compact" }) {
   const { referral } = useMyReferral(token);
@@ -70,6 +71,27 @@ function ReferralCard({ referral, variant = "full" }: { referral: Referral; vari
   const [copyStatus, setCopyStatus] = useState("");
   const { code, active, friend_count, granted_at, expires_at } = referral;
   const compact = variant === "compact";
+  const shareReferral = async () => {
+    const text = L("TrackTalkでコーチにフォーム添削してもらえるよ。購入のときに紹介ID「{v0}」を入れてね。", { v0: code });
+    const copyShareText = async () => {
+      try {
+        await navigator.clipboard.writeText(`${text}\n${referralShareUrl}`);
+        setCopyStatus(L("共有文をコピーしました"));
+      } catch {
+        setCopyStatus(L("共有できませんでした"));
+      }
+    };
+    if (typeof navigator.share !== "function") {
+      await copyShareText();
+      return;
+    }
+    try {
+      await navigator.share({ text, url: referralShareUrl });
+    } catch (error) {
+      if ((error as { name?: unknown }).name === "AbortError") return;
+      await copyShareText();
+    }
+  };
   return <section className={compact ? "app-card space-y-1 rounded-xl p-3" : "app-card space-y-2 rounded-xl p-4"}>
     <h2 className={compact ? "text-sm font-semibold" : "font-semibold"}>{referralHeadline()}</h2>
     {compact ? null : <p className="text-sm">{referralBody()}</p>}
@@ -83,6 +105,7 @@ function ReferralCard({ referral, variant = "full" }: { referral: Referral; vari
           setCopyStatus(L("紹介IDを選択してコピーしてください"));
         }
       }}>{L("コピー")}</Button> : null}
+      {active ? <Button type="button" variant="secondary" onClick={shareReferral}>{L("共有")}</Button> : null}
     </div>
     {copyStatus ? <p role="status" className="text-xs">{copyStatus}</p> : null}
     {granted_at ? <p className="text-sm font-semibold">{L("無料チケットをプレゼントしました")}</p>

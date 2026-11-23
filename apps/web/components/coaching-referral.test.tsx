@@ -12,6 +12,8 @@ let root: Root;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   mocks.api.mockReset();
+  Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn() } });
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -69,12 +71,16 @@ async function renderCard(referral: unknown) {
 }
 
 const copyButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "コピー");
+const shareButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "共有");
+const referralShareText = "TrackTalkでコーチにフォーム添削してもらえるよ。購入のときに紹介ID「K7M3QX」を入れてね。";
+const referralShareUrl = "https://track-talk.netlify.app/referral";
 
 it("終了した紹介IDは赤い取り消し線で薄く表示し、IDの文字列はそのまま残す（本体 #920 A1・A2）", async () => {
   const strong = await renderCard({ code: "CWN8X2", active: false, friend_count: 1, granted_at: null, expires_at: null });
   expect(strong.textContent).toBe("CWN8X2");
   for (const c of [...endedClasses, "decoration-2", "font-mono", "tracking-wider"]) expect(strong.classList).toContain(c);
   expect(copyButton()).toBeUndefined();
+  expect(shareButton()).toBeUndefined();
   expect(container.textContent).toContain(endedNotice);
 });
 
@@ -85,6 +91,7 @@ it("特典付与済みで終了した周でも同じ見た目にし、付与済�
   expect(container.textContent).toContain("無料チケットをプレゼントしました");
   expect(container.textContent).toContain(endedNotice);
   expect(copyButton()).toBeUndefined();
+  expect(shareButton()).toBeUndefined();
 });
 
 it("有効な紹介IDには取り消し線も薄い色も付けず、コピーボタンを出す（本体 #920 A4）", async () => {
@@ -93,10 +100,12 @@ it("有効な紹介IDには取り消し線も薄い色も付けず、コピー�
   for (const c of endedClasses) expect(strong.classList).not.toContain(c);
   expect(strong.className).toBe("font-mono tracking-wider");
   expect(copyButton()).toBeDefined();
+  expect(shareButton()).toBeDefined();
+  expect(copyButton()?.nextElementSibling).toBe(shareButton());
   expect(container.textContent).not.toContain(endedNotice);
 });
 
-it("compact は見出し・ID・コピー・状態だけでコピー結果も表示する", async () => {
+it("compact は見出し・ID・コピー・共有・状態だけでコピー結果も表示する", async () => {
   const writeText = vi.fn(async () => {});
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   mocks.api.mockResolvedValue({ referral: { code: "ABC123", active: true, friend_count: 1, granted_at: null, expires_at: null } });
@@ -107,6 +116,7 @@ it("compact は見出し・ID・コピー・状態だけでコピー結果も表
   expect(container.textContent).toContain("あなたの紹介ID ABC123");
   expect(container.textContent).toContain("あと1人で無料チケット");
   expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。");
+  expect(shareButton()).toBeDefined();
   await act(async () => copyButton()!.click());
   expect(writeText).toHaveBeenCalledWith("ABC123");
   expect(container.querySelector('[role="status"]')?.textContent).toBe("コピーしました");
@@ -117,8 +127,61 @@ it.each(["full", "compact"] as const)("%s の終了IDは取り消し線・グレ
   await act(async () => root.render(<LoadedReferralCard token="test" variant={variant} />));
   for (const c of endedClasses) expect(container.querySelector("strong")?.classList).toContain(c);
   expect(copyButton()).toBeUndefined();
+  expect(shareButton()).toBeUndefined();
   expect(container.textContent).toContain("無料チケットをプレゼントしました");
   for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "特典チケット：", endedNotice]) {
     expect(container.textContent?.includes(text)).toBe(variant === "full");
   }
+});
+
+it("共有ボタンは紹介文とURLをWeb Share APIへ渡し、成功時はコピーも状態表示もしない", async () => {
+  const share = vi.fn(async () => {});
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, "share", { configurable: true, value: share });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  await renderCard({ code: "K7M3QX", active: true, friend_count: 0, granted_at: null, expires_at: null });
+  await act(async () => shareButton()!.click());
+  expect(share).toHaveBeenCalledTimes(1);
+  expect(share).toHaveBeenCalledWith({ text: referralShareText, url: referralShareUrl });
+  expect(writeText).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="status"]')).toBeNull();
+});
+
+it("共有シートを閉じたときはコピーも状態表示もしない", async () => {
+  const share = vi.fn(async () => { throw new DOMException("cancelled", "AbortError"); });
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, "share", { configurable: true, value: share });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  await renderCard({ code: "K7M3QX", active: true, friend_count: 0, granted_at: null, expires_at: null });
+  await act(async () => shareButton()!.click());
+  expect(writeText).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="status"]')).toBeNull();
+});
+
+it("Web Share APIがないときは共有文とURLをコピーして状態を表示する", async () => {
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  await renderCard({ code: "K7M3QX", active: true, friend_count: 0, granted_at: null, expires_at: null });
+  await act(async () => shareButton()!.click());
+  expect(writeText).toHaveBeenCalledWith(`${referralShareText}\n${referralShareUrl}`);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("共有文をコピーしました");
+});
+
+it("共有がAbortError以外で失敗したときは共有文とURLをコピーする", async () => {
+  const share = vi.fn(async () => { throw new Error("unavailable"); });
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, "share", { configurable: true, value: share });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  await renderCard({ code: "K7M3QX", active: true, friend_count: 0, granted_at: null, expires_at: null });
+  await act(async () => shareButton()!.click());
+  expect(writeText).toHaveBeenCalledWith(`${referralShareText}\n${referralShareUrl}`);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("共有文をコピーしました");
+});
+
+it("共有文のコピーにも失敗したときは失敗を表示する", async () => {
+  const writeText = vi.fn(async () => { throw new Error("denied"); });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  await renderCard({ code: "K7M3QX", active: true, friend_count: 0, granted_at: null, expires_at: null });
+  await act(async () => shareButton()!.click());
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("共有できませんでした");
 });

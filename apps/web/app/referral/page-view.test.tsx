@@ -21,7 +21,7 @@ const JA_TEXTS = [
   "購入すると、あなたの紹介IDが発行されます",
   "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。",
   "紹介IDを友達に伝える",
-  "マイページで紹介IDをコピーできます。",
+  "マイページで、紹介IDをコピーしたり共有ボタンで送ったりできます。",
   "友達がコーチを選んで、申し込みに進む",
   "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。",
   "友達が、購入の手続きで紹介IDを入力して購入を完了する",
@@ -48,6 +48,7 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
   expect(text).not.toContain("友達2人に紹介すると、1回無料！");
   expect(text).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
   expect(text).not.toContain("無料チケットは動画添削1回分です。有効期限は、プレゼントされてから6か月です。");
+  expect(text).not.toContain("マイページで紹介IDをコピーできます。");
   const stepTitles = [...container.querySelectorAll("ol > li")].map((li) => li.textContent ?? "");
   expect(stepTitles).toHaveLength(5);
   expect(stepTitles[0]).toContain("購入すると、あなたの紹介IDが発行されます");
@@ -97,6 +98,7 @@ it("英語表示では固定の英訳が出て、新規文の日本語が残ら�
   expect(text).not.toContain("The free ticket is good for one video review and expires 6 months after it is granted.");
   expect(text).toContain("Your friend types the code into the “Referral code” field. If they skip it, the purchase will not count as a referral. Once the purchase is complete, it counts as one referral for the person who shared the code.");
   expect(text).toContain("Your 6-character referral code appears on the purchase completion screen and on your My Page.");
+  expect(text).toContain("You can copy your referral ID on My Page, or send it with the share button.");
   expect(text).toContain("Your friend chooses a coach and starts a request");
   expect(text).toContain("Your referral code is issued when you make a purchase");
   expect(text).toContain("Please note");
@@ -105,5 +107,6 @@ it("英語表示では固定の英訳が出て、新規文の日本語が残ら�
   expect(text).not.toContain("Purchase without a referral code to get your own code");
   expect(text).not.toContain("Good to know");
   expect(text).not.toContain("See your referral code and progress");
+  expect(text).not.toContain("You can copy your code from your My Page.");
   for (const ja of JA_TEXTS.slice(1)) expect(text).not.toContain(ja);
 });

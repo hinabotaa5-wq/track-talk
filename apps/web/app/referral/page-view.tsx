@@ -31,7 +31,7 @@ function StepCard({ step, index, children }: { step: Step; index: number; childr
 
 const steps: Step[] = [
   { icon: Ticket, title: "購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。" },
-  { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで紹介IDをコピーできます。" },
+  { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで、紹介IDをコピーしたり共有ボタンで送ったりできます。" },
   { icon: GraduationCap, title: "友達がコーチを選んで、申し込みに進む", body: "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。" },
   { icon: Keyboard, title: "友達が、購入の手続きで紹介IDを入力して購入を完了する", body: "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。" },
   { icon: Gift, title: "友達2人が購入すると、無料チケットをプレゼント", body: "あと何人かは、マイページで確認できます。" },
