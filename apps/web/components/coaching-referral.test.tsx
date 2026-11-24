@@ -122,3 +122,89 @@ it.each(["full", "compact"] as const)("%s の終了IDは取り消し線・グレ
     expect(container.textContent?.includes(text)).toBe(variant === "full");
   }
 });
+
+// 共有ボタン（本体 #996）。
+const shareButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent === "共有");
+const shareText = "TrackTalkでコーチにフォーム添削してもらえるよ。購入のときに紹介ID「K7M3QX」を入れてね。";
+const shareUrl = "https://track-talk.netlify.app/referral";
+const activeReferral = { code: "K7M3QX", active: true, friend_count: 0, granted_at: null, expires_at: null };
+const status = () => container.querySelector('[role="status"]');
+
+function stubShare(share: ((data: ShareData) => Promise<void>) | undefined) {
+  Object.defineProperty(navigator, "share", { configurable: true, writable: true, value: share });
+}
+function stubClipboard(writeText: (text: string) => Promise<void>) {
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+}
+afterEach(() => { stubShare(undefined); });
+
+async function renderActive(variant: "full" | "compact" = "full") {
+  mocks.api.mockResolvedValue({ referral: activeReferral });
+  await act(async () => root.render(<LoadedReferralCard token="test" variant={variant} />));
+}
+
+it.each(["full", "compact"] as const)("S1・S2：有効な紹介ID（%s）ではコピーボタンの隣に共有ボタンを出す", async (variant) => {
+  await renderActive(variant);
+  const share = shareButton();
+  expect(share).toBeDefined();
+  expect(share?.previousElementSibling).toBe(copyButton());
+});
+
+it.each(["full", "compact"] as const)("S3：終了した紹介ID（%s）にはコピーも共有も出さない", async (variant) => {
+  mocks.api.mockResolvedValue({ referral: { ...activeReferral, active: false } });
+  await act(async () => root.render(<LoadedReferralCard token="test" variant={variant} />));
+  expect(copyButton()).toBeUndefined();
+  expect(shareButton()).toBeUndefined();
+});
+
+it("S4・S5：navigator.share を共有文とURLで1回だけ呼び、成功時はクリップボードもステータスも使わない", async () => {
+  const share = vi.fn(async () => {});
+  const writeText = vi.fn(async () => {});
+  stubShare(share); stubClipboard(writeText);
+  await renderActive();
+  await act(async () => shareButton()!.click());
+  expect(share).toHaveBeenCalledTimes(1);
+  expect(share).toHaveBeenCalledWith({ text: shareText, url: shareUrl });
+  expect(writeText).not.toHaveBeenCalled();
+  expect(status()).toBeNull();
+});
+
+it("S6：共有シートのキャンセル（AbortError）では何もしない", async () => {
+  const share = vi.fn(async () => { throw new DOMException("cancelled", "AbortError"); });
+  const writeText = vi.fn(async () => {});
+  stubShare(share); stubClipboard(writeText);
+  await renderActive();
+  await act(async () => shareButton()!.click());
+  expect(share).toHaveBeenCalledTimes(1);
+  expect(writeText).not.toHaveBeenCalled();
+  expect(status()).toBeNull();
+});
+
+it("S7：navigator.share が無い環境では共有文とURLをコピーして知らせる", async () => {
+  const writeText = vi.fn(async () => {});
+  stubShare(undefined); stubClipboard(writeText);
+  await renderActive();
+  await act(async () => shareButton()!.click());
+  expect(writeText).toHaveBeenCalledWith(`${shareText}\n${shareUrl}`);
+  expect(status()?.textContent).toBe("共有文をコピーしました");
+});
+
+it("S8：AbortError 以外で失敗したら S7 と同じくコピーに切り替える", async () => {
+  const share = vi.fn(async () => { throw new DOMException("denied", "NotAllowedError"); });
+  const writeText = vi.fn(async () => {});
+  stubShare(share); stubClipboard(writeText);
+  await renderActive();
+  await act(async () => shareButton()!.click());
+  expect(share).toHaveBeenCalledTimes(1);
+  expect(writeText).toHaveBeenCalledWith(`${shareText}\n${shareUrl}`);
+  expect(status()?.textContent).toBe("共有文をコピーしました");
+});
+
+it("S9：コピーにも失敗したら「共有できませんでした」を出す", async () => {
+  const writeText = vi.fn(async () => { throw new Error("denied"); });
+  stubShare(undefined); stubClipboard(writeText);
+  await renderActive();
+  await act(async () => shareButton()!.click());
+  expect(writeText).toHaveBeenCalledTimes(1);
+  expect(status()?.textContent).toBe("共有できませんでした");
+});

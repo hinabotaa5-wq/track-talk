@@ -21,7 +21,7 @@ const JA_TEXTS = [
   "購入すると、あなたの紹介IDが発行されます",
   "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。",
   "紹介IDを友達に伝える",
-  "マイページで紹介IDをコピーできます。",
+  "マイページで、紹介IDをコピーしたり共有ボタンで送ったりできます。",
   "友達がコーチを選んで、申し込みに進む",
   "友達は、1回プランの都度払いでも、チケット6枚パックの購入でも申し込めます。",
   "友達が、購入の手続きで紹介IDを入力して購入を完了する",
@@ -71,6 +71,15 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
     "対象は1回プランの都度払いとチケット6枚パックです。追加質問は対象外です。",
     "無料チケットは、もらった本人だけが使えます。払戻しはできません。",
   ]);
+});
+
+it("ステップ2の本文は共有ボタンにも触れ、旧本文は出さない（本体 #996 S10）", async () => {
+  setActiveLocale("ja");
+  await act(async () => root.render(<ReferralGuideView />));
+  const second = container.querySelectorAll("ol > li")[1];
+  expect(second?.textContent).toContain("紹介IDを友達に伝える");
+  expect(second?.textContent).toContain("マイページで、紹介IDをコピーしたり共有ボタンで送ったりできます。");
+  expect(container.textContent).not.toContain("マイページで紹介IDをコピーできます。");
 });
 
 it("ステップ4に紹介ID見本を表示せず、実際の input 要素もない", async () => {
