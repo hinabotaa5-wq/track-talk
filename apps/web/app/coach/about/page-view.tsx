@@ -1,9 +1,8 @@
 "use client";
 
 import { L } from "@/lib/i18n";
-import { SupportPlanCoachTerms } from "@/components/support-plan-coach-terms";
 import Link from "next/link";
-import { ArrowRight, Shuffle, UserRound, Trophy, MapPin } from "lucide-react";
+import { ArrowRight, Shuffle } from "lucide-react";
 
 
 export function CoachAboutView() {
@@ -11,38 +10,29 @@ export function CoachAboutView() {
     <div className="mx-auto max-w-md space-y-7">
       <section className="space-y-3">
         <p className="text-sm font-semibold text-blue-300">{L("TrackTalkのコーチ機能")}</p>
-        <p className="rounded-xl border border-blue-300/30 bg-blue-500/15 p-3 text-sm font-semibold text-blue-200">{L("コーチを募集しています。1回プランは開始していて、申込みとチケットの購入ができます。継続プラン（1ヶ月の継続サポート）は準備中です。")}</p>
+        <p className="rounded-xl border border-blue-300/30 bg-blue-500/15 p-3 text-sm font-semibold text-blue-200">{L("コーチを募集しています。スタンダードプランは開始していて、申込みとチケットの購入ができます。")}</p>
         <h1 className="text-2xl font-bold leading-relaxed">{L("あなたの陸上経験を、")}<br />{L("誰かの次の一歩に。")}</h1>
-        <p className="text-sm leading-relaxed text-slate-200">{L("「フォームを見てほしい」「大会に向けて何をすればいい？」。そんな選手の悩みに、競技や指導で培った経験を生かして応える機能です。動画や文章でのアドバイスから継続的な指導まで、自分が対応できる形で活動できます。")}</p>
+        <p className="text-sm leading-relaxed text-slate-200">{L("「フォームを見てほしい」「大会に向けて何をすればいい？」。そんな選手の悩みに、競技や指導で培った経験を生かして応える機能です。動画や文章でのアドバイスを通じて、自分が対応できる形で活動できます。")}</p>
       </section>
 
       <section className="space-y-4" aria-labelledby="coach-ways">
-        <h2 id="coach-ways" className="text-lg font-bold">{L("関わり方は、大きく2つ")}</h2>
+        <h2 id="coach-ways" className="text-lg font-bold">{L("関わり方")}</h2>
         <article className="space-y-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
-          <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("1回プラン")}</h3>
-          <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容を送り、必要に応じて動画を添えます。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1回1,000円で、コーチの報酬はその70％（700円）です。利用者がチケットで申し込んだ1回プランも、報酬は同じ700円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
+          <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("スタンダードプラン")}</h3>
+          <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容を送り、必要に応じて動画を添えます。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1回1,000円で、コーチの報酬はその70％（700円）です。利用者がチケットで申し込んだスタンダードプランも、報酬は同じ700円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
           <p className="text-sm leading-relaxed text-slate-200">{L("受付をオンにすると、申込みが対応中の一覧に届きます。届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください。")}</p>
-        </article>
-        <article className="space-y-3 rounded-2xl border border-white/20 bg-white/10 p-4">
-          <h3 className="flex items-center gap-2 font-bold"><UserRound className="size-5 text-blue-300" aria-hidden />{L("継続プラン：あなたに相談したい人を支える")}</h3>
-          <p className="text-sm leading-relaxed text-slate-200">{L("継続プランは準備中です。開始後は、選手からの無料相談に回答し、内容をすり合わせて提案を送ります。選手（18歳未満は保護者）が提案に同意して支払うと、引き受け操作なしに契約が成立します。")}</p>
-          <ul className="space-y-3 text-sm text-slate-200">
-            <li className="flex gap-2"><Trophy className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("1ヶ月プラン")}</strong>{L("：1ヶ月の継続サポート。無料相談から始め、提案への同意・支払いで成立します。")}</span></li>
-            <li className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-blue-300" aria-hidden /><span><strong className="text-white">{L("対面プラン")}</strong>{L("：現地で指導するプラン。開始時期は未定で、始まるときに案内します。")}</span></li>
-          </ul>
         </article>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">{L("自分のペースで、責任を持って")}</h2>
-        <p className="text-sm leading-relaxed text-slate-200">{L("1回プランは受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。継続プラン（1ヶ月）は受付設定と無料相談への回答がコーチの操作で、期間・内容・価格は提案で決めます。")}</p>
+        <p className="text-sm leading-relaxed text-slate-200">{L("スタンダードプランは受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。")}</p>
         <p className="text-sm leading-relaxed text-slate-200">{L("やり取りや支払いはTrackTalk上で行います。未成年の利用者の購入には、保護者の許可の確認など、所定の手続きがあります。")}</p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">{L("報酬について")}</h2>
         <p className="text-sm leading-relaxed text-slate-200">{L("有料の依頼やプランで指導を提供すると、サービスの手数料を差し引いた報酬が記録されます。受け取り口座の登録、適用される手数料、報酬と送金の状況は、コーチ専用画面で確認できます。")}</p>
-        <SupportPlanCoachTerms />
       </section>
 
       <section className="space-y-3">

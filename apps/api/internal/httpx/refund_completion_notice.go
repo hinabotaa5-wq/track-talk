@@ -102,13 +102,13 @@ func (s *Server) deliverRefundCompletionNotice(ctx context.Context, id uuid.UUID
 
 func refundCompletionMessage(notice db.RefundCompletionNotice) push.Message {
 	message := push.Message{
-		Title: "1回プランの返金が完了しました",
+		Title: "スタンダードプランの返金が完了しました",
 		URL:   notice.Url,
 		Tag:   "refund-complete-" + notice.ID.String(),
 	}
 	switch notice.Kind {
 	case "review_cancel":
-		message.Title = "1回プランの仮押さえの取り消しが完了しました"
+		message.Title = "スタンダードプランの仮押さえの取り消しが完了しました"
 	case "consultation_refund":
 		message.Title = "追加相談の返金が完了しました"
 		// 追加相談の返金は動画添削の追加質問とサポートプランの追加相談の両方で起きる。

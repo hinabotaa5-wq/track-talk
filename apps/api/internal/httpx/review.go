@@ -157,7 +157,7 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 		if s.push.Configured() {
 			var sent int
 			sent, err = s.sendPush(r.Context(), p.ID, push.Message{
-				Title: "1回プランの通知テスト",
+				Title: "スタンダードプランの通知テスト",
 				Body:  "依頼の受付を始める前の接続テストです",
 				URL:   "/coach",
 				Tag:   "coach-duty-test",
@@ -187,7 +187,7 @@ func (s *Server) updateCoachDuty(w http.ResponseWriter, r *http.Request) {
 	if c.OnDuty && !current.OnDuty {
 		s.pushQuietly(r.Context(), p.ID, notifyImportant, push.Message{
 			Title: "依頼の受付を始めました",
-			Body:  "1回プランの依頼が届くと、この端末に通知します",
+			Body:  "スタンダードプランの依頼が届くと、この端末に通知します",
 			URL:   "/coach",
 			Tag:   "coach-duty",
 		}, 10*time.Minute)
@@ -275,7 +275,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	// 招待コードのゲートは、支払いのない検証用（Stripe の鍵がない環境）のデモ版にだけ残す。
 	// 支払いがある環境では、正規の購入（単発・チケット）で誰でも申し込める（本体 #569）。
 	if !s.reviewOpenTo(p) {
-		Error(w, http.StatusForbidden, "forbidden", "1回プランは準備中です")
+		Error(w, http.StatusForbidden, "forbidden", "スタンダードプランは準備中です")
 		return
 	}
 	var req reviewRequestReq

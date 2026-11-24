@@ -22,7 +22,7 @@ test("スマホの申込画面は?coach=でコーチを引き継ぎ、単発の�
   await route.fulfill({json:body});
  });
  await page.goto("/coaching/new?coach=coach-1");
- await expect(page.getByRole("heading",{name:"1回プラン（フォーム添削や競技に関する悩み）"})).toBeVisible();
+ await expect(page.getByRole("heading",{name:"スタンダードプラン（フォーム添削や競技に関する悩み）"})).toBeVisible();
  await expect(page.getByText("おまかせ")).toHaveCount(0);
  await expect(page.getByText("コーチを選ぶ")).toHaveCount(0);
  await expect(page.getByRole("radio")).toHaveCount(0);

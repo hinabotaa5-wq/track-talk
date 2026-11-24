@@ -46,7 +46,7 @@ export default function MyReviewRequestsPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">{L("1回プランの依頼")}</h1>
+      <h1 className="text-2xl font-bold">{L("スタンダードプランの依頼")}</h1>
       {requests.length === 0 ? (
         <p className="text-sm text-slate-200">{L("まだ依頼はありません。")}<Link href="/coaching" className="text-blue-300 underline">{L("コーチ一覧")}</Link>{L("から依頼できます。")}</p>
       ) : null}

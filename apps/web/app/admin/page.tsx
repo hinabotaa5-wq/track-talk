@@ -305,7 +305,7 @@ function DemoCodesAdmin({ token }: { token: string | null }) {
           コードを作る
         </button>
       </div>
-      <p className="text-xs text-slate-300">1つのコードは1人だけが使えます。相手に送り、「1回プランを申し込む」の画面で入れてもらいます。</p>
+      <p className="text-xs text-slate-300">1つのコードは1人だけが使えます。相手に送り、「スタンダードプランを申し込む」の画面で入れてもらいます。</p>
       {message ? <p className="text-sm text-slate-200">{message}</p> : null}
       <ul className="space-y-1 text-sm">
         {codes.map((c) => (
@@ -717,7 +717,7 @@ export default function AdminPage() {
       {tab === "coaches" ? <CoachesAdmin token={token} /> : null}
       {tab === "personal" ? <><CoachingContractsAdmin token={token} />
               <Link href="/admin/coaching/reconciliation" className="block text-sm text-blue-300 underline">コーチングの会計照合</Link><Link href="/admin/coaching/tickets" className="block text-sm text-blue-300 underline">チケット購入・返金管理</Link><Link href="/admin/coaching/consultations" className="block text-sm text-blue-300 underline">追加相談・返金管理</Link><Link href="/admin/coaching/identity" className="block text-sm text-blue-300 underline">コーチの特商法の登録情報</Link></> : null}
-      {tab === "payouts" ? <><Link href="/admin/coaching/payments" className="block text-sm text-blue-300 underline">1回プラン・追加質問の返金管理</Link><PayoutsAdmin token={token} /></> : null}
+      {tab === "payouts" ? <><Link href="/admin/coaching/payments" className="block text-sm text-blue-300 underline">スタンダードプラン・追加質問の返金管理</Link><PayoutsAdmin token={token} /></> : null}
       {tab === "menu" ? <MenuContestAdmin token={token} /> : null}
       {tab === "meets" ? <MeetSessionsAdmin token={token} /> : null}
       {tab === "stats" ? <AdminStatsView token={token} /> : null}

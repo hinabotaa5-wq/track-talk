@@ -51,14 +51,32 @@ it("旧商品の追加相談の経過措置と、現行の追加質問・継続�
   const terms = renderToStaticMarkup(<TermsPage />);
   expect(article(terms, 6)).toContain("販売を終了した旧商品の「追加相談」を、その販売の終了前に購入していた場合は、購入時の条件のとおり扱います（旧商品の「追加相談」は、この項の追加質問とは別の商品です）。");
   const art8 = article(terms, 8);
-  expect(art8).toContain("1ヶ月プラン（7の2に定めるもの）以外の継続プランについてコーチが料金を設定した場合の追加相談（以下この条で「継続プランの追加相談」といい、第6条の1回プランの追加質問とは別のものです。");
+  expect(art8).toContain("1ヶ月プラン（7の2に定めるもの）以外の継続プランについてコーチが料金を設定した場合の追加相談（以下この条で「継続プランの追加相談」といい、第6条のスタンダードプランの追加質問とは別のものです。");
   // 1ヶ月プランには追加相談がない（本体 #719 運営者決定 2026-11-15）。
   expect(art8).toContain("1ヶ月プランには追加相談はありません。期間中の動画への返答や相談は、プランの料金に含まれます。");
   expect(art8).not.toContain("継続プランの契約に付随する追加相談");
   expect(art8).toContain("継続プランの追加相談の料金はコーチが決め");
   const art3 = article(renderToStaticMarkup(<PrivacyPolicy />), 3);
-  expect(art3).toContain("1回プランとその追加質問（販売を終了した旧商品の「追加相談」を含みます。以下この段落で同じです）の動画のファイル");
+  expect(art3).toContain("スタンダードプランとその追加質問（販売を終了した旧商品の「追加相談」を含みます。以下この段落で同じです）の動画のファイル");
   expect(art3).toContain("追加質問のやりとりが終わる時は");
-  expect(art3).toContain("継続プランの契約に付随する追加相談（1回プランの追加質問とは別のものです）の動画のファイル");
+  expect(art3).toContain("継続プランの契約に付随する追加相談（スタンダードプランの追加質問とは別のものです）の動画のファイル");
   expect(art3).not.toContain("フォーム添削とその追加相談");
+});
+
+// 本体 #1007 B6：継続プランは休眠。利用ガイド・ガイドライン・コーチ機能について・利用規約第2条に「継続プランは準備中です」式の提示を出さない。
+it("利用ガイド・ガイドライン・コーチ機能について・利用規約第2条に、継続プランを準備中と示す提示文が無い", () => {
+  const guide = renderToStaticMarkup(<GuideView />);
+  const guidelines = renderToStaticMarkup(<GuidelinesView />);
+  const about = renderToStaticMarkup(<CoachAboutView />);
+  const terms2 = article(renderToStaticMarkup(<TermsPage />), 2);
+  for (const html of [guide, guidelines, about, terms2]) {
+    expect(html).not.toMatch(/継続プラン[^。]*準備中/);
+    expect(html).not.toContain("1回プラン");
+  }
+  expect(guide).toContain("スタンダードプランは開始していて、コーチを選んで申し込めます。チケットの購入もできます。");
+  expect(guidelines).toContain("スタンダードプランは開始していて、申込みとチケットの購入ができます。");
+  // 直接取引禁止の範囲は狭めない（「継続プランと同じ内容の指導」は残す）。
+  expect(guidelines).toContain("スタンダードプランや継続プランと同じ内容の指導を、TrackTalkを通さずに直接取引しないでください。");
+  expect(about).toContain("コーチを募集しています。スタンダードプランは開始していて、申込みとチケットの購入ができます。");
+  expect(terms2).toContain("本サービスでは、スタンダードプラン（フォーム添削や競技に関する悩み）を提供しています。");
 });

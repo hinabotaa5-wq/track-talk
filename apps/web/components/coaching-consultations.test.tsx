@@ -62,7 +62,7 @@ it("販売終了前に作られた支払い前の追加質問は、支払いへ�
  expect(container.querySelector('input[type="checkbox"]')).toBeNull();
  expect(button("支払い前の質問を取り下げる")).toBeTruthy();
 });
-it("1回プランの選手画面には、新しい追加質問の入力欄・価格・購入前チェック・支払い案内を出さない", async () => {
+it("スタンダードプランの選手画面には、新しい追加質問の入力欄・価格・購入前チェック・支払い案内を出さない", async () => {
  await render({ ...room, funding: "cash", minor: true, consultations: [{ ...draft, id: "a1", status: "answered", answer: "回答", answered_at: "2026-11-14T02:00:00Z" }] });
  expect(container.querySelector("textarea")).toBeNull();
  expect(container.querySelector('input[type="checkbox"]')).toBeNull();

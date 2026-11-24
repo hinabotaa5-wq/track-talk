@@ -15,7 +15,6 @@ import { useLocale } from "@/components/locale-provider";
 import type {
   CoachApplication,
   CoachEarnings,
-  CoachIdentityStatus,
   CoachingContract,
   CoachRequests,
 } from "@/lib/types";
@@ -24,8 +23,6 @@ import {
   BellRing,
   FileText,
   Inbox,
-  Landmark,
-  Layers,
   MessageSquareText,
   MessagesSquare,
   PenLine,
@@ -44,15 +41,6 @@ type ConsultationRow = {
   id: string;
   status: string;
 };
-
-// 身元登録の状態は、既存バッジの取得とは別枠で取る。取れなければ点を出さない。
-async function fetchIdentityStatus(token: string | null): Promise<CoachIdentityStatus | null> {
-  try {
-    return await apiFetch<CoachIdentityStatus>("/v1/coach/me/identity-status", { token });
-  } catch {
-    return null;
-  }
-}
 
 function Tile({
   href,
@@ -159,7 +147,6 @@ export function CoachDashboard() {
   const [consultations, setConsultations] = useState(0);
   const [appliedContracts, setAppliedContracts] = useState(0);
   const [earnings, setEarnings] = useState<CoachEarnings | null>(null);
-  const [identity, setIdentity] = useState<CoachIdentityStatus | null>(null);
   const [error, setError] = useState("");
   const { pending, acquire, release } = useActionLock();
 
@@ -203,9 +190,6 @@ export function CoachDashboard() {
         if (!cancelled) setEarnings(d);
       })
       .catch(() => {});
-    void fetchIdentityStatus(token).then((d) => {
-      if (!cancelled) setIdentity(d);
-    });
     return () => {
       cancelled = true;
     };
@@ -254,7 +238,6 @@ export function CoachDashboard() {
   );
 
   const reviewingCount = offers?.reviewing.length ?? 0;
-  const commerceDot = identity !== null && identity.registered === false && identity.applies === true;
   const payoutsDot = !coach.payouts_ready;
   const [, payoutMonth, payoutDay] = earnings?.next_payout_date?.split("-") ?? [];
 
@@ -294,9 +277,7 @@ export function CoachDashboard() {
         <Tile locale={locale} href="/coach/reviewing" label={t(locale, "coach.tile.reviewing")} Icon={PenLine} badge={reviewingCount} />
         <Tile locale={locale} href="/coach/consultations" label={t(locale, "coach.tile.consultations")} Icon={MessagesSquare} badge={consultations} />
         <Tile locale={locale} href="/coach/contracts" label={t(locale, "coach.tile.contracts")} Icon={FileText} badge={appliedContracts} />
-        <Tile locale={locale} href="/coach/support-consults" label={t(locale, "coach.tile.supportConsults")} Icon={MessagesSquare} />
-        <Tile locale={locale} href="/coach/plans" label={t(locale, "coach.tile.plans")} Icon={Layers} />
-        <Tile locale={locale} href="/coach/commerce" label={t(locale, "coach.tile.commerce")} Icon={Landmark} dot={commerceDot} />
+        {/* 継続プランは休眠させたので（本体 #1007）、届いた相談・継続プラン・特商法・身元のタイルは出さない。各ルートは残す。 */}
         <Tile locale={locale} href="/coach/payouts" label={t(locale, "coach.tile.payouts")} Icon={Wallet} dot={payoutsDot} />
         <Tile locale={locale} href="/coach/profile" label={t(locale, "coach.tile.profile")} Icon={UserRound} />
         <Tile locale={locale} href="/me/push" label={t(locale, "coach.tile.push")} Icon={BellRing} />

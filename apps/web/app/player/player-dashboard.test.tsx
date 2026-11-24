@@ -54,20 +54,19 @@ const counts = (c: Partial<Record<"one" | "personal" | "support" | "ticket", num
 });
 const badges = () => tiles().map((a) => a.querySelector("span[aria-hidden]")?.textContent ?? null);
 const labels = () => tiles().map((a) => a.querySelector(".coach-tile-label")?.textContent);
-const hrefs = ["/me/coaching/requests", "/me/coaching/personal", "/coaching/support-consults", "/me/coaching/tickets", "/me/push"];
+const hrefs = ["/me/coaching/requests", "/me/coaching/tickets", "/me/push"];
 const badgeClass = "absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white";
 
-it("ログイン済みでは見出し『選手』と5つのタイルが順番どおりに出る", async () => {
+it("ログイン済みでは見出し『選手』と3つのタイル（スタンダードプラン・チケット・通知）が順番どおりに出る（本体 #1007 B4）", async () => {
   await render();
   expect(container.querySelector("h1")?.textContent).toBe("選手");
-  expect(tiles().map((a) => a.textContent)).toEqual(["1回プラン", "継続プラン", "無料相談", "チケット", "通知"]);
-  expect(tiles().map((a) => a.getAttribute("href"))).toEqual([
-    "/me/coaching/requests",
-    "/me/coaching/personal",
-    "/coaching/support-consults",
-    "/me/coaching/tickets",
-    "/me/push",
-  ]);
+  expect(tiles().map((a) => a.textContent)).toEqual(["スタンダードプラン", "チケット", "通知"]);
+  expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
+  // 継続プランは休眠。継続プラン・無料相談のタイルは出さない。
+  expect(container.querySelector('a[href="/me/coaching/personal"]')).toBeNull();
+  expect(container.querySelector('a[href="/coaching/support-consults"]')).toBeNull();
+  expect(container.textContent).not.toContain("継続プラン");
+  expect(container.textContent).not.toContain("無料相談");
   expect(navigation.replace).not.toHaveBeenCalled();
 });
 
@@ -83,7 +82,7 @@ it("タイルはコーチ画面と同じ .coach-tiles > nav の構造で、3列�
   expect(nav.className).not.toContain("grid-cols-3");
   expect(nav.getAttribute("aria-label")).toBe("選手");
   const links = [...nav.children];
-  expect(links).toHaveLength(5);
+  expect(links).toHaveLength(3);
   for (const tile of links) {
     expect(tile.tagName).toBe("A");
     expect(tile.className).toContain("aspect-square");
@@ -96,7 +95,7 @@ it("タイルはコーチ画面と同じ .coach-tiles > nav の構造で、3列�
 it("タイルのラベルはコーチ側と同じ coach-tile-label を持ち、折り返さず、タイルに固定の大きさは無い（#940）", async () => {
   await render();
   const labels = [...container.querySelectorAll(".coach-tiles > nav > a > span.coach-tile-label")];
-  expect(labels).toHaveLength(5);
+  expect(labels).toHaveLength(3);
   for (const label of labels) {
     expect(label.className).toBe("coach-tile-label whitespace-nowrap text-[11px] font-semibold leading-tight");
   }
@@ -106,11 +105,11 @@ it("タイルのラベルはコーチ側と同じ coach-tile-label を持ち、�
 });
 
 // #1003：#940 の「タイルにバッジ・ドットは出ない」を置き換え。件数の無いときは出ないことを、モックした件数で確かめる。
-it("件数があるタイルにだけ、その数字の赤バッジが出る（無料相談・通知タイルには出ない）", async () => {
+it("件数があるタイルにだけ、その数字の赤バッジが出る（通知タイルには出ない。継続プラン・無料相談の件数はタイルが無いので出ない）", async () => {
   apiFetch.mockResolvedValue(counts({ one: 2, personal: 1, support: 0, ticket: 3 }));
   await render();
   expect(apiFetch).toHaveBeenCalledWith("/v1/me/coaching/action-counts", { token: "tok" });
-  expect(badges()).toEqual(["2", "1", null, "3", null]);
+  expect(badges()).toEqual(["2", "3", null]);
   for (const tile of tiles()) {
     const badge = tile.querySelector("span[aria-hidden]");
     if (badge) expect(badge.className).toBe(badgeClass);
@@ -118,7 +117,7 @@ it("件数があるタイルにだけ、その数字の赤バッジが出る（�
     expect(tile.querySelectorAll("span").length).toBeLessThanOrEqual(2);
   }
   // 順序・行き先・ラベルは従来どおり。
-  expect(labels()).toEqual(["1回プラン", "継続プラン", "無料相談", "チケット", "通知"]);
+  expect(labels()).toEqual(["スタンダードプラン", "チケット", "通知"]);
   expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
 });
 
@@ -131,7 +130,7 @@ it("件数は丸めずにそのまま出す（99+ にしない）", async () => 
 it("件数が全て 0 のときはバッジを出さず、タイルはラベルのみ", async () => {
   await render();
   expect(apiFetch).toHaveBeenCalledTimes(1);
-  expect(badges()).toEqual([null, null, null, null, null]);
+  expect(badges()).toEqual([null, null, null]);
   for (const tile of tiles()) {
     expect(tile.querySelectorAll("span")).toHaveLength(1);
     expect(tile.getAttribute("aria-label")).toBeNull();
@@ -142,9 +141,9 @@ it("件数が全て 0 のときはバッジを出さず、タイルはラベル�
 it("取得に失敗してもバッジを出さないだけで、タイルは従来どおり表示・遷移できる", async () => {
   apiFetch.mockRejectedValue(new Error("boom"));
   await render();
-  expect(badges()).toEqual([null, null, null, null, null]);
+  expect(badges()).toEqual([null, null, null]);
   expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
-  expect(labels()).toEqual(["1回プラン", "継続プラン", "無料相談", "チケット", "通知"]);
+  expect(labels()).toEqual(["スタンダードプラン", "チケット", "通知"]);
   expect(navigation.replace).not.toHaveBeenCalled();
 });
 
@@ -152,11 +151,11 @@ it("タイルは件数の取得を待たずに出し、届いたらバッジが�
   let resolve: (v: unknown) => void = () => {};
   apiFetch.mockReturnValue(new Promise((r) => { resolve = r; }));
   await render();
-  expect(tiles()).toHaveLength(5);
+  expect(tiles()).toHaveLength(3);
   expect(container.querySelector(".page-loading-screen")).toBeNull();
-  expect(badges()).toEqual([null, null, null, null, null]);
-  await act(async () => { resolve(counts({ personal: 4 })); await Promise.resolve(); });
-  expect(badges()).toEqual([null, "4", null, null, null]);
+  expect(badges()).toEqual([null, null, null]);
+  await act(async () => { resolve(counts({ ticket: 4 })); await Promise.resolve(); });
+  expect(badges()).toEqual([null, "4", null]);
 });
 
 it("画面の再表示（visibilitychange／focus）で取り直す", async () => {
@@ -165,7 +164,7 @@ it("画面の再表示（visibilitychange／focus）で取り直す", async () =
   apiFetch.mockResolvedValue(counts({ ticket: 1 }));
   await act(async () => { document.dispatchEvent(new Event("visibilitychange")); await Promise.resolve(); });
   expect(apiFetch).toHaveBeenCalledTimes(2);
-  expect(badges()).toEqual([null, null, null, "1", null]);
+  expect(badges()).toEqual([null, "1", null]);
   await act(async () => { window.dispatchEvent(new Event("focus")); await Promise.resolve(); });
   expect(apiFetch).toHaveBeenCalledTimes(3);
 });
@@ -175,13 +174,13 @@ it("token が無いときは取得せず、バッジも出さない", async () =
   apiFetch.mockResolvedValue(counts({ one: 5 }));
   await render();
   expect(apiFetch).not.toHaveBeenCalled();
-  expect(badges()).toEqual([null, null, null, null, null]);
+  expect(badges()).toEqual([null, null, null]);
 });
 
 it("件数があるタイルの aria-label は「{ラベル}（{件数}件）」、0件タイルはラベルのみ", async () => {
   apiFetch.mockResolvedValue(counts({ one: 2, ticket: 3 }));
   await render();
-  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["1回プラン（2件）", null, null, "チケット（3件）", null]);
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["スタンダードプラン（2件）", "チケット（3件）", null]);
 });
 
 it("英語では aria-label が \"{label} ({count})\" になる", async () => {
@@ -189,7 +188,7 @@ it("英語では aria-label が \"{label} ({count})\" になる", async () => {
   setActiveLocale("en");
   apiFetch.mockResolvedValue(counts({ one: 2, ticket: 3 }));
   await render();
-  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["One-time Plan (2)", null, null, "Tickets (3)", null]);
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["Standard Plan (2)", "Tickets (3)", null]);
 });
 
 it("未ログインでは /login?next=/player へ寄せ、タイルを出さない", async () => {
@@ -214,5 +213,5 @@ it("英語ではタイル名が既存キーの訳になる", async () => {
   setActiveLocale("en");
   await render();
   expect(container.querySelector("h1")?.textContent).toBe("Athlete");
-  expect(tiles().map((a) => a.textContent)).toEqual(["One-time Plan", "Ongoing plan", "Free consults", "Tickets", "Notifications"]);
+  expect(tiles().map((a) => a.textContent)).toEqual(["Standard Plan", "Tickets", "Notifications"]);
 });

@@ -1,7 +1,6 @@
 "use client";
 import { L } from "@/lib/i18n";
 
-import { SupportPlanCoachTerms } from "@/components/support-plan-coach-terms";
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
@@ -202,7 +201,6 @@ export default function CoachApplyPage() {
         <form onSubmit={onSubmit} className="space-y-5">
           <p className="text-sm text-slate-200">{L("コーチの仕事内容や報酬など、コーチ機能の詳細は")}<Link href="/coach/about" replace className="text-blue-300 underline">{L("コーチ機能について")}</Link>{L("で確認できます。")}</p>
           <p className="text-sm text-slate-200">{L("TrackTalk で知り合った選手を LINE・SNS など外の連絡手段へ誘うこと、連絡先を交換すること、TrackTalk を通さずに直接取引することは禁止されています。")}</p>
-          <SupportPlanCoachTerms />
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">{L("名前")}</span>
             <Input value={draft.name} maxLength={80} autoComplete="name" required
