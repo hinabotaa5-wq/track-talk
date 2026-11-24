@@ -668,7 +668,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (loading) return;
     if (!session) router.replace("/login");
-    else if (!profile?.is_admin) router.replace("/");
+    else if (!profile?.is_admin) router.replace("/coaching");
   }, [loading, session, profile, router]);
 
   if (loading || !isAdmin) {

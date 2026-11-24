@@ -8,7 +8,7 @@ import { readAccountOrigin } from "@/lib/account-origin";
 import { mainTabLabel, t } from "@/lib/i18n";
 import { lastTabChangedEvent, readLastTab } from "@/lib/last-tab";
 import { usePathname } from "next/navigation";
-import { createLucideIcon, GraduationCap, HeartPulse, LayoutGrid, Trophy, UserRound } from "lucide-react";
+import { createLucideIcon, GraduationCap, HeartPulse, Trophy, UserRound } from "lucide-react";
 import { useGuardedLinkClick } from "./leave-guard";
 import { useAuth } from "./auth-provider";
 import { isInjuryBodyPart } from "@/lib/injury";
@@ -28,7 +28,6 @@ const MemoIcon = createLucideIcon("memo", [
 export const mainTabs = [
   { id: "coaching", href: "/coaching", get label() { return L("コーチ"); }, icon: GraduationCap },
   { id: "memo", href: "/memo", get label() { return L("メモ"); }, icon: MemoIcon },
-  { id: "home", href: "/", get label() { return L("フィード"); }, icon: LayoutGrid },
   { id: "competitions", href: "/competitions", get label() { return L("大会"); }, icon: Trophy },
   { id: "injury", href: "/injury", get label() { return L("ケガ"); }, icon: HeartPulse },
 ] as const;
@@ -38,7 +37,8 @@ export const mainTabs = [
 // マイページは下のメニューではなく、ヘッダー右上のアイコンから開く。
 const meTab = { id: "me", href: "/me", get label() { return L("マイページ"); }, icon: UserRound } as const;
 
-export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me", signedIn: boolean) {
+// フィードは当面閉じている（#1008）。"home" はタブに無いが、互換のため引数型に残し、該当タブが無いときの "/" を返す。
+export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me" | "home", signedIn: boolean) {
   const tab = id === "me" ? meTab : mainTabs.find((item) => item.id === id);
   if (!tab) return "/";
   // ログインが要るのはマイページだけ。メモはログインなしでも見られ、書こうとしたときにログインへ案内する。
@@ -125,7 +125,7 @@ export function headerBackFallback(pathname: string) {
   if (pathname.startsWith("/competitions/")) return "/competitions";
   if (pathname.startsWith("/me/")) return "/me";
   if (pathname === "/referral" || pathname === "/player") return "/coaching";
-  return "/";
+  return "/coaching";
 }
 
 // ヘッダーを「戻る」ボタンだけにする画面。ロゴ・大会などのメニュー・通知は出さない。
@@ -206,7 +206,7 @@ export function BottomNav() {
         aria-label={t(locale, "nav.main")}
         data-main-nav=""
       >
-        <ul className="mx-auto grid h-14 max-w-5xl grid-cols-5">
+        <ul className="mx-auto grid h-14 max-w-5xl grid-cols-4">
           {mainTabs.map((tab) => {
             const Icon = tab.icon;
             const active = current === tab.id;

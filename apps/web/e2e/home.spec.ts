@@ -2,29 +2,39 @@ import { devices, expect, test } from "@playwright/test";
 
 
 
-test("フィードの見出しとモバイルナビを表示する", async ({ page }) => {
+// フィードは当面閉じる（#1008）。/ はクエリ付きも含めて /coaching へリダイレクトし、下部バーは4タブ。
+// Next の redirects はクエリを引き継ぐため、着地の判定は pathname だけで行う（/coaching は sort 等を読まない）。
+for (const path of ["/", "/?sort=new"]) {
+  test(`${path} を開くとコーチに着地し、フィードは表示しない`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 664 });
+    await page.goto(path);
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/coaching");
+    await expect(page.getByRole("heading", { name: "フィード", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "投稿一覧", exact: true })).toHaveCount(0);
+  });
+}
+
+test("ヘッダーとモバイルナビを4タブで表示する", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 664 });
-  await page.goto("/?sort=new");
+  await page.goto("/coaching");
   await expect(page.getByRole("link", { name: "TrackTalk", exact: true })).toBeVisible();
   // 本体 #629：ご意見の左の Instagram（別タブの外部リンク）。
   await expect(page.getByRole("link", { name: "Instagram（@tracktalk.office）" })).toBeVisible();
   // 下のメニューから主な画面へ行ける。
   const nav = page.getByRole("navigation", { name: "メイン" });
-  await expect(nav.getByRole("link")).toHaveText(["コーチ", "メモ", "フィード", "大会", "ケガ"]);
-  await expect(nav.getByRole("link", { name: "フィード", exact: true })).toHaveAttribute("href", "/");
-  await expect(page.getByRole("heading", { name: "フィード", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link")).toHaveText(["コーチ", "メモ", "大会", "ケガ"]);
+  await expect(nav.getByRole("link", { name: "フィード", exact: true })).toHaveCount(0);
 });
 
 test.describe("英語のデスクトップナビ", () => {
   test.use({ locale: "en-US", viewport: { width: 1280, height: 720 } });
 
-  test("Feed を3番目に表示する", async ({ page }) => {
-    await page.goto("/?sort=new");
+  test("Feed を出さず4タブで表示する", async ({ page }) => {
+    await page.goto("/coaching");
     const nav = page.locator("header nav[data-main-nav]");
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveText(["Coach", "Notes", "Feed", "Meets", "Injury"]);
-    await expect(nav.getByRole("link", { name: "Feed", exact: true })).toHaveAttribute("href", "/");
-    await expect(page.getByRole("heading", { name: "Feed", exact: true })).toBeVisible();
+    await expect(nav.getByRole("link")).toHaveText(["Coach", "Notes", "Meets", "Injury"]);
+    await expect(nav.getByRole("link", { name: "Feed", exact: true })).toHaveCount(0);
   });
 });
 
@@ -35,7 +45,8 @@ test("legal pages are reachable", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "プライバシーポリシー" })).toBeVisible();
 });
 
-test.describe("iPhone 相当のフィード", () => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.describe.skip("iPhone 相当のフィード", () => {
   test.use({
     viewport: { width: 390, height: 664 },
     userAgent: devices["iPhone 13"].userAgent,

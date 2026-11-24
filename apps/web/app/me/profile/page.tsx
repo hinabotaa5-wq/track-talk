@@ -66,7 +66,7 @@ export default function ProfilePage() {
       if (firstTime) trackEvent("onboarding_completed");
       await refreshProfile();
       if (firstTime) {
-        router.replace("/");
+        router.replace("/coaching");
         return;
       }
       setMessage(t(locale, "profile.saved"));

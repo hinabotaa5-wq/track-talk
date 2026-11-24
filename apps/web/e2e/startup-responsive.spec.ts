@@ -8,7 +8,8 @@ async function hideDevOverlay(page: Page) {
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
 }
 
-test("起動直後の通信が終わらなくても投稿ボタンが表示され、ホームのタブを切り替えられる", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("起動直後の通信が終わらなくても投稿ボタンが表示され、ホームのタブを切り替えられる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const pending: (() => void)[] = [];
   await page.route("**/v1/**", async (route) => {
@@ -33,7 +34,8 @@ test("起動直後の通信が終わらなくても投稿ボタンが表示さ�
   }
 });
 
-test("タブの移動に時間がかかるあいだは画面に読み込み表示を出し、待っている間も別のタブへ移れる", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("タブの移動に時間がかかるあいだは画面に読み込み表示を出し、待っている間も別のタブへ移れる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   let release: (() => void) | undefined;
   await page.route("**/competitions?*", async (route) => {
@@ -63,7 +65,8 @@ test("タブの移動に時間がかかるあいだは画面に読み込み表�
   }
 });
 
-test("投稿ボタンからの移動が遅くても、押した直後に待機表示が出る", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("投稿ボタンからの移動が遅くても、押した直後に待機表示が出る", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const pending: (() => void)[] = [];
   await page.route("**/login?*", async (route) => {

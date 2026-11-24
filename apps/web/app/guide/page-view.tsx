@@ -3,7 +3,6 @@
 import { L } from "@/lib/i18n";
 import Link from "next/link";
 import { Rule } from "@/components/legal-prose";
-import { postOptions } from "@/lib/post-options";
 import { senseSummaryEnabled } from "@/lib/features";
 import { CoachApplyLink } from "@/components/coach-apply-link";
 
@@ -13,19 +12,8 @@ export function GuideView() {
     <div className="mx-auto max-w-2xl space-y-7">
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">{L("TrackTalkの利用ガイド")}</h1>
-        <p className="text-sm leading-relaxed text-slate-300">{L("陸上の話をしたいとき、大会を探すとき、練習の気づきを残したいときに。下の5つのタブから使えます。")}</p>
+        <p className="text-sm leading-relaxed text-slate-300">{L("陸上の話をしたいとき、大会を探すとき、練習の気づきを残したいときに。下の4つのタブから使えます。")}</p>
       </div>
-      <Rule title={L("フィード：投稿を見て、話す")}>
-        <p>{L("「新しい」「人気」「募集」「レビュー」を切り替えて探します。投稿一覧は左右にスワイプでき、虫眼鏡からキーワードで検索できます。")}</p>
-        <p>{L("写真や動画がある投稿は、画像の下部に詳細文を重ねて表示します。文字の背景をぼかして読みやすくしています。カードを押すと詳細文、その下に写真や動画、コメントが開き、コメントのカードを押すとその会話に入れます。自分のコメントを長押しすると、編集や削除などの操作を選べます。")}</p>
-        <p>{L("フィードの「＋」から投稿の種類を選べます。投稿・いいね・保存・コメントにはログインが必要です。")}</p>
-        <ul className="space-y-3">
-          {postOptions.map(({ href, title, body, icon: Icon }) => <li key={href} className="flex items-start gap-2">
-            <Icon className="mt-0.5 size-5 shrink-0 text-blue-300" aria-hidden />
-            <span><strong>{title}</strong>{L("：")}{body}</span>
-          </li>)}
-        </ul>
-      </Rule>
       <Rule title={L("大会：日程と実況を探す")}>
         <p>{L("月や地域を選んで大会を探します。詳しい開催情報は主催者の案内を確認してください。今日開催中の大会があるときは、ヘッダーのトロフィーから実況スレッドを開けます。")}</p>
       </Rule>

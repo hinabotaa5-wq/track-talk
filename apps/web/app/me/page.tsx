@@ -77,7 +77,7 @@ export default function MePage() {
         // SDK は通信エラーでも端末のセッションを削除する。残っている場合だけ再試行を案内する。
         if (error && (await supabase.auth.getSession()).data.session) throw error;
       });
-      router.replace("/");
+      router.replace("/coaching");
       router.refresh();
     } catch {
       leaving.current = false;
