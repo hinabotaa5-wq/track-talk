@@ -268,11 +268,13 @@ func TestAbsenceDoesNotWithholdMonthlyAdvance(t *testing.T) {
 	h, _ := setupStripe(t)
 	_, _, contract := paidConsultContract(t, h, 0, 30)
 	// 前の月の末日までに10日経過（開始は月初の10日前）。うち3日（開始から5〜7日目）が合意した不在日。
+	// 終了予定（ends_at）は翌月11日 0:00 JST に置き、何日に実行しても tick の時点で期間中のままにする（本体 #999）。
+	// 仮払いの日割りは starts_at と competition_date から計算し、ends_at は金額に影響しない。
 	execSQLArgs(t, `UPDATE coaching_contracts SET
 		starts_at=(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo')::date - 10 + time '09:00') AT TIME ZONE 'Asia/Tokyo',
 		competition_date=date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo')::date - 10 + 29,
 		absence_from=date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo')::date - 6, absence_return_on=date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo')::date - 3, absence_days=3,
-		ends_at=((date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo')::date - 10 + 30 + 3)::timestamp AT TIME ZONE 'Asia/Tokyo') WHERE id=$1`, contract)
+		ends_at=((date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') + interval '1 month 10 days') AT TIME ZONE 'Asia/Tokyo') WHERE id=$1`, contract)
 	execSQLArgs(t, `INSERT INTO coaching_messages(id,contract_id,sender_role,body) VALUES(gen_random_uuid(),$1,'coach','よろしくお願いします')`, contract)
 	if r := tick(t, h, "tick-secret"); r.Code != http.StatusOK {
 		t.Fatal(r.Body.String())
