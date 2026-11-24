@@ -3,38 +3,96 @@ import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
 import { useAuth } from "@/components/auth-provider";
+import { apiFetch } from "@/lib/api";
 import { BellRing, ClipboardCheck, MessagesSquare, Ticket, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 // 選手用ページ。コーチ画面（/coach）に合わせ、タイルを並べたダッシュボード形式にする。
-// タイルは静的リンクのみで、件数などのデータ取得は行わない（バッジ・ドットも付けない）。
+// 運営者決定（2026-11-24、本体 #1003）：コーチ画面と同様に、行き先のタイルごとに件数バッジを付ける。
+// 件数は円ボタンと同じ GET /v1/me/coaching/action-counts のタイル別の4フィールド（player_count をタイルごとに分けたもの）で、
+// ログイン中だけ、マウント時と画面の再表示時（visibilitychange で visible／focus）に取り直す。取得を待たずにタイルは出し、
+// 失敗したらバッジを出さないだけ。通知タイル（通知設定）にはバッジを付けない。ドット（オレンジ点）は選手側には付けない。
 // タイル内部の見た目（アイコン・ラベル・角丸・間隔）はコーチ画面と同じ `.coach-tiles` の CSS 規則に乗せて揃える。
 // コーチ画面の縦の余り配分（CoachTiles の ResizeObserver）は持ち込まない（#940）。
-const tiles: { href: string; label: string; Icon: LucideIcon }[] = [
-  { href: "/me/coaching/requests", label: "1回プラン", Icon: ClipboardCheck },
-  { href: "/me/coaching/personal", label: "継続プラン", Icon: Users },
-  { href: "/coaching/support-consults", label: "無料相談", Icon: MessagesSquare },
-  { href: "/me/coaching/tickets", label: "チケット", Icon: Ticket },
+type CountKey = "player_one_time_count" | "player_personal_count" | "player_support_count" | "player_ticket_count";
+type TileCounts = Partial<Record<CountKey, number>>;
+
+const tiles: { href: string; label: string; Icon: LucideIcon; countKey?: CountKey }[] = [
+  { href: "/me/coaching/requests", label: "1回プラン", Icon: ClipboardCheck, countKey: "player_one_time_count" },
+  { href: "/me/coaching/personal", label: "継続プラン", Icon: Users, countKey: "player_personal_count" },
+  { href: "/coaching/support-consults", label: "無料相談", Icon: MessagesSquare, countKey: "player_support_count" },
+  { href: "/me/coaching/tickets", label: "チケット", Icon: Ticket, countKey: "player_ticket_count" },
   { href: "/me/push", label: "通知", Icon: BellRing },
 ];
 
-function Tile({ href, label, Icon }: { href: string; label: string; Icon: LucideIcon }) {
+function validCount(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+// 見た目はコーチ画面（/coach）の Tile と同一。件数はそのままの数字（99+ への丸めはしない）。
+function Tile({ href, label, Icon, badge }: { href: string; label: string; Icon: LucideIcon; badge: number }) {
+  const ariaLabel = badge > 0 ? L("{label}（{count}件）", { label, count: badge }) : undefined;
   return (
     <Link
       href={href}
+      aria-label={ariaLabel}
       className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-white/20 bg-white/10 px-1 py-3 text-center transition active:scale-[0.98]"
     >
       <Icon className="size-6" aria-hidden />
       <span className="coach-tile-label whitespace-nowrap text-[11px] font-semibold leading-tight">{label}</span>
+      {badge > 0 ? (
+        <span
+          aria-hidden
+          className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white"
+        >
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
 
 export function PlayerDashboard() {
-  const { session, loading } = useAuth();
+  const { session, loading, token } = useAuth();
   const router = useRouter();
+  const [loaded, setCounts] = useState<TileCounts>({});
+  // ログアウトしたら、前の件数を残さない。
+  const counts = token ? loaded : {};
+
+  useEffect(() => {
+    // 未ログインでは取得しない。取り直しのタイミングは円ボタン（coach-self-button）と同じ。
+    if (!token) return;
+    let alive = true;
+    const load = () => {
+      apiFetch<TileCounts>("/v1/me/coaching/action-counts", { token })
+        .then((data) => {
+          if (!alive) return;
+          setCounts({
+            player_one_time_count: validCount(data?.player_one_time_count),
+            player_personal_count: validCount(data?.player_personal_count),
+            player_support_count: validCount(data?.player_support_count),
+            player_ticket_count: validCount(data?.player_ticket_count),
+          });
+        })
+        // 失敗してもエラーは出さない。バッジを出さないだけで、タイルの表示・遷移は妨げない。
+        .catch(() => {
+          if (alive) setCounts({});
+        });
+    };
+    const refresh = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    load();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -49,8 +107,8 @@ export function PlayerDashboard() {
       <h1 className="text-2xl font-bold">{L("選手")}</h1>
       <div className="coach-tiles">
         <nav aria-label={L("選手")} className="grid gap-2">
-          {tiles.map(({ href, label, Icon }) => (
-            <Tile key={href} href={href} label={L(label)} Icon={Icon} />
+          {tiles.map(({ href, label, Icon, countKey }) => (
+            <Tile key={href} href={href} label={L(label)} Icon={Icon} badge={countKey ? counts[countKey] ?? 0 : 0} />
           ))}
         </nav>
       </div>

@@ -334,6 +334,11 @@ func TestCircleMigrationBackfillAndDown(t *testing.T) {
 type actionCountsView struct {
 	PlayerCount *int64 `json:"player_count"`
 	CoachCount  *int64 `json:"coach_count"`
+	// 選手ページのタイル別（本体 #1003）。
+	PlayerOneTimeCount  *int64 `json:"player_one_time_count"`
+	PlayerPersonalCount *int64 `json:"player_personal_count"`
+	PlayerSupportCount  *int64 `json:"player_support_count"`
+	PlayerTicketCount   *int64 `json:"player_ticket_count"`
 }
 
 func actionSeed(t *testing.T, sql string, args ...any) {
@@ -521,10 +526,11 @@ func TestActionCountsNoCoachRowsAndAuth(t *testing.T) {
 	if code != http.StatusOK || got.PlayerCount == nil || got.CoachCount == nil || *got.PlayerCount != 1 || *got.CoachCount != 0 {
 		t.Fatalf("%d %+v", code, got)
 	}
-	if len(raw) != 2 {
+	// #1003 でタイル別の4キーが加わり6キー（player_count・coach_count の意味と値は不変）。
+	if len(raw) != 6 {
 		t.Fatalf("keys %v", raw)
 	}
-	for _, k := range []string{"player_count", "coach_count"} {
+	for _, k := range []string{"player_count", "coach_count", "player_one_time_count", "player_personal_count", "player_support_count", "player_ticket_count"} {
 		v, ok := raw[k]
 		if !ok {
 			t.Fatalf("missing %s", k)
@@ -536,4 +542,146 @@ func TestActionCountsNoCoachRowsAndAuth(t *testing.T) {
 	}
 	// 用事が何も無い利用者は 0 と 0。
 	wantActionCounts(t, h, token(t, uuid.New()), 0, 0)
+}
+
+// ---- 本体 #1003：選手ページのタイル別の件数 ----
+
+// タイル別の件数と player_count をまとめて確かめる。
+func wantPlayerTiles(t *testing.T, h http.Handler, tok string, player, oneTime, personal, support, ticket int64) {
+	t.Helper()
+	code, got, _ := getActionCounts(t, h, tok)
+	if code != http.StatusOK || got.PlayerCount == nil || got.PlayerOneTimeCount == nil || got.PlayerPersonalCount == nil ||
+		got.PlayerSupportCount == nil || got.PlayerTicketCount == nil {
+		t.Fatalf("action-counts %d %+v", code, got)
+	}
+	gotAll := []int64{*got.PlayerCount, *got.PlayerOneTimeCount, *got.PlayerPersonalCount, *got.PlayerSupportCount, *got.PlayerTicketCount}
+	want := []int64{player, oneTime, personal, support, ticket}
+	for i := range want {
+		if gotAll[i] != want[i] {
+			t.Fatalf("player/one_time/personal/support/ticket=%v want %v", gotAll, want)
+		}
+	}
+}
+
+// 細目1: 返却済みの依頼＋その review_returned 未読は1回プランに1。依頼詳細を開けば両方0。
+func TestPlayerTilesReturnedReview(t *testing.T) {
+	h := setup(t)
+	player, coach := uuid.New(), uuid.New()
+	tu := token(t, player)
+	id := circleReview(t, player, coach, "returned")
+	circleNotice(t, player, "review_returned", "player", "", &id)
+	wantPlayerTiles(t, h, tu, 1, 1, 0, 0, 0)
+	circleGet(t, h, tu, "/v1/coaching/requests/"+id.String())
+	wantPlayerTiles(t, h, tu, 0, 0, 0, 0, 0)
+}
+
+// 細目2: 差し戻しの依頼＋その未読は1回プランに1（二重にしない）。再提出で用事が消えても未読が残れば通知分で1。
+func TestPlayerTilesNeedsInfoNotDoubleCounted(t *testing.T) {
+	h := setup(t)
+	player, coach := uuid.New(), uuid.New()
+	tu := token(t, player)
+	id := circleReview(t, player, coach, "needs_info")
+	circleNotice(t, player, "review_info_request", "player", "", &id)
+	// URL だけで紐づく未読（# 付き）も同じ用事として二重にしない。
+	circleNotice(t, player, "message", "player", "/coaching/requests/"+id.String()+"#info", nil)
+	wantPlayerTiles(t, h, tu, 1, 1, 0, 0, 0)
+	actionSeed(t, `UPDATE review_requests SET status='queued', info_request=NULL, info_requested_at=NULL, info_from_status=NULL, resubmit_by=NULL WHERE id=$1`, id)
+	// 用事分は消え、未読2件が通知分として残る。
+	wantPlayerTiles(t, h, tu, 2, 2, 0, 0, 0)
+	circleGet(t, h, tu, "/v1/coaching/requests/"+id.String())
+	wantPlayerTiles(t, h, tu, 0, 0, 0, 0, 0)
+	// URL がちょうど /coaching/requests の未読も1回プラン。
+	circleNotice(t, player, "message", "player", "/coaching/requests", nil)
+	wantPlayerTiles(t, h, tu, 1, 1, 0, 0, 0)
+}
+
+// 細目3: accepted の契約＋その通知は継続プランに1。active な契約のチャット未読は1、契約画面を開けば0。
+func TestPlayerTilesContract(t *testing.T) {
+	h := setup(t)
+	coach, tc := approvedCoachWithServices(t, h, nil)
+	circleGet(t, h, tc, "/v1/coach/me")
+	player := uuid.New()
+	tu := token(t, player)
+	circleGet(t, h, tu, "/v1/me")
+	seedActionContract(t, player, coach, "accepted")
+	var id uuid.UUID
+	queryRowArgs(t, `SELECT id FROM coaching_contracts WHERE requester_id=$1`, []any{player}, &id)
+	url := "/coaching/personal/" + id.String()
+	circleNotice(t, player, "message", "player", url, nil)
+	wantPlayerTiles(t, h, tu, 1, 0, 1, 0, 0)
+	circleGet(t, h, tu, "/v1/coaching/contracts/"+id.String())
+	actionSeed(t, `UPDATE coaching_contracts SET status='active', starts_at=now(), ends_at=now()+interval '30 days' WHERE id=$1`, id)
+	wantPlayerTiles(t, h, tu, 0, 0, 0, 0, 0)
+	circleNotice(t, player, "message", "player", url+"#chat", nil)
+	wantPlayerTiles(t, h, tu, 1, 0, 1, 0, 0)
+	circleGet(t, h, tu, "/v1/coaching/contracts/"+id.String())
+	wantPlayerTiles(t, h, tu, 0, 0, 0, 0, 0)
+}
+
+// 細目4: proposed の無料相談＋その未読は無料相談に1（二重にしない）。提案の無い相談の未読も1。
+func TestPlayerTilesSupportConsult(t *testing.T) {
+	h := setup(t)
+	player, coach := uuid.New(), uuid.New()
+	tu := token(t, player)
+	seedActionSupport(t, player, coach, "proposed")
+	var id uuid.UUID
+	queryRowArgs(t, `SELECT id FROM support_consults WHERE athlete_id=$1`, []any{player}, &id)
+	circleNotice(t, player, "message", "player", "/coaching/support-consults/"+id.String(), nil)
+	wantPlayerTiles(t, h, tu, 1, 0, 0, 1, 0)
+	actionSeed(t, `UPDATE support_consults SET status='accepted' WHERE id=$1`, id)
+	// 提案が無い状態での未読は通知分として1。
+	wantPlayerTiles(t, h, tu, 1, 0, 0, 1, 0)
+	circleNotice(t, player, "message", "player", "/coaching/support-consults", nil)
+	wantPlayerTiles(t, h, tu, 2, 0, 0, 2, 0)
+}
+
+// 細目5: 紹介特典の未読はチケットに1、チケット画面を開けば0。/me＋「紹介特典：」の既存行も1。
+func TestPlayerTilesTicket(t *testing.T) {
+	h := setup(t)
+	player := uuid.New()
+	tu := token(t, player)
+	circleNotice(t, player, "message", "player", "/me/coaching/tickets", nil)
+	wantPlayerTiles(t, h, tu, 1, 0, 0, 0, 1)
+	circleGet(t, h, tu, "/v1/me/coaching/tickets")
+	wantPlayerTiles(t, h, tu, 0, 0, 0, 0, 0)
+	legacy := circleNotice(t, player, "message", "player", "/me", nil)
+	actionSeed(t, `UPDATE notifications SET title='紹介特典：チケット1枚' WHERE id=$1`, legacy)
+	wantPlayerTiles(t, h, tu, 1, 0, 0, 0, 1)
+	// 見出しが「紹介特典：」で始まらない /me の未読はチケットに入らない（player_count には入る）。
+	other := circleNotice(t, player, "message", "player", "/me", nil)
+	actionSeed(t, `UPDATE notifications SET title='お知らせ' WHERE id=$1`, other)
+	wantPlayerTiles(t, h, tu, 2, 0, 0, 0, 1)
+}
+
+// 細目6: URL がちょうど /me/coaching の未読はどのタイルにも入らず player_count にだけ入る。
+func TestPlayerTilesUnmatchedOnlyInPlayerCount(t *testing.T) {
+	h := setup(t)
+	player := uuid.New()
+	tu := token(t, player)
+	circleNotice(t, player, "message", "player", "/me/coaching", nil)
+	wantPlayerTiles(t, h, tu, 1, 0, 0, 0, 0)
+	// コーチ役割の通知・ベルの通知はタイルにも player_count にも入らない。
+	circleNotice(t, player, "message", "coach", "/coaching/personal/"+uuid.NewString(), nil)
+	circleNotice(t, player, "message", "", "/me/coaching/tickets", nil)
+	wantPlayerTiles(t, h, tu, 1, 0, 0, 0, 0)
+}
+
+// 細目7: 他人の用事・通知は数えない。用事（a）も各タイルに振り分ける。
+func TestPlayerTilesIgnoresOthers(t *testing.T) {
+	h := setup(t)
+	me, someone, coach := uuid.New(), uuid.New(), uuid.New()
+	tok := token(t, me)
+	rid := circleReview(t, someone, coach, "returned")
+	circleNotice(t, someone, "review_returned", "player", "", &rid)
+	seedActionReview(t, someone, coach, "awaiting_payment")
+	seedActionContract(t, someone, coach, "accepted")
+	seedActionSupport(t, someone, coach, "proposed")
+	circleNotice(t, someone, "message", "player", "/me/coaching/tickets", nil)
+	wantPlayerTiles(t, h, tok, 0, 0, 0, 0, 0)
+	wantPlayerTiles(t, h, token(t, someone), 5, 2, 1, 1, 1)
+
+	seedActionReview(t, me, coach, "awaiting_payment")
+	seedActionContract(t, me, coach, "accepted")
+	seedActionSupport(t, me, coach, "proposed")
+	wantPlayerTiles(t, h, tok, 3, 1, 1, 1, 0)
 }

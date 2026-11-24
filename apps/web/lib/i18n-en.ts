@@ -2573,6 +2573,7 @@ export const en: Readonly<Record<string, string>> = {
   "ニックネームを入力してください": "Please enter a nickname",
   " · 返金 {amount}（{at}）": " · Refunded {amount} ({at})",
   "{label}（{count}回）": "{label} ({count} times)",
+  "{label}（{count}件）": "{label} ({count})",
   "{at} に申告しました。": "Declared on {at}. ",
   "、できなかったもの {failed}件（Stripe の残高を確かめて、もう一度押してください）": ", failed: {failed} (check your Stripe balance and press again)",
   "チケット1枚（{price}相当）": "1 ticket (worth {price})",
