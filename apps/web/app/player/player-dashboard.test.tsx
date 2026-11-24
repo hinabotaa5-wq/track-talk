@@ -6,9 +6,11 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 const navigation = vi.hoisted(() => ({ replace: vi.fn() }));
-const auth = vi.hoisted(() => ({ session: {} as object | null, loading: false }));
+const auth = vi.hoisted(() => ({ session: {} as object | null, loading: false, token: "tok" as string | null }));
+const apiFetch = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: navigation.replace }) }));
-vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ session: auth.session, loading: auth.loading }) }));
+vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ session: auth.session, loading: auth.loading, token: auth.token }) }));
+vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>{children}</a>
@@ -26,6 +28,10 @@ beforeEach(() => {
   navigation.replace.mockReset();
   auth.session = {};
   auth.loading = false;
+  auth.token = "tok";
+  apiFetch.mockReset();
+  // 既定は全タイル 0 件（円ボタンの player_count などの他キーも返る想定）。
+  apiFetch.mockResolvedValue(counts({}));
   setActiveLocale("ja");
 });
 afterEach(async () => {
@@ -38,6 +44,18 @@ const render = async () => {
   await act(async () => { await Promise.resolve(); });
 };
 const tiles = () => [...container.querySelectorAll("a")];
+const counts = (c: Partial<Record<"one" | "personal" | "support" | "ticket", number>>) => ({
+  player_count: 9,
+  coach_count: 4,
+  player_one_time_count: c.one ?? 0,
+  player_personal_count: c.personal ?? 0,
+  player_support_count: c.support ?? 0,
+  player_ticket_count: c.ticket ?? 0,
+});
+const badges = () => tiles().map((a) => a.querySelector("span[aria-hidden]")?.textContent ?? null);
+const labels = () => tiles().map((a) => a.querySelector(".coach-tile-label")?.textContent);
+const hrefs = ["/me/coaching/requests", "/me/coaching/personal", "/coaching/support-consults", "/me/coaching/tickets", "/me/push"];
+const badgeClass = "absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white";
 
 it("ログイン済みでは見出し『選手』と5つのタイルが順番どおりに出る", async () => {
   await render();
@@ -87,13 +105,91 @@ it("タイルのラベルはコーチ側と同じ coach-tile-label を持ち、�
   }
 });
 
-it("タイルにバッジ・ドットは出ない", async () => {
+// #1003：#940 の「タイルにバッジ・ドットは出ない」を置き換え。件数の無いときは出ないことを、モックした件数で確かめる。
+it("件数があるタイルにだけ、その数字の赤バッジが出る（無料相談・通知タイルには出ない）", async () => {
+  apiFetch.mockResolvedValue(counts({ one: 2, personal: 1, support: 0, ticket: 3 }));
   await render();
+  expect(apiFetch).toHaveBeenCalledWith("/v1/me/coaching/action-counts", { token: "tok" });
+  expect(badges()).toEqual(["2", "1", null, "3", null]);
   for (const tile of tiles()) {
-    // アイコンとラベルだけ（バッジ・ドットの span を足さない）。
+    const badge = tile.querySelector("span[aria-hidden]");
+    if (badge) expect(badge.className).toBe(badgeClass);
+    // ドット（オレンジ点）は選手側には付けない。
+    expect(tile.querySelectorAll("span").length).toBeLessThanOrEqual(2);
+  }
+  // 順序・行き先・ラベルは従来どおり。
+  expect(labels()).toEqual(["1回プラン", "継続プラン", "無料相談", "チケット", "通知"]);
+  expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
+});
+
+it("件数は丸めずにそのまま出す（99+ にしない）", async () => {
+  apiFetch.mockResolvedValue(counts({ one: 120 }));
+  await render();
+  expect(badges()[0]).toBe("120");
+});
+
+it("件数が全て 0 のときはバッジを出さず、タイルはラベルのみ", async () => {
+  await render();
+  expect(apiFetch).toHaveBeenCalledTimes(1);
+  expect(badges()).toEqual([null, null, null, null, null]);
+  for (const tile of tiles()) {
     expect(tile.querySelectorAll("span")).toHaveLength(1);
+    expect(tile.getAttribute("aria-label")).toBeNull();
   }
   expect(container.textContent).not.toMatch(/\d+件/);
+});
+
+it("取得に失敗してもバッジを出さないだけで、タイルは従来どおり表示・遷移できる", async () => {
+  apiFetch.mockRejectedValue(new Error("boom"));
+  await render();
+  expect(badges()).toEqual([null, null, null, null, null]);
+  expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
+  expect(labels()).toEqual(["1回プラン", "継続プラン", "無料相談", "チケット", "通知"]);
+  expect(navigation.replace).not.toHaveBeenCalled();
+});
+
+it("タイルは件数の取得を待たずに出し、届いたらバッジが付く", async () => {
+  let resolve: (v: unknown) => void = () => {};
+  apiFetch.mockReturnValue(new Promise((r) => { resolve = r; }));
+  await render();
+  expect(tiles()).toHaveLength(5);
+  expect(container.querySelector(".page-loading-screen")).toBeNull();
+  expect(badges()).toEqual([null, null, null, null, null]);
+  await act(async () => { resolve(counts({ personal: 4 })); await Promise.resolve(); });
+  expect(badges()).toEqual([null, "4", null, null, null]);
+});
+
+it("画面の再表示（visibilitychange／focus）で取り直す", async () => {
+  await render();
+  expect(apiFetch).toHaveBeenCalledTimes(1);
+  apiFetch.mockResolvedValue(counts({ ticket: 1 }));
+  await act(async () => { document.dispatchEvent(new Event("visibilitychange")); await Promise.resolve(); });
+  expect(apiFetch).toHaveBeenCalledTimes(2);
+  expect(badges()).toEqual([null, null, null, "1", null]);
+  await act(async () => { window.dispatchEvent(new Event("focus")); await Promise.resolve(); });
+  expect(apiFetch).toHaveBeenCalledTimes(3);
+});
+
+it("token が無いときは取得せず、バッジも出さない", async () => {
+  auth.token = null;
+  apiFetch.mockResolvedValue(counts({ one: 5 }));
+  await render();
+  expect(apiFetch).not.toHaveBeenCalled();
+  expect(badges()).toEqual([null, null, null, null, null]);
+});
+
+it("件数があるタイルの aria-label は「{ラベル}（{件数}件）」、0件タイルはラベルのみ", async () => {
+  apiFetch.mockResolvedValue(counts({ one: 2, ticket: 3 }));
+  await render();
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["1回プラン（2件）", null, null, "チケット（3件）", null]);
+});
+
+it("英語では aria-label が \"{label} ({count})\" になる", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockResolvedValue(counts({ one: 2, ticket: 3 }));
+  await render();
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["One-time Plan (2)", null, null, "Tickets (3)", null]);
 });
 
 it("未ログインでは /login?next=/player へ寄せ、タイルを出さない", async () => {

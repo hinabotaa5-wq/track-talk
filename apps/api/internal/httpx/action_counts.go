@@ -19,8 +19,19 @@ func (s *Server) coachingActionCounts(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 選手ページのタイル別の件数（本体 #1003）。player_count の (a)＋(b) をタイルごとに分けたもので、
+	// どのタイルにも当たらない未読（例：/me/coaching ちょうど）の分だけタイル合計は player_count より少ない。
+	tiles, err := s.q.CountPlayerTileItems(r.Context(), p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusOK, map[string]any{
-		"player_count": player,
-		"coach_count":  coach,
+		"player_count":          player,
+		"coach_count":           coach,
+		"player_one_time_count": tiles.PlayerOneTimeCount,
+		"player_personal_count": tiles.PlayerPersonalCount,
+		"player_support_count":  tiles.PlayerSupportCount,
+		"player_ticket_count":   tiles.PlayerTicketCount,
 	})
 }
