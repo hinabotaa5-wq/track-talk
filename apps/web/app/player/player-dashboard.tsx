@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 // 選手用ページ。コーチ画面（/coach）に合わせ、タイルを並べたダッシュボード形式にする。
 // 運営者決定（2026-11-24、本体 #1003）：コーチ画面と同様に、行き先のタイルごとに件数バッジを付ける。
 // 件数は円ボタンと同じ GET /v1/me/coaching/action-counts のタイル別の4フィールド（player_count をタイルごとに分けたもの）で、
-// ログイン中だけ、マウント時と画面の再表示時（visibilitychange で visible／focus）に取り直す。取得を待たずにタイルは出し、
+// ログイン中だけ、マウント時と画面の再表示時（visibilitychange で visible／focus／bfcache 復帰の pageshow）に取り直す。取得を待たずにタイルは出し、
 // 失敗したらバッジを出さないだけ。通知タイル（通知設定）にはバッジを付けない。ドット（オレンジ点）は選手側には付けない。
 // タイル内部の見た目（アイコン・ラベル・角丸・間隔）はコーチ画面と同じ `.coach-tiles` の CSS 規則に乗せて揃える。
 // コーチ画面の縦の余り配分（CoachTiles の ResizeObserver）は持ち込まない（#940）。
@@ -57,42 +57,54 @@ function Tile({ href, label, Icon, badge }: { href: string; label: string; Icon:
 export function PlayerDashboard() {
   const { session, loading, token } = useAuth();
   const router = useRouter();
-  const [loaded, setCounts] = useState<TileCounts>({});
-  // ログアウトしたら、前の件数を残さない。
-  const counts = token ? loaded : {};
+  // 本体 #1009：件数は「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ出す。
+  // キーは利用者 ID（session がなければ token）。同じ利用者の token 更新では消さずに取り直す。
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [loaded, setCounts] = useState<{ key: string | null; counts: TileCounts }>({ key: null, counts: {} });
+  // ログアウト・利用者の切替直後は、前の件数を残さない。
+  const counts = userKey && loaded.key === userKey ? loaded.counts : {};
 
   useEffect(() => {
     // 未ログインでは取得しない。取り直しのタイミングは円ボタン（coach-self-button）と同じ。
-    if (!token) return;
+    if (!token || !userKey) return;
     let alive = true;
     const load = () => {
       apiFetch<TileCounts>("/v1/me/coaching/action-counts", { token })
         .then((data) => {
           if (!alive) return;
           setCounts({
-            player_one_time_count: validCount(data?.player_one_time_count),
-            player_personal_count: validCount(data?.player_personal_count),
-            player_support_count: validCount(data?.player_support_count),
-            player_ticket_count: validCount(data?.player_ticket_count),
+            key: userKey,
+            counts: {
+              player_one_time_count: validCount(data?.player_one_time_count),
+              player_personal_count: validCount(data?.player_personal_count),
+              player_support_count: validCount(data?.player_support_count),
+              player_ticket_count: validCount(data?.player_ticket_count),
+            },
           });
         })
         // 失敗してもエラーは出さない。バッジを出さないだけで、タイルの表示・遷移は妨げない。
         .catch(() => {
-          if (alive) setCounts({});
+          if (alive) setCounts({ key: userKey, counts: {} });
         });
     };
     const refresh = () => {
       if (document.visibilityState === "visible") load();
     };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1009）。
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) load();
+    };
     load();
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
     return () => {
       alive = false;
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
     };
-  }, [token]);
+  }, [token, userKey]);
 
   useEffect(() => {
     if (!loading && !session) {

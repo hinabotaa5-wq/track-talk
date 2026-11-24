@@ -216,3 +216,81 @@ it("英語ではタイル名が既存キーの訳になる", async () => {
   expect(container.querySelector("h1")?.textContent).toBe("Athlete");
   expect(tiles().map((a) => a.textContent)).toEqual(["One-time Plan", "Ongoing plan", "Free consults", "Tickets", "Notifications"]);
 });
+
+// ---- 本体 #1009：表示中の利用者の分だけを出す ----
+function deferredCounts() {
+  let resolve!: (value: ReturnType<typeof counts>) => void;
+  const promise = new Promise<ReturnType<typeof counts>>((res) => { resolve = res; });
+  return { promise, resolve };
+}
+const switchUser = async (token: string | null, userId: string | null) => {
+  auth.token = token;
+  auth.session = userId ? { user: { id: userId } } : null;
+  await act(async () => root.render(<PlayerDashboard />));
+};
+const firePageshow = async (persisted: boolean) => {
+  const event = new Event("pageshow");
+  Object.defineProperty(event, "persisted", { value: persisted });
+  await act(async () => { window.dispatchEvent(event); });
+  await act(async () => { await Promise.resolve(); });
+};
+
+it("T3：利用者 A のタイル件数のあと B に切り替えると、B の取得が終わるまで全タイルのバッジを出さず、終わったら B の件数だけを出す", async () => {
+  auth.session = { user: { id: "user-a" } };
+  auth.token = "tok-a";
+  apiFetch.mockResolvedValueOnce(counts({ one: 1, personal: 2, support: 3, ticket: 4 }));
+  await render();
+  expect(badges()).toEqual(["1", "2", "3", "4", null]);
+
+  const b = deferredCounts();
+  apiFetch.mockReturnValueOnce(b.promise);
+  await switchUser("tok-b", "user-b");
+  expect(badges()).toEqual([null, null, null, null, null]);
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual([null, null, null, null, null]);
+  expect(apiFetch).toHaveBeenLastCalledWith("/v1/me/coaching/action-counts", { token: "tok-b" });
+
+  await act(async () => { b.resolve(counts({ support: 5 })); });
+  expect(badges()).toEqual([null, null, "5", null, null]);
+});
+
+it("T3：切替前に出した A の取得が切替後に返っても、B の画面には出さない", async () => {
+  auth.session = { user: { id: "user-a" } };
+  const a = deferredCounts();
+  apiFetch.mockReturnValueOnce(a.promise);
+  await render();
+  const b = deferredCounts();
+  apiFetch.mockReturnValueOnce(b.promise);
+  await switchUser("tok-b", "user-b");
+  await act(async () => { a.resolve(counts({ one: 9, ticket: 9 })); });
+  expect(badges()).toEqual([null, null, null, null, null]);
+  await act(async () => { b.resolve(counts({ personal: 1 })); });
+  expect(badges()).toEqual([null, "1", null, null, null]);
+});
+
+it("T4：pageshow（persisted）で現在の利用者の件数を取り直し、persisted でなければ取り直さない", async () => {
+  auth.session = { user: { id: "user-a" } };
+  apiFetch.mockResolvedValueOnce(counts({ one: 1 }));
+  await render();
+  expect(badges()).toEqual(["1", null, null, null, null]);
+  apiFetch.mockClear();
+  await firePageshow(false);
+  expect(apiFetch).not.toHaveBeenCalled();
+  apiFetch.mockResolvedValueOnce(counts({ ticket: 2 }));
+  await firePageshow(true);
+  expect(apiFetch).toHaveBeenCalledTimes(1);
+  expect(apiFetch).toHaveBeenCalledWith("/v1/me/coaching/action-counts", { token: "tok" });
+  expect(badges()).toEqual([null, null, null, "2", null]);
+});
+
+it("T12：同じ利用者のまま token 文字列だけが変わったら、バッジを消さずに取り直し、完了後に新しい値へ更新する", async () => {
+  auth.session = { user: { id: "user-a" } };
+  apiFetch.mockResolvedValueOnce(counts({ one: 1, ticket: 2 }));
+  await render();
+  const next = deferredCounts();
+  apiFetch.mockReturnValueOnce(next.promise);
+  await switchUser("tok-2", "user-a");
+  expect(badges()).toEqual(["1", null, null, "2", null]);
+  expect(apiFetch).toHaveBeenLastCalledWith("/v1/me/coaching/action-counts", { token: "tok-2" });
+  await act(async () => { next.resolve(counts({ personal: 3 })); });
+  expect(badges()).toEqual([null, "3", null, null, null]);
+});
