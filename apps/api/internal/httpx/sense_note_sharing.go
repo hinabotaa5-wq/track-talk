@@ -162,14 +162,31 @@ func (s *Server) shareContractSenseNote(w http.ResponseWriter, r *http.Request) 
 		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
 		return
 	}
-	if *req.Shared {
-		err = s.q.DeleteSenseNoteContractExclusion(r.Context(), db.DeleteSenseNoteContractExclusionParams{
+	// 作成・削除と同じ作者ロックの中で切り替える。削除の退避と削除のあいだに除外の追加・削除が
+	// 割り込むと、選手の最後の操作が同じ日の書き直しへ引き継がれないため、作者単位で直列にする。
+	// ロックを取ったあとでメモをもう一度確かめ、先に消えていたら 404 にする（消えたメモに除外を作らない）。
+	errMissing := errors.New("sense note not found")
+	err = s.tx(r.Context(), func(q *db.Queries) error {
+		if err := q.LockSenseNoteAuthor(r.Context(), me.ID); err != nil {
+			return err
+		}
+		if _, err := q.GetContractSenseNote(r.Context(), db.GetContractSenseNoteParams{ID: noteID, AuthorID: me.ID}); errors.Is(err, pgx.ErrNoRows) {
+			return errMissing
+		} else if err != nil {
+			return err
+		}
+		if *req.Shared {
+			return q.DeleteSenseNoteContractExclusion(r.Context(), db.DeleteSenseNoteContractExclusionParams{
+				ContractID: id, SenseNoteID: noteID,
+			})
+		}
+		return q.InsertSenseNoteContractExclusion(r.Context(), db.InsertSenseNoteContractExclusionParams{
 			ContractID: id, SenseNoteID: noteID,
 		})
-	} else {
-		err = s.q.InsertSenseNoteContractExclusion(r.Context(), db.InsertSenseNoteContractExclusionParams{
-			ContractID: id, SenseNoteID: noteID,
-		})
+	})
+	if errors.Is(err, errMissing) {
+		Error(w, http.StatusNotFound, "not_found", "見つかりませんでした")
+		return
 	}
 	if err != nil {
 		MapDBError(w, err)

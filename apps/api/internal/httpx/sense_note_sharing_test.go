@@ -305,6 +305,13 @@ func TestContractSenseNoteAuthMatrix(t *testing.T) {
 		t.Fatalf("missing shared %d", code)
 	}
 
+	// 継続プラン（period）以外の契約では切り替えられない（#1001 でも検証順・応答は不変）。
+	execSQLArgs(t, `UPDATE coaching_contracts SET plan_kind = 'single' WHERE id = $1`, id)
+	if code, body := post(tu, mine, map[string]any{"shared": false}); code != http.StatusConflict || !strings.Contains(body, "contract_not_active") {
+		t.Fatalf("non-period post %d %s", code, body)
+	}
+	execSQLArgs(t, `UPDATE coaching_contracts SET plan_kind = 'period' WHERE id = $1`, id)
+
 	execSQLArgs(t, `UPDATE coaching_contracts SET status = 'ended', ends_at = now() - interval '1 second' WHERE id = $1`, id)
 	if code, body := post(tu, mine, map[string]any{"shared": false}); code != http.StatusConflict || !strings.Contains(body, "contract_not_active") {
 		t.Fatalf("ended post %d %s", code, body)
