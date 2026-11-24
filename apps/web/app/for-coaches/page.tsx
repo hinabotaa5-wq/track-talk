@@ -35,7 +35,7 @@ export default function ForCoachesPage() {
         <p>
           <strong>1. One-month coaching package (the main offer)</strong>
           <br />
-          An athlete buys a one-month package, and you coach them across the month. They send you training and race videos for feedback — there&apos;s no set cap on videos — and they also ask you questions as they come up, about their training, their technique, and the theory behind how you coach; you answer both, aiming for about 36 hours per reply. It isn&apos;t a video-review service with extras — it&apos;s a month of being coached by you. You also build a training menu at the start and revise it each week. Athletes can renew month to month.
+          An athlete buys a one-month package, and you coach them across the month. They send you training and race videos for feedback — up to 20 videos a month — and they also ask you questions as they come up, about their training, their technique, and the theory behind how you coach; you answer both, aiming for about 36 hours per reply. It isn&apos;t a video-review service with extras — it&apos;s a month of being coached by you. You also build a training menu at the start and revise it each week. Athletes can renew month to month.
         </p>
         <p>
           <strong>2. Single video review (the entry point)</strong>
@@ -52,14 +52,14 @@ export default function ForCoachesPage() {
       <Rule title="Pay">
         <ul className="list-disc space-y-2 pl-5">
           <li>
-            <strong>Package: athletes pay $139 (¥22,000) per month — you receive $104 (¥16,500) of that, per athlete per month.</strong>
+            <strong>Package: athletes pay $380 (¥60,000) per month — you receive $300 of that, per athlete per month.</strong>
           </li>
           <li>
-            <strong>Reviews: around $10 per review.</strong>
+            <strong>Reviews: athletes pay $65 (¥10,000) per review — you receive $50 of that.</strong>
           </li>
           <li>These are starting figures — we want to agree the final rates with you directly, not just set them. For reference, in Japan a single review costs the athlete ¥1,000 and the coach receives ¥700; the figures for overseas coaches are set higher.</li>
           <li>
-            Paid monthly via <strong>Wise</strong>, in USD: month-end close, paid by the 15th of the following month (during the pilot we aim to send it around the 7th). The package fee is set in yen and converted at the transfer rate, so the dollar amount moves slightly with the exchange rate. There is no minimum payout — everything you earn is paid out each month, and we cover the Wise transfer fees.
+            Paid monthly via <strong>Wise</strong>, in USD: month-end close, paid by the 15th of the following month (during the pilot we aim to send it around the 7th). Both fees are set in US dollars, so the amount you receive does not move with the exchange rate. There is no minimum payout — everything you earn is paid out each month, and we cover the Wise transfer fees.
           </li>
         </ul>
       </Rule>

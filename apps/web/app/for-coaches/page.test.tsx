@@ -10,10 +10,12 @@ it("海外コーチ向けの英語の紹介ページ：確定原稿の金額・�
   const text = html.replace(/<[^>]*>/g, "").replace(/&#x27;|&apos;/g, "'");
   expect(html).toContain('lang="en"');
   expect(text).toContain("Coach Japanese sprinters online — monthly packages and video reviews");
-  expect(text).toContain("Package: athletes pay $139 (¥22,000) per month — you receive $104 (¥16,500) of that, per athlete per month.");
-  expect(text).toContain("Reviews: around $10 per review.");
+  // 海外コーチの新価格（#1005 運営者決定 2026-11-24）。コーチ受取はドル固定。
+  expect(text).toContain("Package: athletes pay $380 (¥60,000) per month — you receive $300 of that, per athlete per month.");
+  expect(text).toContain("Reviews: athletes pay $65 (¥10,000) per review — you receive $50 of that.");
   expect(text).toContain("in Japan a single review costs the athlete ¥1,000 and the coach receives ¥700");
-  expect(text).toContain("there's no set cap on videos");
+  expect(text).toContain("They send you training and race videos for feedback — up to 20 videos a month — and they also ask you questions");
+  expect(text).not.toContain("no set cap");
   expect(text).not.toContain("28 videos");
   expect(text).not.toContain("$12");
   // 海外の単発には有料フォローアップを付けない（#718 運営者決定 2026-11-14）。Coach Terms 第1条・第2条と一致させる。
@@ -22,6 +24,8 @@ it("海外コーチ向けの英語の紹介ページ：確定原稿の金額・�
   expect(text).toContain("aiming for about 36 hours per reply");
   expect(text).toContain("revise it each week");
   expect(text).toContain("paid by the 15th of the following month (during the pilot we aim to send it around the 7th)");
+  expect(text).toContain("Both fees are set in US dollars, so the amount you receive does not move with the exchange rate.");
+  expect(text).not.toContain("The package fee is set in yen");
   expect(text).toContain("There is no minimum payout — everything you earn is paid out each month, and we cover the Wise transfer fees.");
   expect(text).toContain("Paid pilot");
   expect(text).toContain("We start small with a paid pilot, run manually with a few athletes.");

@@ -79,7 +79,9 @@ it("公開文面に開発中の注記や販売を終えた追加相談を表示�
 it("海外コーチ 1ヶ月コーチング（パイロット）の分を表示する（#539）", () => {
   const html = renderToStaticMarkup(<CommercePage />);
   expect(html).toContain("運営者が販売する「海外コーチ 1ヶ月コーチング（パイロット）」についての表記です。");
-  expect(html).toContain("1ヶ月コーチング 22,000円（税込）");
+  // 海外コーチの新価格（#1005 運営者決定 2026-11-24）。動画は月20本まで。
+  expect(html).toContain("海外コーチ 1ヶ月コーチング（パイロット）は 1ヶ月 60,000円（税込）。動画への回答は月20本までです。");
+  expect(html).not.toContain("22,000円");
   expect(html).toContain("決済リンク経由。1回ごとのお支払いです");
   expect(html).toContain("お申込み（決済リンクでのお支払い）の時に決済が完了します");
   expect(html).toContain("お支払いの確認後、案内した開始日から1ヶ月間（開始日と終了日はお申込みの前に案内します）、指導を提供します");
@@ -95,14 +97,16 @@ it("海外コーチ 単発動画添削（パイロット）の分を表示する
   const html = renderToStaticMarkup(<CommercePage />);
   expect(html).toContain("運営者が販売する「海外コーチ 単発動画添削（パイロット）」についての表記です。");
   expect(html).toContain("利用規約第6条冒頭の定めにより、海外コーチによる単発の価格その他の条件は、このページと購入時の個別の案内で示します。追加質問は付きません。お申込みは決済リンク経由で受け付け、チケットは使えません。");
-  expect(html).toContain("海外コーチ 単発動画添削（パイロット）は 1回 2,000円（税込）。動画1本への回答1回分です。");
+  expect(html).toContain("海外コーチ 単発動画添削（パイロット）は 1回 10,000円（税込）。動画1本への回答1回分です。");
+  expect(html).not.toContain("海外コーチ 単発動画添削（パイロット）は 1回 2,000円");
   expect(html).toContain("海外コーチ 単発動画添削（パイロット）もインターネットの通信料は利用者の負担です。");
   expect(html).toContain("海外コーチ 単発動画添削（パイロット）はクレジットカード（決済リンク経由。1回ごとのお支払いです）。");
   expect(html).toContain("海外コーチ 単発動画添削（パイロット）はお申込み（決済リンクでのお支払い）の時に決済が完了します。");
   expect(html).toContain("コーチが受け取ってから約24時間以内の回答を目安として提供します");
   expect(html).toContain("回答が提供される前であれば、お問い合わせから取り消すことができ、その場合は全額を返金します。コーチ側の事情で回答が提供できなかった場合も、全額を返金します。回答が提供された後は、利用者の都合による返金はできません。");
   // 単発分の段落は、各 Row で海外月額分の段落の直後に置く。
-  expect(html.indexOf("海外コーチ 単発動画添削（パイロット）は 1回 2,000円")).toBeGreaterThan(html.indexOf("1ヶ月コーチング 22,000円（税込）"));
+  expect(html.indexOf("海外コーチ 単発動画添削（パイロット）は 1回 10,000円")).toBeGreaterThan(html.indexOf("1ヶ月 60,000円（税込）"));
+  expect(html.indexOf("1ヶ月 60,000円（税込）")).toBeGreaterThan(-1);
   expect(html.indexOf("運営者が販売する「海外コーチ 単発動画添削（パイロット）」")).toBeGreaterThan(html.indexOf("運営者が販売する「海外コーチ 1ヶ月コーチング（パイロット）」"));
   const single = html.slice(html.indexOf("運営者が販売する「海外コーチ 単発動画添削（パイロット）」"));
   expect(single).not.toContain("PayPay");
