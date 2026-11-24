@@ -10,11 +10,17 @@ vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: s
 it("海外コーチの業務委託条件：決定済みの金額・支払・相殺・為替・期間を英語で示し、個別事項は work order に回す", () => {
   const html = renderToStaticMarkup(<CoachTermsPage />);
   expect(html).toContain('lang="en"');
-  expect(html).toContain("¥16,500 per athlete per month");
-  expect(html).toContain("75% of the tax-inclusive athlete price of ¥22,000");
-  expect(html).toContain("$10 per completed review");
+  // 海外コーチの新価格（#1005 運営者決定 2026-11-24）。コーチ受取はドル固定。
+  expect(html).toContain("$300 per athlete per month");
+  expect(html).toContain("the tax-inclusive athlete price is ¥60,000");
+  expect(html).toContain("$50 per completed review");
+  expect(html).toContain("the tax-inclusive athlete price is ¥10,000");
+  expect(html).not.toContain("$10 per completed review");
+  expect(html).not.toContain("¥16,500 per athlete per month");
+  expect(html).not.toContain("75% of the tax-inclusive athlete price of ¥22,000");
   expect(html).not.toContain("$12 per completed review");
-  expect(html).toContain("with no set cap on the number of videos per athlete per month, replies targeted within about 36 hours");
+  expect(html).toContain("with a cap of 20 videos per athlete per month, replies targeted within about 36 hours");
+  expect(html).not.toContain("no set cap");
   expect(html).not.toContain("up to about 28 videos");
   expect(html).toContain("15th of the following month");
   expect(html).toContain("TrackTalk bears the Wise transfer fees");
@@ -45,7 +51,7 @@ it("発注サービスだけに規約を適用し、標準額より個別の書�
   expect(text).not.toContain("may be revised only for future months by mutual agreement");
   expect(text).toContain("and a training menu created at the start of the month and revised weekly");
   expect(text).toContain("single video reviews in TrackTalk's fixed format, targeted within about 24 hours of receipt");
-  expect(text).toContain("The fee is denominated in Japanese yen and converted to USD at the Wise transfer rate on the payment date.");
+  expect(text).toContain("The fee is denominated in US dollars.");
 });
 
 it("実施州、為替提案の効力、単発を含む終了と相殺先を確定文面で表示する", () => {
@@ -63,7 +69,7 @@ it("実施州、為替提案の効力、単発を含む終了と相殺先を確�
 });
 
 it("export と表示の版を更新する", () => {
-  expect(coachTermsVersion).toBe("2026-11-18");
+  expect(coachTermsVersion).toBe("2026-11-24");
   const html = renderToStaticMarkup(<CoachTermsPage />);
-  expect(html).toContain("Version: 2026-11-18");
+  expect(html).toContain("Version: 2026-11-24");
 });

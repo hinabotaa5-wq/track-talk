@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export const coachTermsVersion = "2026-11-18";
+export const coachTermsVersion = "2026-11-24";
 
 export default function CoachTermsPage() {
   return (
@@ -27,13 +27,13 @@ export default function CoachTermsPage() {
 
       <Rule title="1. Services">
         <p>
-          The Coach provides, through the TrackTalk app, online via information and communications technology: (a) one-month coaching packages — written feedback on athlete-submitted training and race videos (with no set cap on the number of videos per athlete per month, replies targeted within about 36 hours), answers to the athlete&apos;s coaching questions (including questions about training theory), and a training menu created at the start of the month and revised weekly; and (b) single video reviews in TrackTalk&apos;s fixed format, targeted within about 24 hours of receipt. All communication is asynchronous and in-app. Athletes never contact the Coach directly. The specific services, service period, and deadlines for each engagement are confirmed in an individual work order issued under these Terms (see clause 10). The Coach provides only the services confirmed in an individual work order. Paragraphs (a) and (b) describe the services available under these Terms; neither paragraph obliges the Coach to provide, or TrackTalk to order, the other type of service, and a service type not stated in a work order is not part of that engagement.
+          The Coach provides, through the TrackTalk app, online via information and communications technology: (a) one-month coaching packages — written feedback on athlete-submitted training and race videos (with a cap of 20 videos per athlete per month, replies targeted within about 36 hours), answers to the athlete&apos;s coaching questions (including questions about training theory), and a training menu created at the start of the month and revised weekly; and (b) single video reviews in TrackTalk&apos;s fixed format, targeted within about 24 hours of receipt. All communication is asynchronous and in-app. Athletes never contact the Coach directly. The specific services, service period, and deadlines for each engagement are confirmed in an individual work order issued under these Terms (see clause 10). The Coach provides only the services confirmed in an individual work order. Paragraphs (a) and (b) describe the services available under these Terms; neither paragraph obliges the Coach to provide, or TrackTalk to order, the other type of service, and a service type not stated in a work order is not part of that engagement.
         </p>
       </Rule>
 
       <Rule title="2. Fees">
         <p>
-          (a) Package: <strong>¥16,500 per athlete per month</strong> (calculated as 75% of the tax-inclusive athlete price of ¥22,000). The fee is denominated in Japanese yen and converted to USD at the Wise transfer rate on the payment date. (b) Single review: <strong>$10 per completed review</strong>. The amounts in (a) and (b) are the standard fees. If a different fee is agreed with the Coach individually in writing (including by direct message) or is stated in an individual work order, that fee applies instead of the standard fee for that service. Fees may be revised only by mutual agreement, and any revision applies only to services ordered after the revision is agreed (for a package, to future months).
+          (a) Package: <strong>$300 per athlete per month</strong> (the tax-inclusive athlete price is ¥60,000). The fee is denominated in US dollars. (b) Single review: <strong>$50 per completed review</strong> (the tax-inclusive athlete price is ¥10,000). The amounts in (a) and (b) are the standard fees. If a different fee is agreed with the Coach individually in writing (including by direct message) or is stated in an individual work order, that fee applies instead of the standard fee for that service. Fees may be revised only by mutual agreement, and any revision applies only to services ordered after the revision is agreed (for a package, to future months).
         </p>
       </Rule>
 
