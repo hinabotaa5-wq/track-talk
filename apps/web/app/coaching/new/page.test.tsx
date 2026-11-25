@@ -458,6 +458,11 @@ it("W3: 200m を選んで最終確認へ進むと「種目」行が200mになり
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "後半に失速します。");
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   });
+  // 申込動画は必須（本体 #1036）。動画を選ばないと最終確認へ進まない。
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, "files", { value: [new File(["x"], "run.mp4", { type: "video/mp4" })] });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => {});
   await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
   await act(async () => container.querySelector("form")!.requestSubmit());
   await act(async () => {});
