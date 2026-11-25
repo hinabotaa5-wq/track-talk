@@ -79,8 +79,8 @@ export const helpfulLabels: Record<HelpfulAnswer, string> = {
 // 返答の1項目の上限（サーバーと同じ）。
 export const maxResponseChars = 300;
 
-// 添削の動画は30秒まで。少しの誤差はサーバーと同じく許す。
-export const maxReviewSeconds = 30;
+// 添削の動画は60秒まで。少しの誤差はサーバーと同じく許す。
+export const maxReviewSeconds = 60;
 const secondsSlop = 1;
 const videoDurationTimeoutMs = 10_000;
 

@@ -38,7 +38,7 @@ const (
 	// 署名付きの URL を知っている人だけが見られる。
 	CoachingFolder      = "track-talk-coaching"
 	CoachingVideoType   = "authenticated"
-	MaxCoachingSeconds  = 30
+	MaxCoachingSeconds  = 60
 	coachingSecondsSlop = 0.5
 
 	// 保存する前に Cloudinary 側で縮める。元ファイルは残らない。
@@ -52,7 +52,7 @@ const (
 	videoPlayback       = "c_limit,w_1280,h_1280,q_auto"
 	videoThumbnail      = "so_auto,c_limit,w_800,q_auto,f_jpg"
 	videoCardThumbnail  = "so_auto,c_limit,w_" + cardWidth + ",q_auto,f_jpg"
-	coachingPlayback    = "c_limit,w_1280,h_1280,q_auto,du_30"
+	coachingPlayback    = "c_limit,w_1280,h_1280,q_auto,du_60"
 	coachingThumbnail   = "so_auto,c_limit,w_800,f_jpg"
 	playbackExt         = "mp4"
 	thumbnailExt        = "jpg"
@@ -432,7 +432,7 @@ func (c Client) AvatarURL(publicID string) string {
 }
 
 // CoachingPlaybackURL は非公開の添削動画を再生する署名付き URL を返す。
-// du_30 で、万一長い動画が入っていても30秒までしか配信しない。
+// du_60 で、万一長い動画が入っていても60秒までしか配信しない。
 // 保存前に縮めなくなった動画も、これまでどおり長辺1280px以内で配信する。
 func (c Client) CoachingPlaybackURL(publicID string) string {
 	return c.signedVideoURL(coachingPlayback, publicID, playbackExt)
@@ -656,7 +656,7 @@ func (c Client) CoachingVideoReady(ctx context.Context, publicID string) error {
 	if info.Bytes <= 0 || info.Bytes > MaxVideoBytes {
 		return ErrTooLarge
 	}
-	// 長さが返ってこないときは配信側の du_30 に任せる。
+	// 長さが返ってこないときは配信側の du_60 に任せる。
 	if info.Duration > MaxCoachingSeconds+coachingSecondsSlop {
 		return ErrTooLong
 	}

@@ -310,7 +310,11 @@ export default function NewReviewRequestPage() {
       setError(L("相談内容を記入してください"));
       return false;
     }
-    if (file && file.size > maxBytes) {
+    if (!file) {
+      setError(L("動画を選んでください"));
+      return false;
+    }
+    if (file.size > maxBytes) {
       setError(L("100MB以内の動画にしてください"));
       return false;
     }
@@ -499,7 +503,7 @@ export default function NewReviewRequestPage() {
           </fieldset>
 
           <label className="block space-y-1 text-sm">
-            <span className="font-semibold">{L("動画（任意・{maxReviewSeconds}秒まで）", { maxReviewSeconds })}</span>
+            <span className="font-semibold">{L("動画（{maxReviewSeconds}秒まで）", { maxReviewSeconds })}</span>
             <input
               className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
               type="file"

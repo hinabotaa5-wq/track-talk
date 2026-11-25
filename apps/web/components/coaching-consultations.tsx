@@ -115,7 +115,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo,
     <ContactNotice />
     {guard.warning}
     <Textarea aria-label={L(kind === "review" ? "追加質問の質問" : "追加相談の質問")} value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} disabled={pending} placeholder={L("新しく相談したいこと")} />
-    <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs text-slate-200">{L("動画（30秒・100MB以内")}{requiresVideo ? L("、必須") : L("、任意")}{L("）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label>
+    <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs text-slate-200">{L("動画（60秒・100MB以内")}{requiresVideo ? L("、必須") : L("、任意")}{L("）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label>
     {videoID && !file ? <p className="text-xs text-slate-300">{L("保存済みの動画を添付します。")}<button type="button" disabled={pending} onClick={() => setVideoID("")} className="underline">{L("外す")}</button></p> : null}
     <p className="text-xs text-slate-300">{kind === "review" ? L("下書きは7日間保存します。送信後は変更できません。") : L("購入前に下書きを7日間保存します。送信後は内容を変更できません。{v0}", { v0: L("18歳未満の方のパーソナル指導の相談は、保護者が支払います。") })}</p>
     {kind === "review" ? <ReviewPayNotice /> : null}
@@ -227,7 +227,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
         <ContactNotice />
         {guard.warning}
         <Textarea aria-label={reply ? L("コーチの回答") : clarify ? L("回答への確認質問") : L("コーチの補足")} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} disabled={pending} />
-        {reply ? <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs">{L("実践動画（30秒・100MB以内、任意）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label> : null}
+        {reply ? <label className="block rounded-xl border border-white/25 bg-white/10 p-3 text-xs">{L("実践動画（60秒・100MB以内、任意）")}<input type="file" accept="video/*" disabled={pending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-2 block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100" /></label> : null}
         <Button disabled={pending || !body.trim() && !file} onClick={() => void act(reply ? "answer" : clarify ? "clarify" : "clarification")}>{reply ? L("回答を送る") : clarify ? L("回答について確認する（1回無料）") : L("補足を送る")}</Button>
       </div> : null}
       {/* 追加質問（review）は販売終了なので、支払い前のものは支払いに進めず、取り下げだけができる（本体 #984）。 */}

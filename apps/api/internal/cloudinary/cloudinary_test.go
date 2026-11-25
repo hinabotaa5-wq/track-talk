@@ -268,7 +268,7 @@ func TestCoachingURLsAreSigned(t *testing.T) {
 	id := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
 	// 期待値は Cloudinary の公式 SDK と同じ手順（SHA-256 → URL 用 Base64 の先頭8文字）で別に計算したもの。
 	// 再生は、保存前に縮めなくなった動画も長辺1280px以内で配信する（#494）。
-	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--8AjFpRpa--/c_limit,w_1280,h_1280,q_auto,du_30/v1/"+id+".mp4"; got != want {
+	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--HxgT-m1t--/c_limit,w_1280,h_1280,q_auto,du_60/v1/"+id+".mp4"; got != want {
 		t.Fatalf("playback\n got %s\nwant %s", got, want)
 	}
 	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/s--AF2cg9FF--/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"; got != want {
@@ -298,7 +298,14 @@ func TestCoachingVideoReadyChecksTypeAndLength(t *testing.T) {
 	if !strings.Contains(path, "/resources/video/authenticated/track-talk-coaching/") {
 		t.Fatalf("path %s", path)
 	}
-	payload = `{"resource_type":"video","type":"authenticated","format":"mp4","bytes":1024,"duration":31}`
+	// 上限は60秒（#1036）。31秒・60秒（と誤差0.5秒まで）は通し、61秒は長すぎる。
+	for _, d := range []string{"31", "60", "60.5"} {
+		payload = `{"resource_type":"video","type":"authenticated","format":"mp4","bytes":1024,"duration":` + d + `}`
+		if err := c.CoachingVideoReady(ctx, id); err != nil {
+			t.Fatalf("%s seconds: %v", d, err)
+		}
+	}
+	payload = `{"resource_type":"video","type":"authenticated","format":"mp4","bytes":1024,"duration":61}`
 	if err := c.CoachingVideoReady(ctx, id); err != ErrTooLong {
 		t.Fatalf("length: %v", err)
 	}
@@ -325,7 +332,7 @@ func TestCoachingURLsCarryExpiringTokenWithAuthKey(t *testing.T) {
 	id := "track-talk-coaching/0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11"
 	// 期待値は Cloudinary の公式 Python SDK（cloudinary_url の auth_token）で、同じ鍵・期限・acl から作ったもの。
 	token := "?__cld_token__=exp=1800000000~acl=%2fvideo%2fauthenticated%2f*track-talk-coaching%2f0b8f0f5e-0c39-4f7e-9d3a-5f0b5d6c7a11*~hmac=d4aea924058f847b18a5c8ed9a4a9b1e114fbdec9421de90650d1e185c53f7d8"
-	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/c_limit,w_1280,h_1280,q_auto,du_30/v1/"+id+".mp4"+token; got != want {
+	if got, want := c.CoachingPlaybackURL(id), "https://res.cloudinary.com/demo/video/authenticated/c_limit,w_1280,h_1280,q_auto,du_60/v1/"+id+".mp4"+token; got != want {
 		t.Fatalf("playback\n got %s\nwant %s", got, want)
 	}
 	if got, want := c.CoachingThumbnailURL(id), "https://res.cloudinary.com/demo/video/authenticated/so_auto,c_limit,w_800,f_jpg/v1/"+id+".jpg"+token; got != want {
@@ -366,7 +373,7 @@ func TestAsyncVideoUploadsSignEager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantCoaching := "c_limit,w_1280,h_1280,q_auto,du_30/mp4|so_auto,c_limit,w_800,f_jpg/jpg"
+	wantCoaching := "c_limit,w_1280,h_1280,q_auto,du_60/mp4|so_auto,c_limit,w_800,f_jpg/jpg"
 	if coaching.UploadPreset != VideoAsyncPreset || coaching.Eager != wantCoaching || coaching.EagerAsync != "true" || coaching.Type != CoachingVideoType {
 		t.Fatalf("coaching %+v", coaching)
 	}
@@ -464,7 +471,7 @@ func TestReadyWaitsForEagerDerivedOnLargeVideos(t *testing.T) {
 		t.Fatalf("coaching large without derived: %v", err)
 	}
 	payload = fmt.Sprintf(`{"resource_type":"video","type":"authenticated","format":"mov","bytes":%d,"duration":10,"derived":[
-		{"transformation":"c_limit,w_1280,h_1280,q_auto,du_30/mp4","format":"mp4"},
+		{"transformation":"c_limit,w_1280,h_1280,q_auto,du_60/mp4","format":"mp4"},
 		{"transformation":"so_auto,c_limit,w_800,f_jpg/jpg","format":"jpg"}]}`, large)
 	if err := c.CoachingVideoReady(ctx, coachingID); err != nil {
 		t.Fatalf("coaching large with derived: %v", err)

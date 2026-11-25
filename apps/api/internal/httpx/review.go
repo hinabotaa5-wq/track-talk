@@ -349,7 +349,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	goalTime := optionalRequestText(fields, "goal_time", req.GoalTime, 100)
 	windSpeed := optionalRequestText(fields, "wind_speed", req.WindSpeed, 50)
 	bodyCondition := optionalRequestText(fields, "body_condition", req.BodyCondition, 300)
-	if req.VideoPublicID != "" && !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
+	// 申込には動画が必須（#1036）。動画なしの依頼は新しく作れない（過去の動画なし依頼の閲覧・返答は変えない）。
+	if req.VideoPublicID == "" || !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
 	useTickets := req.Method == "tickets" || req.UseTickets
