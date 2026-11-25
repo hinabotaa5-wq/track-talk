@@ -64,15 +64,34 @@ function badgeText(count: number) {
 }
 
 export function NotificationBell() {
-  const { token } = useAuth();
+  const { session, token } = useAuth();
   const locale = useLocale();
   const panelID = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [items, setItems] = useState<AppNotification[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // 本体 #1009：未読件数・一覧・パネルの開閉は「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ出す。
+  // キーは利用者 ID（session がなければ token）。切替直後は前の利用者の分を出さず、パネルも閉じた扱いにする。
+  // 同じ利用者の token 更新ではキーが変わらないので、消さずに取り直す。
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [openFor, setOpenFor] = useState<string | null>(null);
+  const [unreadState, setUnread] = useState<{ key: string | null; count: number }>({ key: null, count: 0 });
+  const [itemsState, setItems] = useState<{ key: string | null; list: AppNotification[] }>({ key: null, list: [] });
+  const [loadingFor, setLoadingFor] = useState<string | null>(null);
+  const [errorState, setError] = useState<{ key: string | null; text: string }>({ key: null, text: "" });
+  const current = userKey !== null;
+  const open = current && openFor === userKey;
+  const unread = current && unreadState.key === userKey ? unreadState.count : 0;
+  const items = current && itemsState.key === userKey ? itemsState.list : [];
+  const loading = current && loadingFor === userKey;
+  const error = current && errorState.key === userKey ? errorState.text : "";
+  // 取得結果が返った時点の利用者。切替前に出した取得の結果は、ベルにもアプリバッジにも写さない。
+  const keyRef = useRef(userKey);
+  useEffect(() => {
+    const previous = keyRef.current;
+    keyRef.current = userKey;
+    // 別の利用者に切り替わったら、新しい取得が返るまでアプリバッジの前の件数を消しておく。
+    // ログアウト（userKey なし）のときは下の effect が消す。
+    if (previous && userKey && previous !== userKey) void clearAppBadge();
+  }, [userKey]);
   // タブに戻ったときの読み直しは、effect を作った時点ではなく、いま開いているかで決める。
   const openRef = useRef(false);
   useEffect(() => {
@@ -81,28 +100,31 @@ export function NotificationBell() {
 
   const load = useCallback(
     (list: boolean) => {
-      if (!token) return;
+      if (!token || !userKey) return;
+      const key = userKey;
       apiFetch<{ notifications: AppNotification[]; unread_count: number; meta: Meta }>(
         `/v1/me/notifications?per_page=${list ? 20 : 1}`,
         { token },
       )
         .then((data) => {
-          setUnread(data.unread_count ?? 0);
+          if (keyRef.current !== key) return;
+          setUnread({ key, count: data.unread_count ?? 0 });
           // バッジはベルの未読数と同じ正本（unread_count）から写す。ローカルで増減を数えない。
           void applyAppBadge(data.unread_count);
           if (list) {
-            setItems(data.notifications ?? []);
-            setError("");
+            setItems({ key, list: data.notifications ?? [] });
+            setError({ key, text: "" });
           }
         })
         .catch(() => {
-          if (list) setError(t(locale, "notify.loadError"));
+          if (keyRef.current !== key) return;
+          if (list) setError({ key, text: t(locale, "notify.loadError") });
         })
         .finally(() => {
-          if (list) setLoading(false);
+          if (list) setLoadingFor((value) => (value === key ? null : value));
         });
     },
-    [token, locale],
+    [token, userKey, locale],
   );
 
   useEffect(() => {
@@ -114,27 +136,33 @@ export function NotificationBell() {
     const refresh = () => {
       if (document.visibilityState === "visible") load(openRef.current);
     };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1009）。
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) load(openRef.current);
+    };
     // 初回は即フェッチ、以降はフォアグラウンド復帰時
     load(openRef.current);
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
     return () => {
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, userKey]);
 
   async function markRead(id: string) {
     if (!token) return;
     try {
       await apiFetch(`/v1/me/notifications/${id}/read`, { method: "POST", token });
-      setItems((current) => current.map((item) => (item.id === id ? { ...item, read: true } : item)));
-      setUnread((count) => Math.max(0, count - 1));
+      setItems((state) => ({ ...state, list: state.list.map((item) => (item.id === id ? { ...item, read: true } : item)) }));
+      setUnread((state) => ({ ...state, count: Math.max(0, state.count - 1) }));
       // バッジは正本の最新数で付け直す。
       load(false);
     } catch {
-      setError(t(locale, "notify.readError"));
+      setError({ key: userKey, text: t(locale, "notify.readError") });
     }
   }
 
@@ -142,12 +170,12 @@ export function NotificationBell() {
     if (!token) return;
     try {
       await apiFetch("/v1/me/notifications/read", { method: "POST", token });
-      setItems((current) => current.map((item) => ({ ...item, read: true })));
-      setUnread(0);
+      setItems((state) => ({ ...state, list: state.list.map((item) => ({ ...item, read: true })) }));
+      setUnread((state) => ({ ...state, count: 0 }));
       // バッジは正本の最新数で付け直す。
       load(false);
     } catch {
-      setError(t(locale, "notify.readError"));
+      setError({ key: userKey, text: t(locale, "notify.readError") });
     }
   }
 
@@ -162,9 +190,9 @@ export function NotificationBell() {
         aria-controls={panelID}
         onClick={() => {
           const willOpen = !open;
-          if (willOpen && items.length === 0) setLoading(true);
+          if (willOpen && items.length === 0) setLoadingFor(userKey);
           if (willOpen) load(true);
-          setOpen(willOpen);
+          setOpenFor(willOpen ? userKey : null);
         }}
         className={`relative inline-flex size-11 items-center justify-center rounded-full transition active:scale-[0.98] ${open ? "bg-white/20 text-white" : "text-slate-300 hover:bg-white/16"}`}
       >
@@ -179,7 +207,7 @@ export function NotificationBell() {
         open={open}
         anchorRef={rootRef}
         panelID={panelID}
-        onClose={() => setOpen(false)}
+        onClose={() => setOpenFor(null)}
         className="w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-white/20 bg-surface shadow-xl"
       >
           <div className="flex items-center justify-between border-b border-white/20 px-3 py-2">
@@ -202,7 +230,7 @@ export function NotificationBell() {
                   <Link
                     href={hrefFor(item)}
                     onClick={() => {
-                      setOpen(false);
+                      setOpenFor(null);
                       if (!item.read) void markRead(item.id);
                     }}
                     className="block px-3 py-3 transition-colors hover:bg-white/16 active:bg-slate-500/15"

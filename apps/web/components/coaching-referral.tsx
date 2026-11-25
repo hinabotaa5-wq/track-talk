@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import type { Referral } from "@/lib/coaching-tickets";
@@ -21,17 +22,34 @@ export async function checkReferralInput(code: string, token: string | null): Pr
 
 // useMyReferral は、自分の紹介IDの周（有効な周、なければ直近に終了した周）を読む。
 // 読み込み前・失敗時は loaded=false のまま。
+// 本体 #1009：読んだ値は「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ返す（切替直後は未読込扱い）。
+// キーは利用者 ID。session が取れない（Provider の外など）ときは token にフォールバックする。
+// 履歴キャッシュ（bfcache）から戻ったとき（pageshow の persisted）にも取り直す。
+const notLoaded = { loaded: false, referral: null };
 function useMyReferral(token: string | null | undefined) {
-  const [state, setState] = useState<{ loaded: boolean; referral: Referral | null }>({ loaded: false, referral: null });
+  const { session } = useAuth();
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [state, setState] = useState<{ key: string | null; loaded: boolean; referral: Referral | null }>({ key: null, ...notLoaded });
   useEffect(() => {
-    if (!token) return;
+    if (!token || !userKey) return;
     let active = true;
-    apiFetch<{ referral: Referral | null }>("/v1/me/coaching/referral", { token })
-      .then((data) => { if (active) setState({ loaded: true, referral: data.referral ?? null }); })
-      .catch(() => { if (active) setState({ loaded: false, referral: null }); });
-    return () => { active = false; };
-  }, [token]);
-  return state;
+    const load = () => {
+      apiFetch<{ referral: Referral | null }>("/v1/me/coaching/referral", { token })
+        .then((data) => { if (active) setState({ key: userKey, loaded: true, referral: data.referral ?? null }); })
+        .catch(() => { if (active) setState({ key: userKey, ...notLoaded }); });
+    };
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) load();
+    };
+    load();
+    window.addEventListener("pageshow", restored);
+    return () => {
+      active = false;
+      window.removeEventListener("pageshow", restored);
+    };
+  }, [token, userKey]);
+  if (!userKey || state.key !== userKey) return notLoaded;
+  return { loaded: state.loaded, referral: state.referral };
 }
 
 export function ReferralInput({ code, onChange, warning, disabled, token }: {

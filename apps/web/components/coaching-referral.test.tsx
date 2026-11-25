@@ -208,3 +208,107 @@ it("S9：コピーにも失敗したら「共有できませんでした」を�
   expect(writeText).toHaveBeenCalledTimes(1);
   expect(status()?.textContent).toBe("共有できませんでした");
 });
+
+// ---- 本体 #1009：表示中の利用者の紹介だけを出す ----
+// この試験は auth-provider を mock しない（Provider の既定コンテキスト＝session なし）ので、キーは token にフォールバックする。
+function deferredReferral() {
+  let resolve!: (value: { referral: unknown }) => void;
+  const promise = new Promise<{ referral: unknown }>((res) => { resolve = res; });
+  return { promise, resolve };
+}
+const referralA = { code: "AAAAAA", active: true, friend_count: 1, granted_at: null, expires_at: null };
+const referralB = { code: "BBBBBB", active: true, friend_count: 0, granted_at: null, expires_at: null };
+const firePageshow = async (persisted: boolean) => {
+  const event = new Event("pageshow");
+  Object.defineProperty(event, "persisted", { value: persisted });
+  await act(async () => { window.dispatchEvent(event); });
+  await act(async () => { await Promise.resolve(); });
+};
+
+it("T5（カード）：A の紹介IDのあと B に切り替えると、B の取得が終わるまで A の紹介ID・状態を出さず、終わったら B の紹介だけを出す", async () => {
+  mocks.api.mockResolvedValueOnce({ referral: referralA });
+  await act(async () => root.render(<LoadedReferralCard token="tok-a" />));
+  expect(container.textContent).toContain("AAAAAA");
+  expect(container.textContent).toContain("あと1人で無料チケット");
+
+  const b = deferredReferral();
+  mocks.api.mockReturnValueOnce(b.promise);
+  await act(async () => root.render(<LoadedReferralCard token="tok-b" />));
+  expect(container.textContent).not.toContain("AAAAAA");
+  expect(container.textContent).not.toContain("あと1人で無料チケット");
+  expect(container.querySelector("section")).toBeNull();
+  expect(mocks.api).toHaveBeenLastCalledWith("/v1/me/coaching/referral", { token: "tok-b" });
+
+  await act(async () => { b.resolve({ referral: referralB }); });
+  expect(container.textContent).toContain("BBBBBB");
+  expect(container.textContent).not.toContain("AAAAAA");
+});
+
+it("T5（カード）：B に紹介がなければ、B の取得完了後もカードを出さない。遅れて返った A の取得も出さない", async () => {
+  const a = deferredReferral();
+  mocks.api.mockReturnValueOnce(a.promise);
+  await act(async () => root.render(<LoadedReferralCard token="tok-a" />));
+  const b = deferredReferral();
+  mocks.api.mockReturnValueOnce(b.promise);
+  await act(async () => root.render(<LoadedReferralCard token="tok-b" />));
+  await act(async () => { a.resolve({ referral: referralA }); });
+  expect(container.textContent).not.toContain("AAAAAA");
+  await act(async () => { b.resolve({ referral: null }); });
+  expect(container.querySelector("section")).toBeNull();
+});
+
+it("T5（入力欄）：A の紹介状態のあと B に切り替えると、B の取得が終わるまで A の状態で注記を出さず、終わったら B の状態で出す", async () => {
+  // A は紹介IDを持たない（注記が出る）。
+  mocks.api.mockResolvedValueOnce({ referral: null });
+  await act(async () => root.render(<ReferralInput token="tok-a" code="ABCDEF" onChange={() => {}} warning={false} />));
+  expect(container.textContent).toContain(note);
+
+  const b = deferredReferral();
+  mocks.api.mockReturnValueOnce(b.promise);
+  await act(async () => root.render(<ReferralInput token="tok-b" code="ABCDEF" onChange={() => {}} warning={false} />));
+  expect(container.textContent).not.toContain(note);
+
+  // B は有効な紹介IDを持つ（注記は出ない）。
+  await act(async () => { b.resolve({ referral: referralB }); });
+  expect(container.textContent).not.toContain(note);
+
+  // C は紹介IDを持たない。B の状態（有効）は C の取得完了まで使わず、完了後に C の状態で注記を出す。
+  const c = deferredReferral();
+  mocks.api.mockReturnValueOnce(c.promise);
+  await act(async () => root.render(<ReferralInput token="tok-c" code="ABCDEF" onChange={() => {}} warning={false} />));
+  expect(container.textContent).not.toContain(note);
+  await act(async () => { c.resolve({ referral: null }); });
+  expect(container.textContent).toContain(note);
+});
+
+it("T6：pageshow（persisted）で現在の token の紹介を取り直し、persisted でなければ取り直さない", async () => {
+  mocks.api.mockResolvedValueOnce({ referral: referralA });
+  await act(async () => root.render(<LoadedReferralCard token="tok-a" />));
+  expect(container.textContent).toContain("AAAAAA");
+  mocks.api.mockClear();
+  await firePageshow(false);
+  expect(mocks.api).not.toHaveBeenCalled();
+  mocks.api.mockResolvedValueOnce({ referral: { ...referralA, code: "NEWNEW" } });
+  await firePageshow(true);
+  expect(mocks.api).toHaveBeenCalledTimes(1);
+  expect(mocks.api).toHaveBeenCalledWith("/v1/me/coaching/referral", { token: "tok-a" });
+  expect(container.textContent).toContain("NEWNEW");
+});
+
+it("T7：ログアウト（token なし）では前の紹介IDを出さず、取得もしない", async () => {
+  mocks.api.mockResolvedValueOnce({ referral: referralA });
+  await act(async () => root.render(<LoadedReferralCard token="tok-a" />));
+  mocks.api.mockClear();
+  await act(async () => root.render(<LoadedReferralCard token={null} />));
+  expect(container.textContent).not.toContain("AAAAAA");
+  expect(mocks.api).not.toHaveBeenCalled();
+});
+
+it("T7：取得に失敗したら紹介IDを出さない（未読込のまま）", async () => {
+  mocks.api.mockRejectedValueOnce(new Error("fail"));
+  await act(async () => root.render(<LoadedReferralCard token="tok-a" />));
+  expect(container.querySelector("section")).toBeNull();
+  mocks.api.mockRejectedValueOnce(new Error("fail"));
+  await act(async () => root.render(<ReferralInput token="tok-b" code="ABCDEF" onChange={() => {}} warning={false} />));
+  expect(container.textContent).not.toContain(note);
+});

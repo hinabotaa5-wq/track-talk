@@ -39,38 +39,49 @@ function CountBadge({ count }: { count: number }) {
   );
 }
 
+const noCounts = { player: 0, coach: 0 };
+
 export function CoachSelfButton() {
-  const { token } = useAuth();
-  const [loaded, setCounts] = useState<{ player: number; coach: number }>({ player: 0, coach: 0 });
-  // ログアウトしたら、前の件数を残さない。
-  const counts = token ? loaded : { player: 0, coach: 0 };
+  const { session, token } = useAuth();
+  // 本体 #1009：件数は「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ出す。
+  // キーは利用者 ID（session がなければ token）。同じ利用者の token 更新では消さずに取り直す。
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [loaded, setCounts] = useState<{ key: string | null; player: number; coach: number }>({ key: null, ...noCounts });
+  // ログアウト・利用者の切替直後は、前の件数を残さない。
+  const counts = userKey && loaded.key === userKey ? loaded : noCounts;
 
   useEffect(() => {
     // 未ログインでは取得せず、バッジも出さない。
-    if (!token) return;
+    if (!token || !userKey) return;
     let alive = true;
     const load = () => {
       apiFetch<ActionCounts>("/v1/me/coaching/action-counts", { token })
         .then((data) => {
-          if (alive) setCounts({ player: validCount(data?.player_count), coach: validCount(data?.coach_count) });
+          if (alive) setCounts({ key: userKey, player: validCount(data?.player_count), coach: validCount(data?.coach_count) });
         })
         // 失敗してもエラーは出さない。バッジを出さないだけで、遷移も妨げない。
         .catch(() => {
-          if (alive) setCounts({ player: 0, coach: 0 });
+          if (alive) setCounts({ key: userKey, ...noCounts });
         });
     };
     const refresh = () => {
       if (document.visibilityState === "visible") load();
     };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1009）。
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) load();
+    };
     load();
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
     return () => {
       alive = false;
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
     };
-  }, [token]);
+  }, [token, userKey]);
 
   const playerLabel = counts.player > 0 ? L("選手（未対応{count}件）", { count: counts.player }) : L("選手");
   const coachLabel = counts.coach > 0 ? L("コーチ（未対応{count}件）", { count: counts.coach }) : L("コーチ");
