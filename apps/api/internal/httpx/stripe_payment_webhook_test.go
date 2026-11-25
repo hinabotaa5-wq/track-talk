@@ -31,7 +31,6 @@ func setupStripeBeforeAndAfterClose(t *testing.T) (http.Handler, http.Handler, *
 	cfg.CoachingEnabled = false
 	cfg.CoachingNewAcceptance = false
 	cfg.CoachingMessaging = false
-	cfg.CoachingTicketSales = false
 	cfg.ReviewRandomAssign = false
 	return before, httpx.New(cfg, pool, verifier), f
 }
@@ -125,7 +124,6 @@ func TestStripePaymentWebhookDoesNotOpenPurchases(t *testing.T) {
 		c.CoachingEnabled = false
 		c.CoachingNewAcceptance = false
 		c.CoachingMessaging = false
-		c.CoachingTicketSales = false
 	})
 	tok := token(t, uuid.New())
 	id := uuid.NewString()
@@ -187,7 +185,6 @@ func TestStripeMoneyAlertsAcceptedWhileClosed(t *testing.T) {
 		c.CoachingEnabled = false
 		c.CoachingNewAcceptance = false
 		c.CoachingMessaging = false
-		c.CoachingTicketSales = false
 	})
 	cases := []struct {
 		typ string

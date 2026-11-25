@@ -15,8 +15,10 @@ export type TicketSummary = {
   purchases: TicketPurchase[] | null;
   ledger: { id: string; kind: string; available_delta: number; reserved_delta: number; created_at: string }[] | null;
   can_purchase: boolean; purchase_block_reason: string; unit_yen: number;
-  // false の間はチケットの新規販売を止めている。購入済みの残高・履歴・返金はそのまま。
+  // チケットの販売は終了した（本体 #1031、API は常に false）。発行済みの残高・履歴・返金はそのまま。
   sales_open?: boolean;
+  // 本体 #1031：紹介特典の ¥500 クーポンの保有状況。古い API では返らない。
+  coupons?: CouponSummary | null;
   next_expiry?: TicketNextExpiry | null;
   is_minor?: boolean | null;
   // 単発の料金・添削1回に使う枚数・有効期限（月）。価格の比較と条件の表示に使う。
@@ -26,14 +28,27 @@ export type TicketSummary = {
   balance_by_kind?: Record<TicketKind, TicketKindBalance> | null;
 };
 
+// 紹介特典の ¥500 クーポン（本体 #1031）。使える枚数・いちばん早い有効期限・額面・条件。
+export type CouponSummary = { available: number; next_expires_at: string | null; amount_yen: number; terms?: string };
+
+// 使えるクーポンの枚数（サマリが取れない・古い API では 0）。
+export function couponCount(summary: Pick<TicketSummary, "coupons"> | null | undefined): number {
+  return summary?.coupons?.available ?? 0;
+}
+
+// クーポンを使ったときの支払額（0円未満にはしない）。API の couponCashPrice と同じ。
+export function couponCashPrice(priceYen: number, couponYen: number): number {
+  return Math.max(priceYen - couponYen, 0);
+}
+
 // チケットの種別（本体 #687）。normal＝通常チケット（購入分）、reward＝無料チケット（紹介特典）。
 export type TicketKind = "normal" | "reward";
 export type TicketKindBalance = { available: number; next_expires_at: string | null };
 
-// コーチ詳細の入口から申込画面へ渡す支払いの初期値（?pay=）。
-export type ReviewPayParam = "card" | TicketKind;
+// コーチ詳細の入口から申込画面へ渡す支払いの初期値（?pay=）。coupon は ¥500 クーポン（本体 #1031）。
+export type ReviewPayParam = "card" | "coupon" | TicketKind;
 export function parseReviewPayParam(value: string | null | undefined): ReviewPayParam | null {
-  return value === "card" || value === "normal" || value === "reward" ? value : null;
+  return value === "card" || value === "coupon" || value === "normal" || value === "reward" ? value : null;
 }
 
 // 種別ごとの使える枚数。サマリが取れない・古い API で種別がない場合は null（枚数を出さない）。
@@ -52,17 +67,21 @@ function defaultTicketKind(counts: Record<TicketKind, number> | null): TicketKin
 }
 
 // 申込画面の支払い方法と内訳の初期値。入口の指定（?pay=）を優先し、その種別が使えなくなっていたら
-// 使える側に直す（チケットが1枚もなければ単発）。指定がなければ従来どおり、残りがあればチケット。
+// 使える側に直す（チケットが1枚もなければクーポン、クーポンもなければ単発）。
+// 指定がなければ、残りがあればチケット、なければクーポン、どちらもなければ単発。
 export function initialReviewPayment(
-  summary: Pick<TicketSummary, "balance" | "balance_by_kind"> | null | undefined,
+  summary: Pick<TicketSummary, "balance" | "balance_by_kind" | "coupons"> | null | undefined,
   pay: ReviewPayParam | null,
-): { method: "card" | "tickets"; kind: TicketKind | null } {
+): { method: "card" | "tickets" | "coupon"; kind: TicketKind | null } {
   const counts = ticketKindCounts(summary);
   const kind = defaultTicketKind(counts);
   const total = summary?.balance?.available ?? 0;
+  const coupons = couponCount(summary);
   if (pay === "card") return { method: "card", kind };
+  if (pay === "coupon" && coupons >= 1) return { method: "coupon", kind };
   if ((pay === "normal" || pay === "reward") && counts && counts[pay] >= 1) return { method: "tickets", kind: pay };
-  return total >= 1 ? { method: "tickets", kind } : { method: "card", kind };
+  if (total >= 1) return { method: "tickets", kind };
+  return coupons >= 1 ? { method: "coupon", kind } : { method: "card", kind };
 }
 
 // 確保される1枚の有効期限（種別を選んだら、その種別の中でいちばん早いもの）。null は期限のない旧ロット。
@@ -82,12 +101,6 @@ export function ticketReturnPath(value: string | null | undefined): string {
   return "/me/coaching/tickets";
 }
 
-// コーチ詳細からチケット購入画面へ進むリンク。購入を完了したら、そのコーチ詳細に戻れるようにする（本体 #691）。
-export function coachTicketPurchaseHref(coachID: string | null | undefined): string {
-  const back = coachID ? `/coaches/${coachID}` : "";
-  return ticketReturnPath(back) === back ? `/me/coaching/tickets?return_to=${encodeURIComponent(back)}` : "/me/coaching/tickets";
-}
-
 export const ticketStatusLabels: Record<TicketPurchase["status"], string> = {
   get pending() { return L("お支払い待ち"); }, get paid() { return L("購入済み"); }, get partially_refunded() { return L("一部返金済み"); }, get refunded() { return L("返金済み"); },
 };
@@ -103,4 +116,6 @@ export type Referral = {
   friend_count: number;
   granted_at: string | null;
   expires_at: string | null;
+  // 本体 #1031：付与した特典の種類（coupon＝¥500 クーポン、ticket＝発行済みの特典チケット）。古い API では返らない。
+  reward_kind?: "coupon" | "ticket" | null;
 };

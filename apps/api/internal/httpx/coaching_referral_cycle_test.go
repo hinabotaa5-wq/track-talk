@@ -48,17 +48,9 @@ func referralCheck(t *testing.T, h http.Handler, tok, code string) bool {
 // buySixWithReferral は、紹介IDを入れて6回パックを買い、支払いまで済ませて購入IDを返す。
 func buySixWithReferral(t *testing.T, h http.Handler, tok, code string) string {
 	t.Helper()
-	rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", tok, map[string]any{
-		"product_id": "six", "request_key": uuid.NewString(), "guardian_permission": true, "referral_code": code,
-	})
-	var data struct {
-		ID string `json:"purchase_id"`
-	}
-	if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
-		t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
-	}
-	payTicketPurchase(t, h, data.ID, 5000)
-	return data.ID
+	purchaseID := seedTicketPurchase(t, tok, "six", uuid.NewString(), "/coaching/new", code)
+	payTicketPurchase(t, h, purchaseID, 5000)
+	return purchaseID
 }
 
 func activeCodeCount(t *testing.T, owner uuid.UUID) int {
@@ -188,20 +180,20 @@ func TestCoachingReferralDisputeCancelsCountAndReward(t *testing.T) {
 	code := myReferral(t, h, owner).Code
 	buySixWithReferral(t, h, f1, code)
 	disputed := buySixWithReferral(t, h, f2, code)
-	var lot uuid.UUID
-	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{ownerID}, &lot)
+	var coupon uuid.UUID
+	queryRowArgs(t, `SELECT coupon_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{ownerID}, &coupon)
 
 	if rec := stripeWebhook(t, h, testWebhookSecret, "charge.dispute.created", map[string]any{
 		"id": "dp_referral", "amount": 5000, "reason": "fraudulent", "payment_intent": "pi_ticket_" + disputed,
 	}); rec.Code != 200 {
 		t.Fatalf("dispute %d %s", rec.Code, rec.Body.String())
 	}
-	var available int
+	var status string
 	var canceled bool
-	queryRowArgs(t, `SELECT l.available, r.canceled_at IS NOT NULL FROM coaching_ticket_lots l
-		JOIN coaching_referral_rewards r ON r.lot_id=l.id WHERE l.id=$1`, []any{lot}, &available, &canceled)
-	if available != 0 || !canceled {
-		t.Fatalf("disputed reward available=%d canceled=%v", available, canceled)
+	queryRowArgs(t, `SELECT c.status, r.canceled_at IS NOT NULL FROM coaching_coupons c
+		JOIN coaching_referral_rewards r ON r.coupon_id=c.id WHERE c.id=$1`, []any{coupon}, &status, &canceled)
+	if status != "canceled" || !canceled {
+		t.Fatalf("disputed reward coupon=%s canceled=%v", status, canceled)
 	}
 	r := myReferral(t, h, owner)
 	if r.Code != code || !r.Active || r.FriendCount != 1 {
@@ -363,12 +355,12 @@ func TestCoachingReferralConcurrentSecondCount(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		var rewards, valid, lots int
+		var rewards, valid, coupons int
 		queryRowArgs(t, `SELECT count(*) FROM coaching_referral_rewards WHERE referral_code=$1`, []any{code}, &rewards)
 		queryRowArgs(t, `SELECT count(*) FROM coaching_referral_counts WHERE referral_code=$1 AND canceled_at IS NULL`, []any{code}, &valid)
-		queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_lots WHERE owner_id=$1 AND kind='referral_reward'`, []any{owner}, &lots)
-		if rewards != 1 || valid != 2 || lots != 1 {
-			t.Fatalf("round %d: rewards=%d valid counts=%d lots=%d", round, rewards, valid, lots)
+		queryRowArgs(t, `SELECT count(*) FROM coaching_coupons WHERE owner_id=$1 AND source='referral'`, []any{owner}, &coupons)
+		if rewards != 1 || valid != 2 || coupons != 1 {
+			t.Fatalf("round %d: rewards=%d valid counts=%d coupons=%d", round, rewards, valid, coupons)
 		}
 	}
 }

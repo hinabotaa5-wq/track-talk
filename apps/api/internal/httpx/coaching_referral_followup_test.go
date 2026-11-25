@@ -117,17 +117,9 @@ func TestCoachingReferralConsumedRewardSurvivesRefund(t *testing.T) {
 	}
 	checkoutWithCode := func(tok, referral string) string {
 		t.Helper()
-		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", tok, map[string]any{
-			"product_id": "six", "request_key": uuid.NewString(), "guardian_permission": true, "referral_code": referral,
-		})
-		var data struct {
-			ID string `json:"purchase_id"`
-		}
-		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
-			t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
-		}
-		payTicketPurchase(t, h, data.ID, 5000)
-		return data.ID
+		purchaseID := seedTicketPurchase(t, tok, "six", uuid.NewString(), "/coaching/new", referral)
+		payTicketPurchase(t, h, purchaseID, 5000)
+		return purchaseID
 	}
 	_, buyer1 := demoRequester(t, h, admin)
 	_, buyer2 := demoRequester(t, h, admin)
@@ -138,11 +130,8 @@ func TestCoachingReferralConsumedRewardSurvivesRefund(t *testing.T) {
 	if active != 2 {
 		t.Fatalf("friend count = %d, want 2", active)
 	}
-	var lotID string
-	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{referrerID}, &lotID)
-	if lotID == "" {
-		t.Fatal("no reward granted")
-	}
+	// 発行済みの特典チケット（本体 #1031 より前の付与）として扱う。
+	lotID := legacyRewardLotFromCoupon(t, referrerID)
 	// 6枚つづりを6回使い切ってから、7回目で特典ロットを予約・消費する。
 	_, coach := onDutyCoach(t, h, admin)
 	consumeReview := func() string {
@@ -225,23 +214,30 @@ func grantRewardLot(t *testing.T, h http.Handler, admin string) (uuid.UUID, stri
 	}
 	for i := 0; i < 2; i++ {
 		_, buyer := demoRequester(t, h, admin)
-		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", buyer, map[string]any{
-			"product_id": "six", "request_key": uuid.NewString(), "guardian_permission": true, "referral_code": code,
-		})
-		var data struct {
-			ID string `json:"purchase_id"`
-		}
-		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
-			t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
-		}
-		payTicketPurchase(t, h, data.ID, 5000)
+		purchaseID := seedTicketPurchase(t, buyer, "six", uuid.NewString(), "/coaching/new", code)
+		payTicketPurchase(t, h, purchaseID, 5000)
 	}
-	var lotID string
-	queryRowArgs(t, `SELECT lot_id FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{referrerID}, &lotID)
-	if lotID == "" {
+	return referrerID, referrer, legacyRewardLotFromCoupon(t, referrerID)
+}
+
+// legacyRewardLotFromCoupon は、紹介者に付与された ¥500 クーポンの特典を、本体 #1031 より前の形
+// （特典チケットのロット1枚＋台帳の referral_grant 1行＋特典行の lot_id）に置き換え、ロットIDを返す。
+// 発行済みの無料チケット（1名分）が、発行時の条件のまま使えることを確かめるための前提づくり。
+func legacyRewardLotFromCoupon(t *testing.T, referrerID uuid.UUID) string {
+	t.Helper()
+	var couponID string
+	queryRowArgs(t, `SELECT coupon_id::text FROM coaching_referral_rewards WHERE referrer_id=$1 AND canceled_at IS NULL`, []any{referrerID}, &couponID)
+	if couponID == "" {
 		t.Fatal("no reward granted")
 	}
-	return referrerID, referrer, lotID
+	lotID := uuid.NewString()
+	execSQLArgs(t, `INSERT INTO coaching_ticket_lots(id, owner_id, quantity, available, expires_at, kind)
+		SELECT $1::uuid, owner_id, 1, 1, expires_at, 'referral_reward' FROM coaching_coupons WHERE id = $2::uuid`, lotID, couponID)
+	execSQLArgs(t, `INSERT INTO coaching_ticket_ledger(id, lot_id, operation_key, kind, available_delta)
+		VALUES (gen_random_uuid(), $1::uuid, 'referral-grant-' || $1::text, 'referral_grant', 1)`, lotID)
+	execSQLArgs(t, `UPDATE coaching_referral_rewards SET lot_id = $1::uuid, coupon_id = NULL WHERE coupon_id = $2::uuid`, lotID, couponID)
+	execSQLArgs(t, `DELETE FROM coaching_coupons WHERE id = $1::uuid`, couponID)
+	return lotID
 }
 
 // consumeOneTicketReview は、利用者のチケット1枚で動画添削を1件やり切り、

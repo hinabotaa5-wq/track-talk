@@ -27,15 +27,12 @@ func TestPurchaseNoticeForEveryAccount(t *testing.T) {
 			if age == "unregistered" {
 				execSQLArgs(t, `UPDATE profiles SET birth_month=NULL WHERE id=$1`, account)
 			}
-			for _, kind := range []string{"review", "ticket_purchase"} {
+			// チケットの購入は販売終了（本体 #1031）で受け付けないため、都度払いの申込みだけを確かめる。
+			for _, kind := range []string{"review"} {
 				path := "/v1/coaching/requests"
 				body := reviewBodyFor(t, h, tok)
 				body["method"] = "card"
 				body["requested_coach_id"] = coach.String()
-				if kind == "ticket_purchase" {
-					path = "/v1/coaching/tickets/checkout"
-					body = map[string]any{"product_id": "six", "request_key": uuid.NewString()}
-				}
 				delete(body, "guardian_permission")
 				sessions := sessionCount(f)
 				for _, checked := range []bool{false, true} {
@@ -67,7 +64,9 @@ func TestPurchaseNoticeForEveryAccount(t *testing.T) {
 func TestPurchaseNoticeRetentionPreservesLegacyRecords(t *testing.T) {
 	h, _ := setupStripe(t)
 	account, tok := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
-	buySixTickets(t, h, tok)
+	purchase := buySixTickets(t, h, tok)
+	// 販売終了（本体 #1031）の前の購入で残っていた、購入のたびの注意事項の記録（新しい形式）。
+	execSQLArgs(t, `INSERT INTO minor_purchase_declarations(id,minor_id,ref_type,ref_id,text_version) VALUES($1,$2,'ticket_purchase',$3,'purchase-notice-2026-11-13')`, uuid.New(), account, purchase)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, testDSN(t))
 	if err != nil {

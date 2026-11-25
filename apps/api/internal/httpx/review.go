@@ -90,10 +90,12 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"requested_coach_id": rr.RequestedCoachID, "requested_coach_name": rr.RequestedCoachName,
 		"base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets,
 		"total_price_yen": rr.BasePriceYen, "cash_price_yen": reviewCashPrice(rr),
-		"video_url":     reviewVideoURL(rr, s.cloud.CoachingPlaybackURL),
-		"thumbnail_url": reviewVideoURL(rr, s.cloud.CoachingThumbnailURL),
-		"info_request":  infoRequestJSON(rr),
-		"withdrawal":    withdrawalJSON(rr),
+		// 適用したクーポンの割引額（運営負担。本体 #1031）。使っていなければ 0。
+		"coupon_discount_yen": rr.CouponDiscountYen,
+		"video_url":           reviewVideoURL(rr, s.cloud.CoachingPlaybackURL),
+		"thumbnail_url":       reviewVideoURL(rr, s.cloud.CoachingThumbnailURL),
+		"info_request":        infoRequestJSON(rr),
+		"withdrawal":          withdrawalJSON(rr),
 		// スレッドの終わりから7日を過ぎて、動画ファイル（依頼の動画とコーチの見本動画）を消したか（本体 #506）。
 		"videos_purged": rr.VideosPurgedAt != nil,
 		// 海外コーチとのやり取りの訳（本体 #916）。詳細の応答でだけ withReviewTranslations が入れ、それ以外は null。
@@ -282,6 +284,10 @@ type reviewRequestReq struct {
 	// 空なら従来どおり種別を区別せず失効の早いものから使う。
 	TicketKind   string `json:"ticket_kind"`
 	ReferralCode string `json:"referral_code"`
+	// 紹介特典の ¥500 クーポンを1枚使うか（本体 #1031）。coupon_id を指定したらその1枚、なければ期限の早いもの。
+	// チケットとは併用できない。
+	UseCoupon bool       `json:"use_coupon"`
+	CouponID  *uuid.UUID `json:"coupon_id"`
 	// 選手が選んだコーチ。おまかせ(REVIEW_RANDOM_ASSIGN_ENABLED)を止めている間は必須。
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
 	// 選手が任意で書ける選手情報（本体 #1013 補足）。空白だけ・未入力は NULL で保存する。
@@ -350,6 +356,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if !validTicketKind(req.TicketKind) || (req.TicketKind != "" && !useTickets) {
 		fields["ticket_kind"] = "チケットの種類を選び直してください"
 	}
+	useCoupon := req.UseCoupon || req.CouponID != nil
+	if useCoupon && useTickets {
+		fields["use_coupon"] = "クーポンとチケットは一緒に使えません"
+	}
 	// 特集モードでは、コーチを選ばずに送った依頼も特集コーチへの指名として扱う（本体 #985）。指名の確認は下の候補で行う。
 	if featured, on := s.featuredCoach(); on && req.RequestedCoachID == nil {
 		req.RequestedCoachID = &featured
@@ -371,11 +381,16 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		coachName = nominees[0].Nickname
 	}
 	// 料金は全コーチ共通。チケットで払うときは現金の支払いはない。
+	// クーポンを使うときは価格から額面を引いた額を払う（0円になれば支払いはない。本体 #1031）。
 	cashPrice := int32(0)
-	if !useTickets {
-		cashPrice = reviewPriceYen
+	couponYen := int32(0)
+	if useCoupon {
+		couponYen = couponDiscount(reviewPriceYen, referralCouponYen)
 	}
-	payments := s.stripe.Configured() && cashPrice > 0
+	if !useTickets {
+		cashPrice = couponCashPrice(reviewPriceYen, couponYen)
+	}
+	payments := reviewNeedsPayment(s.stripe.Configured(), cashPrice)
 	if payments && !validReviewPayMethod(req.Method) {
 		fields["method"] = "支払い方法を選んでください"
 	}
@@ -426,7 +441,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if useTickets {
+	if useTickets || useCoupon {
 		// 同時に送られた2本が、どちらも「まだ0本」と読んで作られないように、ロックを取ってから確かめ直す。
 		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
 			MapDBError(w, err)
@@ -450,7 +465,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Focus:            focus,
 		Question:         question,
 		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
-		BasePriceYen: reviewPriceYen, UseTickets: useTickets,
+		BasePriceYen: reviewPriceYen, UseTickets: useTickets, CouponDiscountYen: couponYen,
 		Pb: pb, GoalTime: goalTime, WindSpeed: windSpeed, BodyCondition: bodyCondition,
 		VideoPublicID: video,
 		DueAt:         due,
@@ -468,6 +483,12 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if useTickets {
 		if err := s.reserveReviewTickets(r.Context(), q, p, rr, req.TicketKind); err != nil {
+			writeCheckoutError(w, err)
+			return
+		}
+	}
+	if useCoupon {
+		if err := reserveReviewCoupon(r.Context(), q, p.ID, req.CouponID, rr); err != nil {
 			writeCheckoutError(w, err)
 			return
 		}
@@ -493,6 +514,9 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 						return e
 					}
 				} else if !errors.Is(e, pgx.ErrNoRows) {
+					return e
+				}
+				if e := releaseReviewCouponFor(r.Context(), q, rr.ID); e != nil {
 					return e
 				}
 				return q.DeleteAwaitingReviewRequest(r.Context(), rr.ID)

@@ -5,7 +5,7 @@ import type { ComponentType, ReactNode } from "react";
 import { Copy, Gift, GraduationCap, Keyboard, Ticket } from "lucide-react";
 import { L } from "@/lib/i18n";
 
-// 無料チケットの説明ページ（本体 #823）。ログイン不要の静的ページで、データ取得はしない。
+// 紹介特典（¥500 クーポン、本体 #1031）の説明ページ（本体 #823）。ログイン不要の静的ページで、データ取得はしない。
 type Step = { icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>; title: string; body: string };
 
 function StepCard({ step, index, children }: { step: Step; index: number; children?: ReactNode }) {
@@ -32,9 +32,9 @@ function StepCard({ step, index, children }: { step: Step; index: number; childr
 const steps: Step[] = [
   { icon: Ticket, title: "購入すると、あなたの紹介IDが発行されます", body: "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。" },
   { icon: Copy, title: "紹介IDを友達に伝える", body: "マイページで、紹介IDをコピーしたり共有ボタンで送ったりできます。" },
-  { icon: GraduationCap, title: "友達がコーチを選んで、申し込みに進む", body: "友達は、スタンダードの都度払いでも、チケット6枚パックの購入でも申し込めます。" },
+  { icon: GraduationCap, title: "友達がコーチを選んで、申し込みに進む", body: "友達は、スタンダードの都度払いで申し込みます。" },
   { icon: Keyboard, title: "友達が、購入の手続きで紹介IDを入力して購入を完了する", body: "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。" },
-  { icon: Gift, title: "友達2人が購入すると、無料チケットをプレゼント", body: "あと何人かは、マイページで確認できます。" },
+  { icon: Gift, title: "友達2人が購入すると、¥500クーポンをプレゼント", body: "あと何人かは、マイページで確認できます。クーポンはスタンダードの申込みで使え、1,000円の申込みならお支払いは500円になります。" },
 ];
 
 const notes = [
@@ -43,15 +43,16 @@ const notes = [
   "使えない紹介IDを入力しても、購入は止まりません（紹介として数えられないだけです）。",
   "自分の紹介IDは、自分の購入には使えません。",
   "同じ友達は、同じ紹介者には1回だけ数えられます。",
-  "対象はスタンダードの都度払いとチケット6枚パックです。追加質問は対象外です。",
-  "無料チケットは、もらった本人だけが使えます。払戻しはできません。",
+  "対象はスタンダードの都度払いです。クーポンを使った申込みと追加質問は対象外です。",
+  "¥500クーポンは、プレゼントされてから6か月有効です。もらった本人だけが使えます。現金への払戻しはできません。",
+  "1回の申込みに使えるクーポンは1枚までです。チケットとは一緒に使えません。",
 ];
 
 export function ReferralGuideView() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-bold">{L("友達2人に紹介すると、1回分(1,000円)無料！")}</h1>
+        <h1 className="text-2xl font-bold">{L("2人に紹介すると500円分無料！")}</h1>
       </div>
 
       <section className="space-y-3">

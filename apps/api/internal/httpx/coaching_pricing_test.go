@@ -7,21 +7,22 @@ import (
 	"testing"
 )
 
-// 売るのは6枚つづり5,000円だけ（本体 #569、価格は #983）。旧商品（1枚・5枚）は出さず、買えない。
-// 単発の料金（1,000円）と1回あたりの枚数（1枚）・有効期限（6か月）も一緒に返す。
-func TestTicketProductsAreSixForFiveThousand(t *testing.T) {
+// チケットの販売は全商品とも終了した（本体 #1031、S1・S2）。サマリは商品を出さず sales_open=false、
+// 購入の API は商品（現行の6枚・旧商品の1枚・5枚）によらず 409 ticket_sales_closed。単発の料金（1,000円）と
+// 1回あたりの枚数（1枚）・有効期限（6か月）は、発行済みのチケットの説明のため引き続き返す。
+func TestTicketSalesEndedForAllProducts(t *testing.T) {
 	h, _ := setupStripe(t)
 	_, owner := demoRequester(t, h, adminToken(t, h))
 	summary := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", owner, nil).Body.String()
-	for _, want := range []string{`"products":[{"id":"six","title":"チケット6枚","quantity":6,"amount_yen":5000`, `"single_price_yen":1000`, `"review_units":1`, `"validity_months":6`} {
+	for _, want := range []string{`"products":[]`, `"sales_open":false`, `"can_purchase":false`, `"single_price_yen":1000`, `"review_units":1`, `"validity_months":6`, `"terms_version":"v7"`} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary %s missing %s", summary, want)
 		}
 	}
-	for _, old := range []string{"single", "five"} {
-		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", owner, map[string]any{"guardian_permission": true, "product_id": old, "request_key": uuid.NewString(), "return_path": "/coaching/new"})
-		if rec.Code != 422 || !strings.Contains(rec.Body.String(), "product_unavailable") {
-			t.Fatalf("old product %s %d %s", old, rec.Code, rec.Body.String())
+	for _, product := range []string{"six", "single", "five"} {
+		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", owner, map[string]any{"guardian_permission": true, "product_id": product, "request_key": uuid.NewString(), "return_path": "/coaching/new"})
+		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "ticket_sales_closed") {
+			t.Fatalf("product %s %d %s", product, rec.Code, rec.Body.String())
 		}
 	}
 }

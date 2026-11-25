@@ -15,7 +15,7 @@ for (const age of ["unregistered", "adult", "minor"]) {
    let body: unknown = {};
    if (p.endsWith("/me")) body = { id:userID,nickname:"テスト選手",event:"100m",mfa_required:false,overseas_consent:true };
    else if (p.endsWith("/me/coaching")) body = { demo:true,review_open:true,birth_month:age==="unregistered"?null:age==="adult"?"1995-01":"2012-01",is_minor:age==="unregistered"?null:age==="minor",guardian:null,push_devices:0 };
-   else if (p.endsWith("/tickets")) body = { balance:{available:0,reserved:0},products:[{id:"six",quantity:6,amount_yen:2500}],purchases:[],ledger:[],can_purchase:true,sales_open:true,single_price_yen:500,review_units:1,validity_months:6 };
+   else if (p.endsWith("/tickets")) body = { balance:{available:0,reserved:0},products:[],purchases:[],ledger:[],can_purchase:false,sales_open:false,single_price_yen:500,review_units:1,validity_months:6 };
    else if (p.endsWith("/estimate")) body = { due_at:new Date(Date.now()+86400000).toISOString(),coaches_on_duty:true,payments:true,price_yen:500 };
    else if (p.endsWith("/nominees")) body = { price_yen:500,coaches:[] };
    else if (p.endsWith("/notifications")) body = { notifications:[],unread:0 };
@@ -31,14 +31,8 @@ for (const age of ["unregistered", "adult", "minor"]) {
   await expect(checkbox).toBeChecked();
   await page.reload();
   await expect(checkbox).not.toBeChecked();
+  // チケットの販売は終了した（本体 #1031）。チケット画面には購入の入口がない。
   await page.goto("/me/coaching/tickets");
-  await page.getByRole("button",{name:"購入内容を確認する",exact:true}).click();
-  await expect(checkbox).toBeVisible();
-  await expect(page.getByRole("button",{name:/確定してお支払いへ/})).toBeDisabled();
-  await checkbox.check();
-  await expect(page.getByRole("button",{name:/確定してお支払いへ/})).toBeEnabled();
-  await page.getByRole("button",{name:"戻って直す",exact:true}).click();
-  await page.getByRole("button",{name:"購入内容を確認する",exact:true}).click();
-  await expect(checkbox).not.toBeChecked();
+  await expect(page.getByRole("button",{name:"購入内容を確認する",exact:true})).toHaveCount(0);
  });
 }

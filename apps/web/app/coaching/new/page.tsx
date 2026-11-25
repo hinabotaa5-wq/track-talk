@@ -27,9 +27,9 @@ import {
   tooLong,
   videoDuration,
 } from "@/lib/review";
-import { initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
+import { couponCashPrice, couponCount, initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import { reviewPriceYen, ticketPackPriceYen } from "@/lib/review-pricing";
+import { reviewPriceYen } from "@/lib/review-pricing";
 import { reviewAthleteInfoKeys, reviewAthleteInfoLabel, reviewConfirmRows, type ReviewAthleteInfo, type ReviewAthleteInfoKey } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { looksLikeContact } from "@/lib/solicitation";
@@ -99,7 +99,8 @@ export default function NewReviewRequestPage() {
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
   const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
-  const [method, setMethod] = useState<ReviewPayMethod | "tickets">("card");
+  // coupon は ¥500 クーポンを使ってカードで差額を払う（本体 #1031）。チケットとは併用できない。
+  const [method, setMethod] = useState<ReviewPayMethod | "tickets" | "coupon">("card");
   // チケットの内訳（通常／無料。本体 #687）。種別が分からない古い API では null のまま（従来どおり自動）。
   const [ticketKind, setTicketKind] = useState<TicketKind | null>(null);
   const { pending, acquire, release } = useActionLock();
@@ -112,8 +113,12 @@ export default function NewReviewRequestPage() {
   const appliedCoachRef = useRef("");
   const coach = coaches.find((c) => c.id === coachID);
   const totalPrice = estimate?.price_yen ?? reviewPriceYen;
-  const cashPrice = method === "tickets" ? 0 : totalPrice;
-  // チケットが1枚（添削1回分）以上残っている人にだけ、チケットで払う選択肢を出す。
+  // 使えるクーポンがある人にだけ、クーポンの選択肢を出す（本体 #1031）。
+  const couponsLeft = couponCount(ticketSummary);
+  const couponsUsable = couponsLeft >= 1;
+  const couponYen = method === "coupon" ? Math.min(ticketSummary?.coupons?.amount_yen ?? 500, totalPrice) : 0;
+  const cashPrice = method === "tickets" ? 0 : couponCashPrice(totalPrice, couponYen);
+  // チケットが1枚（添削1回分）以上残っている人にだけ、チケットで払う選択肢を出す（販売は終了。発行済みの分だけ）。
   const ticketsUsable = (ticketSummary?.balance.available ?? 0) >= 1;
   const kindCounts = ticketKindCounts(ticketSummary);
   const chosenKind = method === "tickets" ? ticketKind : null;
@@ -125,7 +130,9 @@ export default function NewReviewRequestPage() {
   const reviewOpen = !!(me?.review_open ?? me?.demo);
   // 最終確認を出しているか。お金かチケットが動く申込みだけ確認を挟む（デモ版はそのまま送る）。
   const [confirming, setConfirming] = useState(false);
-  const needsConfirm = cashPayment || method === "tickets";
+  const needsConfirm = cashPayment || method === "tickets" || method === "coupon";
+  // 紹介IDは、定価で払う申込みにだけ入れられる（クーポンを使った申込みは紹介の対象外）。
+  const referralEligible = cashPayment && method !== "coupon";
   // 確認画面を開いた時点で取っておいた動画の署名（本体 #917）。確定後の往復を1つ減らす。1回使ったら捨てる。
   const prefetchedSignature = useRef<PrefetchedSignature | null>(null);
 
@@ -308,7 +315,11 @@ export default function NewReviewRequestPage() {
       return false;
     }
     if (method === "tickets" && (ticketSummary?.balance.available ?? 0) < 1) {
-      setError(L("チケットが不足しています。先にチケットを購入してください。"));
+      setError(L("チケットの残りがありません。別のお支払い方法を選んでください。"));
+      return false;
+    }
+    if (method === "coupon" && !couponsUsable) {
+      setError(L("使えるクーポンがありません。別のお支払い方法を選んでください。"));
       return false;
     }
     if (chosenKind && kindCounts && kindCounts[chosenKind] < 1) {
@@ -327,7 +338,7 @@ export default function NewReviewRequestPage() {
     if (!coach || !validate() || !acquire()) return;
     setError("");
     try {
-      const referralCheck = cashPayment ? await checkReferralInput(referralCode, token) : "ok";
+      const referralCheck = referralEligible ? await checkReferralInput(referralCode, token) : "ok";
       if (referralCheck !== "ok") {
         setReferralCode("");
         setReferralWarning(referralCheck);
@@ -347,7 +358,8 @@ export default function NewReviewRequestPage() {
         method: "POST",
         token,
         body: JSON.stringify({ tier, event, question: question.trim(), ...athleteInfoBody(athleteInfo), video_public_id: videoPublicID,
-          method, use_tickets: method === "tickets", ticket_kind: chosenKind ?? undefined, referral_code: cashPayment ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
+          method: method === "coupon" ? "card" : method, use_tickets: method === "tickets", use_coupon: method === "coupon", ticket_kind: chosenKind ?? undefined,
+          referral_code: referralEligible ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
       });
       if (created.checkout_url) {
         window.location.assign(created.checkout_url);
@@ -356,7 +368,7 @@ export default function NewReviewRequestPage() {
       router.push(`/coaching/requests/${created.id}`);
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : L("送信に失敗しました")));
-      if (err instanceof ApiRequestError && ["ticket_kind_unavailable", "insufficient_tickets"].includes(err.code)) {
+      if (err instanceof ApiRequestError && ["ticket_kind_unavailable", "insufficient_tickets", "coupon_unavailable"].includes(err.code)) {
         // 残りを読み直す。選んだ種別は他に切り替えない（0枚の側は選べない表示になる）。
         try { setTicketSummary(await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })); } catch { /* 元のエラーを表示する。 */ }
       }
@@ -394,14 +406,14 @@ export default function NewReviewRequestPage() {
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind, athleteInfo })}
-            confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ")}
+            rows={reviewConfirmRows({ method: method === "coupon" ? "card" : method, priceYen: totalPrice, couponYen, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind, athleteInfo })}
+            confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : method === "coupon" && !cashPayment ? L("確定してクーポンで送る") : L("確定してお支払いへ")}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
             pending={pending}
             pendingLabel={cashPayment ? L("お支払い画面へ移動しています") : undefined}
           >
-            {cashPayment ? <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
+            {referralEligible ? <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
               onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} /> : null}
             <Link href="/legal/commerce" className="inline-block text-xs text-slate-200 underline">
               {L("特定商取引法に基づく表記")}
@@ -502,25 +514,33 @@ export default function NewReviewRequestPage() {
           ) : null}
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
           {!estimate ? <p role="status" className="text-sm text-slate-300">{L("料金と受付状況を確認しています。表示されない場合はページを開き直してください。")}</p> : null}
-          {estimate?.payments || ticketsUsable ? (
+          {estimate?.payments || ticketsUsable || couponsUsable ? (
             <fieldset disabled={pending} className="space-y-2">
               <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
               <div className="flex flex-wrap gap-2">
                 <button type="button" aria-pressed={method === "card"} onClick={() => setMethod("card")} className={chip(method === "card")}>
                   {L("単発 {v0}／回", { v0: formatYen(totalPrice) })}
                 </button>
+                {couponsUsable ? (
+                  <button type="button" aria-pressed={method === "coupon"} onClick={() => setMethod("coupon")} className={chip(method === "coupon")}>
+                    {L("¥500クーポン（残り {n} 枚）", { n: couponsLeft })}
+                  </button>
+                ) : null}
                 {ticketsUsable ? (
                   <button type="button" aria-pressed={method === "tickets"} onClick={() => setMethod("tickets")} className={chip(method === "tickets")}>
-                    {L("チケット（6枚）{v0}", { v0: formatYen(ticketPackPriceYen) })}
+                    {L("チケット（残り {n} 枚）", { n: ticketSummary?.balance.available ?? 0 })}
                   </button>
-                ) : ticketSummary?.can_purchase ? (
-                  <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className={chip(false)}>
-                    {L("チケット（6枚）{v0}", { v0: formatYen(ticketPackPriceYen) })}
-                  </Link>
                 ) : null}
               </div>
               {method === "card" ? (
                 <p className="text-xs text-slate-300">{reviewPayMethodLabels.card}</p>
+              ) : null}
+              {method === "coupon" && couponsUsable ? (
+                <div className="space-y-1 text-sm" aria-label={L("クーポンの内訳")}>
+                  <p>{L("価格 {price} − クーポン {coupon} ＝ お支払い {pay}", { price: formatYen(totalPrice), coupon: formatYen(couponYen), pay: formatYen(cashPrice) })}</p>
+                  {ticketSummary?.coupons?.next_expires_at ? <p className="text-xs text-slate-300">{L("使うクーポンの有効期限：{v0}", { v0: formatDateTime(ticketSummary.coupons.next_expires_at) })}</p> : null}
+                  <p className="text-xs text-slate-300">{cashPrice > 0 ? reviewPayMethodLabels.card : L("クーポンで全額を払うので、このあとのお支払いはありません。")}</p>
+                </div>
               ) : null}
               {method === "tickets" && ticketsUsable && ticketSummary ? (
                 <div className="space-y-2 text-sm">
@@ -545,8 +565,8 @@ export default function NewReviewRequestPage() {
                   ) : null}
                   <TicketBalance summary={ticketSummary} />
                   <p className="text-xs text-slate-300">{L("スタンダード1件はチケット1枚です。")}</p>
-                  <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
-                    {ticketSummary.can_purchase ? L("チケットを購入・確認する") : L("コーチングチケット")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
+                  <Link href="/me/coaching/tickets" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
+                    {L("チケット・クーポン")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
                   </Link>
                 </div>
               ) : null}
@@ -559,7 +579,7 @@ export default function NewReviewRequestPage() {
               {L("申し込みが確定してから24時間以内に回答が来ます。")}
             </p>
           ) : null}
-          {coachID ? <p className="text-xs text-slate-300">{L("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。")}</p> : null}
+          {coachID ? <p className="text-xs text-slate-300">{L("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケット・クーポンは返還します。")}</p> : null}
           {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
           <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !estimate || !coach || (needsDeclaration && !declared)}>
             {pending ? L("送っています") : needsConfirm ? L("申込み内容を確認する") : L("送る")}

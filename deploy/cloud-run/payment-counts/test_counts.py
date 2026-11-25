@@ -60,6 +60,23 @@ class SummarizeTest(unittest.TestCase):
         json.dumps(report)
 
 
+class CouponTest(unittest.TestCase):
+    # 本体 #1031：クーポンを使った添削の決済（実額 = 価格 - クーポン）を価格不一致・孤児として数えない。
+    def test_no_orphan_compares_payment_amount_to_price(self):
+        for sql in counts.ORPHANS.values():
+            self.assertNotIn("amount_yen =", sql)
+            self.assertNotIn("base_price_yen", sql)
+
+    def test_fully_subsidized_review_earning_is_not_an_orphan(self):
+        sql = counts.ORPHANS["review_earning_without_payment_link"]
+        self.assertIn("NOT (e.platform_subsidy_yen > 0 AND e.platform_subsidy_yen >= e.gross_yen)", sql)
+        self.assertIn(("coach_earnings", "platform_subsidy_yen"), counts.REQUIRED_COLUMNS)
+
+    def test_coupon_status_and_migration(self):
+        self.assertEqual(counts.STATUS_COLUMNS[("coaching_coupons", "status")], ("unused", "reserved", "used", "expired", "canceled"))
+        self.assertEqual(counts.EXPECTED_MIGRATION, 192)
+
+
 class ConnectionTest(unittest.TestCase):
     def test_requires_encryption_for_remote_hosts(self):
         with self.assertRaises(RuntimeError):

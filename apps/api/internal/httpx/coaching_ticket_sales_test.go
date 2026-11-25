@@ -7,12 +7,11 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/hinata/track-talk/apps/api/internal/config"
 )
 
 func setupTicketSalesClosed(t *testing.T) (http.Handler, *fakeStripe) {
 	t.Helper()
-	return setupStripeConfig(t, func(cfg *config.Config) { cfg.CoachingTicketSales = false })
+	return setupStripeConfig(t, nil)
 }
 
 func sessionCount(f *fakeStripe) int {
@@ -39,7 +38,7 @@ func TestTicketSalesClosedStopsNewPurchases(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &summary); err != nil {
 		t.Fatal(err)
 	}
-	if summary.CanPurchase || summary.SalesOpen || len(summary.Products) != 0 || !strings.Contains(rec.Body.String(), "新規販売は終了しました") {
+	if summary.CanPurchase || summary.SalesOpen || len(summary.Products) != 0 || !strings.Contains(rec.Body.String(), "チケットの販売は終了しました") {
 		t.Fatalf("summary %s", rec.Body.String())
 	}
 	for _, product := range []string{"single", "five"} {

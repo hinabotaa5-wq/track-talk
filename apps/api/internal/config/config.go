@@ -61,10 +61,6 @@ type Config struct {
 	// コーチの公開プロフィールを一覧から取れないようにする。CoachingEnabled が false なら値によらず閉じる。
 	// 動画添削の指名候補（GET /v1/coaching/nominees）と申込みは止めない。既定は停止。
 	CoachingCoachList bool
-	// CoachingTicketSales が false の間は、コーチングチケットの新規購入を止める。動画添削は都度払い
-	// （今はカードのみ）だけにしたので既定は停止。購入済みチケットの残高・履歴・返金は止めない。
-	// 再開するときだけ立てる。テーブルと過去の購入・消費の記録は残す。
-	CoachingTicketSales bool
 	// ReviewRandomAssign が false の間は、動画添削の「おまかせ」(運営が受付中のコーチへ順番に割り当てる)を止め、
 	// 選手が選んだコーチにだけ依頼を届ける。既定は停止。割り当てのコードと過去の打診・割り当ての記録は残す。
 	ReviewRandomAssign bool
@@ -172,7 +168,6 @@ func Load() (Config, error) {
 		CoachingMessaging:              enabled(os.Getenv("COACHING_MESSAGING_ENABLED")),
 		CoachingConsultation:           enabled(os.Getenv("COACHING_CONSULTATION_ENABLED")),
 		CoachingCoachList:              enabled(os.Getenv("COACHING_COACH_LIST_ENABLED")),
-		CoachingTicketSales:            enabled(os.Getenv("COACHING_TICKET_SALES_ENABLED")),
 		ReviewRandomAssign:             enabled(os.Getenv("REVIEW_RANDOM_ASSIGN_ENABLED")),
 		FeaturedCoachID:                strings.TrimSpace(os.Getenv("COACHING_FEATURED_COACH_ID")),
 		IdentityReaderURL:              os.Getenv("IDENTITY_READER_URL"),

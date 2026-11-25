@@ -1,7 +1,6 @@
 package httpx_test
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -89,17 +88,7 @@ func TestTicketPurchaseNonJPCardRefundsWithoutCredit(t *testing.T) {
 	buySixTickets(t, h, referrer)
 	var code string
 	queryRowArgs(t, `SELECT code FROM coaching_referral_codes WHERE owner_id=(SELECT owner_id FROM coaching_ticket_purchases ORDER BY created_at LIMIT 1)`, nil, &code)
-	r := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", tu, map[string]any{"product_id": "six", "request_key": uuid.NewString(), "return_path": "/coaching/new", "guardian_permission": true, "referral_code": code})
-	if r.Code != 200 {
-		t.Fatalf("checkout %d %s", r.Code, r.Body.String())
-	}
-	var started struct {
-		ID string `json:"purchase_id"`
-	}
-	if err := json.Unmarshal(r.Body.Bytes(), &started); err != nil {
-		t.Fatal(err)
-	}
-	id := started.ID
+	id := seedTicketPurchase(t, tu, "six", uuid.NewString(), "/coaching/new", code)
 	before := len(f.refundList())
 
 	intent := "pi_nonjp_ticket_" + id

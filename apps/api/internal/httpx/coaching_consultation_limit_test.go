@@ -15,7 +15,6 @@ func answeredCashReviewRoom(t *testing.T, mutate func(*config.Config)) (h http.H
 	t.Helper()
 	fakeCoachingCloudinary(t)
 	h, f = setupStripeConfig(t, func(c *config.Config) {
-		c.CoachingTicketSales = false
 		if mutate != nil {
 			mutate(c)
 		}

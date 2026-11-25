@@ -50,7 +50,7 @@ it("初回読み込み中（スタンダード）はストップウォッチだ�
   await render();
   expect(stopwatches()).toHaveLength(1);
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
-  expect(container.textContent).not.toContain("2人に紹介すると、1回(1000円)無料！");
+  expect(container.textContent).not.toContain("2人に紹介すると500円分無料！");
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
   expect(container.textContent).not.toContain("スタンダードの都度払いやチケットの購入で、紹介IDが発行されます。");
   expect(container.textContent).not.toContain("スタンダード");
@@ -65,7 +65,7 @@ it("?tab=support でも初回読み込み中はスタンダードの一覧を待
   await render();
   expect(stopwatches()).toHaveLength(1);
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
-  expect(container.textContent).not.toContain("2人に紹介すると、1回(1000円)無料！");
+  expect(container.textContent).not.toContain("2人に紹介すると500円分無料！");
   expect(container.textContent).not.toContain("スタンダード");
   expect(container.textContent).not.toContain("継続プラン");
   expect(container.querySelector('[role="radio"]')).toBeNull();
@@ -96,7 +96,7 @@ it("読み込み完了後はバナー・タブ切り替え・一覧が出て、�
   await act(async () => finishCoaches({ coaches: [] }));
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   expect(container.querySelector(".page-loading-screen")).toBeNull();
-  expect(container.textContent).toContain("2人に紹介すると、1回(1000円)無料！");
+  expect(container.textContent).toContain("2人に紹介すると500円分無料！");
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
   expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると");
   expect(container.textContent).toContain("スタンダード");

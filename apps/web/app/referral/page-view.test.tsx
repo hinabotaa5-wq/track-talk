@@ -16,26 +16,27 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 
 const JA_TEXTS = [
-  "友達2人に紹介すると、1回分(1,000円)無料！",
+  "2人に紹介すると500円分無料！",
   "紹介の流れ",
   "購入すると、あなたの紹介IDが発行されます",
   "購入完了の画面とマイページに、あなたの紹介ID（6文字）が表示されます。",
   "紹介IDを友達に伝える",
   "マイページで、紹介IDをコピーしたり共有ボタンで送ったりできます。",
   "友達がコーチを選んで、申し込みに進む",
-  "友達は、スタンダードの都度払いでも、チケット6枚パックの購入でも申し込めます。",
+  "友達は、スタンダードの都度払いで申し込みます。",
   "友達が、購入の手続きで紹介IDを入力して購入を完了する",
   "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。",
-  "友達2人が購入すると、無料チケットをプレゼント",
-  "あと何人かは、マイページで確認できます。",
+  "友達2人が購入すると、¥500クーポンをプレゼント",
+  "あと何人かは、マイページで確認できます。クーポンはスタンダードの申込みで使え、1,000円の申込みならお支払いは500円になります。",
   "注意点",
   "紹介IDを使って購入すると、この購入ではあなたの紹介IDは発行されません。",
   "紹介IDの入力は任意です。空欄でも購入できます。",
   "使えない紹介IDを入力しても、購入は止まりません（紹介として数えられないだけです）。",
   "自分の紹介IDは、自分の購入には使えません。",
   "同じ友達は、同じ紹介者には1回だけ数えられます。",
-  "対象はスタンダードの都度払いとチケット6枚パックです。追加質問は対象外です。",
-  "無料チケットは、もらった本人だけが使えます。払戻しはできません。",
+  "対象はスタンダードの都度払いです。クーポンを使った申込みと追加質問は対象外です。",
+  "¥500クーポンは、プレゼントされてから6か月有効です。もらった本人だけが使えます。現金への払戻しはできません。",
+  "1回の申込みに使えるクーポンは1枚までです。チケットとは一緒に使えません。",
   "コーチ一覧へ",
 ];
 
@@ -44,7 +45,7 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
   await act(async () => root.render(<ReferralGuideView />));
   const text = container.textContent ?? "";
   for (const expected of JA_TEXTS) expect(text).toContain(expected);
-  expect(container.querySelector("h1")?.textContent).toBe("友達2人に紹介すると、1回分(1,000円)無料！");
+  expect(container.querySelector("h1")?.textContent).toBe("2人に紹介すると500円分無料！");
   expect(text).not.toContain("友達2人に紹介すると、1回無料！");
   expect(text).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
   expect(text).not.toContain("無料チケットは動画添削1回分です。有効期限は、プレゼントされてから6か月です。");
@@ -54,22 +55,23 @@ it("日本語で見出し・全ステップ・注意書き・末尾リンクを�
   expect(stepTitles[1]).toContain("紹介IDを友達に伝える");
   expect(stepTitles[2]).toContain("友達がコーチを選んで、申し込みに進む");
   expect(stepTitles[3]).toContain("友達が、購入の手続きで紹介IDを入力して購入を完了する");
-  expect(stepTitles[4]).toContain("友達2人が購入すると、無料チケットをプレゼント");
+  expect(stepTitles[4]).toContain("友達2人が購入すると、¥500クーポンをプレゼント");
   expect(container.querySelector('a[href="/me"]')).toBeNull();
   expect(container.querySelector('a[href="/coaching"]')).not.toBeNull();
   expect(text).not.toContain("紹介IDを使わずに購入すると、あなたの紹介IDが発行されます");
   expect(text).not.toContain("知っておいてほしいこと");
   expect(text).not.toContain("あなたの紹介IDと進捗を見る");
   const noteItems = [...container.querySelectorAll("ul > li")].map((li) => li.textContent ?? "");
-  expect(noteItems).toHaveLength(7);
+  expect(noteItems).toHaveLength(8);
   expect(noteItems[0]).toBe("紹介IDを使って購入すると、この購入ではあなたの紹介IDは発行されません。");
   expect(noteItems.slice(1)).toEqual([
     "紹介IDの入力は任意です。空欄でも購入できます。",
     "使えない紹介IDを入力しても、購入は止まりません（紹介として数えられないだけです）。",
     "自分の紹介IDは、自分の購入には使えません。",
     "同じ友達は、同じ紹介者には1回だけ数えられます。",
-    "対象はスタンダードの都度払いとチケット6枚パックです。追加質問は対象外です。",
-    "無料チケットは、もらった本人だけが使えます。払戻しはできません。",
+    "対象はスタンダードの都度払いです。クーポンを使った申込みと追加質問は対象外です。",
+    "¥500クーポンは、プレゼントされてから6か月有効です。もらった本人だけが使えます。現金への払戻しはできません。",
+    "1回の申込みに使えるクーポンは1枚までです。チケットとは一緒に使えません。",
   ]);
 });
 
@@ -100,7 +102,9 @@ it("英語表示では固定の英訳が出て、新規文の日本語が残ら�
   await act(async () => root.render(<ReferralGuideView />));
   const text = container.textContent ?? "";
   expect(text).toContain("How it works");
-  expect(container.querySelector("h1")?.textContent).toBe("Refer two friends and get one free review (¥1,000)!");
+  expect(container.querySelector("h1")?.textContent).toBe("Refer 2 friends, get ¥500 off!");
+  expect(text).not.toContain("Refer two friends and get one free review (¥1,000)!");
+  expect(text).not.toMatch(/free ticket/i);
   expect(text).not.toContain("Refer two friends and get a free review!");
   expect(text).not.toContain("A referral code is issued when you make a purchase. When two friends purchase using that code, the person who referred them receives a free ticket.");
   expect(text).not.toContain("The free ticket is good for one video review and expires 6 months after it is granted.");

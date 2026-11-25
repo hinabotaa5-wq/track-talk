@@ -7,7 +7,7 @@ import subprocess
 import sys
 import urllib.parse
 
-# Status enumerations as the code and migrations define them (checked through 000146).
+# Status enumerations as the code and migrations define them (checked through 000192).
 STATUS_COLUMNS = {
     ("review_payments", "status"): ("pending", "authorized", "captured", "canceled", "refund_pending", "refunded"),
     ("coaching_payments", "status"): ("pending", "paid", "refunded", "partially_refunded"),
@@ -18,6 +18,8 @@ STATUS_COLUMNS = {
     ("coaching_ticket_refunds", "status"): ("pending", "succeeded", "failed"),
     ("coaching_consultation_refunds", "status"): ("pending", "succeeded", "failed"),
     ("coach_payouts", "status"): ("pending", "paid", "failed"),
+    # 紹介特典の ¥500 クーポン（000192、本体 #1031）。
+    ("coaching_coupons", "status"): ("unused", "reserved", "used", "expired", "canceled"),
 }
 
 # Allowed by the schema, but must be zero while the refund features are closed.
@@ -44,8 +46,10 @@ ORPHANS = {
     "review_captured_returned_without_earning":
         "SELECT count(*) FROM review_payments p JOIN review_requests r ON r.id = p.request_id WHERE p.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL AND NOT r.use_tickets AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)",
     # Review earnings without a payment link and without a ticket reservation (candidates only).
+    # A review whose whole price was covered by a coupon has no payment by design (platform_subsidy_yen >= gross_yen, #1031).
+    # Coupon reviews with a card payment keep the payment link; their payment amount is price - coupon and is never compared to the price here.
     "review_earning_without_payment_link":
-        "SELECT count(*) FROM coach_earnings e WHERE e.source = 'review' AND NOT EXISTS (SELECT 1 FROM review_payment_earning_links l WHERE l.earning_id = e.id) AND NOT EXISTS (SELECT 1 FROM coaching_ticket_reservations t WHERE t.request_id = e.review_request_id)",
+        "SELECT count(*) FROM coach_earnings e WHERE e.source = 'review' AND NOT EXISTS (SELECT 1 FROM review_payment_earning_links l WHERE l.earning_id = e.id) AND NOT EXISTS (SELECT 1 FROM coaching_ticket_reservations t WHERE t.request_id = e.review_request_id) AND NOT (e.platform_subsidy_yen > 0 AND e.platform_subsidy_yen >= e.gross_yen)",
     # coaching_payments.contract_id is ON DELETE SET NULL.
     "coaching_payment_settled_without_contract":
         "SELECT count(*) FROM coaching_payments p WHERE p.status <> 'pending' AND p.contract_id IS NULL",
@@ -67,6 +71,8 @@ INFO = {
     "review_payment_unsettled_without_request": "SELECT count(*) FROM review_payments p WHERE p.status IN ('pending','canceled') AND p.request_id IS NULL",
     "coaching_payment_pending_session_open": "SELECT count(*) FROM coaching_payments p WHERE p.status = 'pending' AND p.session_expires_at > now()",
     "ticket_purchase_pending_session_open": "SELECT count(*) FROM coaching_ticket_purchases p WHERE p.status = 'pending' AND p.session_expires_at > now()",
+    # Card payments for reviews that used a coupon (the charged amount is price - coupon, #1031).
+    "review_payment_with_coupon": "SELECT count(*) FROM review_payments p JOIN review_requests r ON r.id = p.request_id WHERE r.coupon_discount_yen > 0",
 }
 
 ROW_COUNT_TABLES = ("review_payment_earning_links", "captured_refund_earnings", "coach_refund_adjustments",
@@ -76,6 +82,7 @@ ROW_COUNT_TABLES = ("review_payment_earning_links", "captured_refund_earnings", 
 REQUIRED_COLUMNS = sorted({*STATUS_COLUMNS, ("review_payments", "request_id"), ("review_payments", "session_expires_at"),
                            ("review_requests", "returned_at"), ("review_requests", "use_tickets"), ("review_requests", "coach_id"),
                            ("coach_earnings", "source"), ("coach_earnings", "review_request_id"), ("coach_earnings", "consultation_id"),
+                           ("coach_earnings", "gross_yen"), ("coach_earnings", "platform_subsidy_yen"), ("review_requests", "coupon_discount_yen"),
                            ("review_payment_earning_links", "payment_id"), ("review_payment_earning_links", "earning_id"),
                            ("coaching_payments", "contract_id"), ("coaching_payments", "session_expires_at"),
                            ("coaching_consultations", "funding"), ("coaching_consultations", "status"), ("coaching_consultations", "coach_id"),
@@ -83,7 +90,7 @@ REQUIRED_COLUMNS = sorted({*STATUS_COLUMNS, ("review_payments", "request_id"), (
                            ("coaching_ticket_purchases", "owner_id"), ("coaching_ticket_purchases", "session_expires_at"),
                            ("coaching_ticket_reservations", "request_id"), ("captured_payment_refunds", "source"),
                            ("captured_payment_refunds", "payment_id")} | {(t, "earning_id" if t in ("review_payment_earning_links", "captured_refund_earnings") else "id") for t in ROW_COUNT_TABLES})
-EXPECTED_MIGRATION = 191
+EXPECTED_MIGRATION = 192
 
 # row_security=off makes RLS raise an error instead of silently hiding rows from the count.
 BEGIN = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL row_security = off;\n"

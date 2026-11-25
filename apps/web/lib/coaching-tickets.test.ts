@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { coachTicketPurchaseHref, initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, ticketReturnPath } from "./coaching-tickets";
+import { couponCashPrice, initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, ticketReturnPath } from "./coaching-tickets";
 
 it("チケット購入の戻り先で外部URL・保護者トークン・別機能への転送を許可しない", () => {
   const request = "/coaching/requests/12345678-1234-1234-1234-123456789abc";
@@ -23,11 +23,22 @@ it("チケット購入の戻り先の判定が API と同じ表で一致する�
   expect(ticketReturnPath(undefined)).toBe("/me/coaching/tickets");
 });
 
-it("コーチ詳細から購入画面へ進むリンクにそのコーチ詳細への戻り先を付ける", () => {
-  const id = "12345678-1234-1234-1234-123456789abc";
-  expect(coachTicketPurchaseHref(id)).toBe("/me/coaching/tickets?return_to=%2Fcoaches%2F12345678-1234-1234-1234-123456789abc");
-  // ID が分からない・UUID でないときは戻り先を付けない（従来の遷移先）。
-  for (const bad of [undefined, null, "", "not-a-uuid", "../admin", id + "/x"]) expect(coachTicketPurchaseHref(bad)).toBe("/me/coaching/tickets");
+// 本体 #1031：クーポンの支払額と、入口の指定（?pay=coupon）。
+it("クーポンの支払額は価格から額面を引き、0円未満にしない", () => {
+  expect(couponCashPrice(1000, 500)).toBe(500);
+  expect(couponCashPrice(2000, 500)).toBe(1500);
+  expect(couponCashPrice(500, 500)).toBe(0);
+  expect(couponCashPrice(300, 500)).toBe(0);
+});
+
+it("?pay=coupon はクーポンがあるときだけクーポンにし、なければ単発に直す", () => {
+  const withCoupons = (n: number) => ({ balance: { available: 0, reserved: 0 }, balance_by_kind: null, coupons: { available: n, next_expires_at: null, amount_yen: 500 } });
+  expect(parseReviewPayParam("coupon")).toBe("coupon");
+  expect(initialReviewPayment(withCoupons(1), "coupon").method).toBe("coupon");
+  expect(initialReviewPayment(withCoupons(0), "coupon").method).toBe("card");
+  expect(initialReviewPayment(withCoupons(1), "card").method).toBe("card");
+  // 指定がなく、チケットがなくてクーポンがあればクーポン。
+  expect(initialReviewPayment(withCoupons(1), null).method).toBe("coupon");
 });
 
 // 本体 #687：入口の指定（?pay=）と種別ごとの残りから、申込画面の初期値を決める。

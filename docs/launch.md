@@ -70,7 +70,7 @@ API は、Stripe の鍵だけ入れて Webhook の鍵が無いときや、本番
 | `NEXT_PUBLIC_COACHING_ENABLED=1` | Webのコーチング画面を表示する（ビルド時に設定） |
 | `COACHING_NEW_ACCEPTANCE_ENABLED=1` | 新しい動画添削の依頼・追加質問の送信／支払いを受け付ける（旧チケット購入には別の販売フラグも必要） |
 | `COACH_IDENTITY_KEY` | コーチの本名・住所・電話番号を暗号化する鍵（`openssl rand -base64 32`）。DB とは別に Secret Manager に置く。変えると登録済みの情報が読めなくなる。空の間はコーチの特商法の登録ができず、プランを公開できない |
-| `COACHING_TICKET_SALES_ENABLED=1` | 技術的には旧チケット購入を許可する設定。新規販売は終了しており、動画添削・追加質問は都度払い（カード・PayPay）だけにしたので、空（停止）のままにする。空でも購入済みチケットの残高・履歴・返金は使える |
+| `COACHING_TICKET_SALES_ENABLED` | 廃止（本体 #1031）。API はこの値を読まず、どの値でもチケットの購入は `409 ticket_sales_closed` になる（再開の経路はない）。購入済みチケットの残高・履歴・返金・申込みでの利用は使える |
 | `REVIEW_RANDOM_ASSIGN_ENABLED=1` | 技術的には動画添削のおまかせ（受付中のコーチへの割り当て・再割り当て）を許可する設定。選手がコーチを選ぶ方式だけにしたので、空（停止）のままにする |
 | `COACHING_MESSAGING_ENABLED=1` / `NEXT_PUBLIC_COACHING_MESSAGING_ENABLED=1` | 有料の1対1のやりとり（契約のやりとり欄・サポートプランの追加相談・添削の確認質問と補足）の送信を開く。**電気通信事業の届出が受理されてから立てる**。空の間は大会サポート・対面指導のプランを公開できない |
 | `COACHING_COACH_LIST_ENABLED=1` / `NEXT_PUBLIC_COACHING_COACH_LIST_ENABLED=1` | コーチ一覧（`/coaches` とコーチの詳細、`GET /v1/coaches`）を公開する。`COACHING_ENABLED` も立っているときだけ効く。空の間は一覧だけ準備中（API は 404）で、動画添削の申込み（指名候補 `GET /v1/coaching/nominees`）は使える。開ける時期は運営者が決める |

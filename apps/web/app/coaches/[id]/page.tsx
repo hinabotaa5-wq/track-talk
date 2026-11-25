@@ -11,8 +11,8 @@ import { formatYen } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import { coachTicketPurchaseHref, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
-import { reviewPriceYen, ticketPackPriceYen, ticketPackQuantity } from "@/lib/review-pricing";
+import { couponCount, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
+import { reviewPriceYen } from "@/lib/review-pricing";
 import { coachDisplayText } from "@/lib/coach-display";
 import type { PublicCoach } from "@/lib/types";
 import { CreditCard, Gift, Ticket, Trophy, type LucideIcon } from "lucide-react";
@@ -20,7 +20,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 
-type ReviewEntry = { key: "card" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string; enabled: boolean };
+type ReviewEntry = { key: "card" | "coupon" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string; enabled: boolean };
 
 // どのプランの文脈で開いたか（本体 #694）。継続プランは休眠させたので（本体 #1007）、
 // クエリが tab=support でもつねにスタンダード（動画添削）の文脈とし、継続プランの節（CoachServicePlans）は描画しない。
@@ -53,7 +53,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   const [result, setResult] = useState<{ coach: PublicCoach | null } | { error: true }>();
   const { token } = useAuth();
   const [availability, setAvailability] = useState<Availability>("unknown");
-  const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean; counts: Record<TicketKind, number> | null }>();
+  const [ticketSales, setTicketSales] = useState<{ token: string; counts: Record<TicketKind, number> | null; coupons: number | null }>();
 
   useEffect(() => {
     let cancelled = false;
@@ -95,12 +95,12 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   }, [videoContext, token, coachID, eventsKey]);
 
   useEffect(() => {
-    // チケットの要約は動画添削の入口とチケット節にだけ使う。
+    // チケット・クーポンの要約は動画添削の入口にだけ使う。
     if (!videoContext || !token || !coachID) return;
     let cancelled = false;
     apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
       .then((data) => {
-        if (!cancelled) setTicketSales({ token, canPurchase: data.can_purchase, counts: ticketKindCounts(data) });
+        if (!cancelled) setTicketSales({ token, counts: ticketKindCounts(data), coupons: data.coupons ? couponCount(data) : null });
       })
       .catch(() => {
         if (!cancelled) setTicketSales(undefined);
@@ -115,29 +115,29 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   const achievementLines = displayAchievements ? displayAchievements.split("\n").map((line) => line.trim()).filter(Boolean) : [];
   const ctaHref = `/coaching/new?coach=${encodeURIComponent(id)}`;
   const ctaEnabled = availability !== "unavailable";
-  // チケット購入画面へのリンク。購入を完了したらこのコーチ詳細に戻る（本体 #691。2つの入口で同じ戻り先）。
-  const ticketPurchaseHref = coachTicketPurchaseHref(coachID);
-  const showTickets = !(ticketSales?.canPurchase === false && ticketSales.token === token);
   // 種別ごとの残り。未ログイン・取得失敗・古い API では枚数を出さない（#684 と同じく、取れなくても入口は出す）。
-  const counts = ticketSales && ticketSales.token === token ? ticketSales.counts : null;
-  // 動画添削の入口（本体 #687）：単発・通常チケット・無料チケット。支払い方式を選んでから申込画面へ進む。
-  const rewardZero = counts?.reward === 0;
+  const loaded = ticketSales && ticketSales.token === token ? ticketSales : null;
+  const counts = loaded?.counts ?? null;
+  const coupons = loaded?.coupons ?? null;
+  // 動画添削の入口（本体 #687、#1031）：単発・¥500クーポン。チケットの販売は終了したので、
+  // 発行済みのチケットが残っている人にだけチケットの入口を出す（購入画面への導線は置かない）。
+  const couponZero = coupons === 0;
+  const ticketKind: TicketKind | null = counts ? (counts.reward >= 1 ? "reward" : counts.normal >= 1 ? "normal" : null) : null;
   const entries: ReviewEntry[] = [
     { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
     {
-      key: "normal", Icon: Ticket, label: L("通常チケット"),
-      note: counts ? L("残り {n} 枚", { n: counts.normal }) : undefined,
-      // 通常チケットが0枚なら購入画面へ（#684 の「購入する」と同じ遷移先・同じ戻り先）。
-      href: counts?.normal === 0 ? ticketPurchaseHref : `${ctaHref}&pay=normal`,
+      key: "coupon", Icon: Gift, label: L("¥500クーポン"),
+      note: coupons !== null ? L("残り {n} 枚", { n: coupons }) : undefined,
+      // クーポンが0枚（枚数が取れている場合）なら紹介の手順ページ（/referral）へ。受付停止中のコーチでもこの場合だけは押せる。
+      href: couponZero ? "/referral" : `${ctaHref}&pay=coupon`,
+      enabled: couponZero || ctaEnabled,
+    },
+    ...(counts && ticketKind ? [{
+      key: ticketKind, Icon: Ticket, label: L("チケット"),
+      note: L("残り {n} 枚", { n: counts.normal + counts.reward }),
+      href: `${ctaHref}&pay=${ticketKind}`,
       enabled: ctaEnabled,
-    },
-    {
-      key: "reward", Icon: Gift, label: L("無料チケット"),
-      note: counts ? L("残り {n} 枚", { n: counts.reward }) : undefined,
-      // 無料チケットが0枚（枚数が取れている場合）なら手順ページ（/referral）へ。受付停止中のコーチでもこの場合だけは押せる。
-      href: rewardZero ? "/referral" : `${ctaHref}&pay=reward`,
-      enabled: rewardZero || ctaEnabled,
-    },
+    }] : []),
   ];
 
   return (
@@ -182,13 +182,13 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
             </div> : null}
           </dl>
         </section>
-        {/* 動画添削文脈：動画添削とチケット（動画添削の購入導線）の節だけ。サポートプランの節は描画しない。 */}
+        {/* 動画添削文脈：動画添削の節だけ。サポートプランの節とチケットの購入導線（販売終了、本体 #1031）は描画しない。 */}
         {videoContext ? <>
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
           {ctaEnabled ? null : <p className="mx-auto w-fit rounded-full border border-red-400/70 px-3 py-1 text-center text-sm font-semibold text-red-400">{L("現在は受付していません")}</p>}
           <h2 id="coach-video-review" className="text-lg font-bold">{L("フォーム添削や競技に関する悩み")}</h2>
           <p className="text-slate-200">{L("選択して下さい")}</p>
-          <ul className="grid grid-cols-3 gap-2" aria-label={L("お支払い方法を選んで依頼する")}>
+          <ul className={`grid ${entries.length === 3 ? "grid-cols-3" : "grid-cols-2"} gap-2`} aria-label={L("お支払い方法を選んで依頼する")}>
             {entries.map(({ key, Icon, label, note, href, enabled }) => {
               const body = <>
                 <Icon className="size-5" aria-hidden />
@@ -209,14 +209,6 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
           </ul>
           <p className="text-slate-200">{L("申し込みが確定してから24時間以内に回答が来ます。")}</p>
         </section>
-        {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
-          <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>
-          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。スタンダードの申込み1件につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
-          <Link
-            href={ticketPurchaseHref}
-            className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition hover:bg-blue-500 active:scale-[0.98]"
-          >{L("購入する")}</Link>
-        </section> : null}
         </> : null}
       </>}
     </div>

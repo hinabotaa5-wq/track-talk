@@ -82,7 +82,7 @@ it("特典付与済みで終了した周でも同じ見た目にし、付与済�
   const strong = await renderCard({ code: "K7M3QX", active: false, friend_count: 2, granted_at: "2026-11-14T09:00:00Z", expires_at: "2027-05-14T09:00:00Z" });
   expect(strong.textContent).toBe("K7M3QX");
   for (const c of [...endedClasses, "font-mono", "tracking-wider"]) expect(strong.classList).toContain(c);
-  expect(container.textContent).toContain("無料チケットをプレゼントしました");
+  expect(container.textContent).toContain("¥500クーポンをプレゼントしました");
   expect(container.textContent).toContain(endedNotice);
   expect(copyButton()).toBeUndefined();
 });
@@ -101,11 +101,11 @@ it("compact は見出し・ID・コピー・状態だけでコピー結果も表
   Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
   mocks.api.mockResolvedValue({ referral: { code: "ABC123", active: true, friend_count: 1, granted_at: null, expires_at: null } });
   await act(async () => root.render(<LoadedReferralCard token="test" variant="compact" />));
-  expect(container.querySelector("h2")?.textContent).toBe("友達2人に紹介すると、1回分(1,000円)無料！");
+  expect(container.querySelector("h2")?.textContent).toBe("2人に紹介すると500円分無料！");
   expect(container.querySelector("h2")?.classList).toContain("text-sm");
   expect(container.querySelector("section")?.classList).toContain("p-3");
   expect(container.textContent).toContain("あなたの紹介ID ABC123");
-  expect(container.textContent).toContain("あと1人で無料チケット");
+  expect(container.textContent).toContain("あと1人で¥500クーポン");
   expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。");
   await act(async () => copyButton()!.click());
   expect(writeText).toHaveBeenCalledWith("ABC123");
@@ -117,8 +117,8 @@ it.each(["full", "compact"] as const)("%s の終了IDは取り消し線・グレ
   await act(async () => root.render(<LoadedReferralCard token="test" variant={variant} />));
   for (const c of endedClasses) expect(container.querySelector("strong")?.classList).toContain(c);
   expect(copyButton()).toBeUndefined();
-  expect(container.textContent).toContain("無料チケットをプレゼントしました");
-  for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "特典チケット：", endedNotice]) {
+  expect(container.textContent).toContain("¥500クーポンをプレゼントしました");
+  for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "¥500クーポン：付与日から6か月有効", endedNotice]) {
     expect(container.textContent?.includes(text)).toBe(variant === "full");
   }
 });
@@ -229,13 +229,13 @@ it("T5（カード）：A の紹介IDのあと B に切り替えると、B の�
   mocks.api.mockResolvedValueOnce({ referral: referralA });
   await act(async () => root.render(<LoadedReferralCard token="tok-a" />));
   expect(container.textContent).toContain("AAAAAA");
-  expect(container.textContent).toContain("あと1人で無料チケット");
+  expect(container.textContent).toContain("あと1人で¥500クーポン");
 
   const b = deferredReferral();
   mocks.api.mockReturnValueOnce(b.promise);
   await act(async () => root.render(<LoadedReferralCard token="tok-b" />));
   expect(container.textContent).not.toContain("AAAAAA");
-  expect(container.textContent).not.toContain("あと1人で無料チケット");
+  expect(container.textContent).not.toContain("あと1人で¥500クーポン");
   expect(container.querySelector("section")).toBeNull();
   expect(mocks.api).toHaveBeenLastCalledWith("/v1/me/coaching/referral", { token: "tok-b" });
 
@@ -311,4 +311,14 @@ it("T7：取得に失敗したら紹介IDを出さない（未読込のまま）
   mocks.api.mockRejectedValueOnce(new Error("fail"));
   await act(async () => root.render(<ReferralInput token="tok-b" code="ABCDEF" onChange={() => {}} warning={false} />));
   expect(container.textContent).not.toContain(note);
+});
+
+// 本体 #1031：発行済みの特典チケット（クーポン導入前の付与）は、発行時の条件のまま表示し、クーポンとは書かない。
+it("発行済みの特典チケットの付与は、特典チケットの条件で表示する", async () => {
+  mocks.api.mockResolvedValue({ referral: { code: "ABC123", active: false, friend_count: 2, granted_at: "2026-11-14T09:00:00Z", expires_at: "2027-05-14T09:00:00Z", reward_kind: "ticket" } });
+  await act(async () => root.render(<LoadedReferralCard token="test" variant="full" />));
+  expect(container.textContent).toContain("紹介特典をプレゼントしました");
+  expect(container.textContent).toContain("特典チケット：付与日から6か月有効／付与された本人だけが使えます／払戻しはできません");
+  expect(container.textContent).not.toContain("¥500クーポンをプレゼントしました");
+  expect(container.textContent).not.toContain("¥500クーポン：");
 });

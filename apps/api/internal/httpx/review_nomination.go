@@ -14,7 +14,7 @@ func reviewCashPrice(rr db.ReviewRequest) int32 {
 	if rr.UseTickets {
 		return 0
 	}
-	return rr.BasePriceYen
+	return couponCashPrice(rr.BasePriceYen, rr.CouponDiscountYen)
 }
 
 // 指名候補の一覧と、申込み時の指名の確認の両方がここを通る。特集モードでは特集コーチ以外を候補から外す（本体 #985）。

@@ -114,7 +114,7 @@ describe("RegisterPage", () => {
       expect(signUp.mock.calls[0][0].options.data).toEqual({
         overseas_consent_version: "overseas-2026-10",
         document_consent_versions: {
-          terms: "terms-2026-11-25",
+          terms: "terms-2026-11-25b",
           guidelines: "guidelines-2026-11-25",
           privacy: "privacy-2026-11-25",
         },

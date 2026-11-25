@@ -26,17 +26,9 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 	}
 	checkout := func(token, referral string) string {
 		t.Helper()
-		rec := doJSON(t, h, "POST", "/v1/coaching/tickets/checkout", token, map[string]any{
-			"product_id": "six", "request_key": uuid.NewString(), "guardian_permission": true, "referral_code": referral,
-		})
-		var data struct {
-			ID string `json:"purchase_id"`
-		}
-		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &data) != nil || data.ID == "" {
-			t.Fatalf("checkout %d %s", rec.Code, rec.Body.String())
-		}
-		payTicketPurchase(t, h, data.ID, 5000)
-		return data.ID
+		purchaseID := seedTicketPurchase(t, token, "six", uuid.NewString(), "/coaching/new", referral)
+		payTicketPurchase(t, h, purchaseID, 5000)
+		return purchaseID
 	}
 	assertCount := func(want int) {
 		t.Helper()
@@ -77,24 +69,39 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 		t.Fatalf("return %d %s", rec.Code, rec.Body.String())
 	}
 	assertCount(2)
-	var lot uuid.UUID
+	// 本体 #1031 G1・G2：周の達成で ¥500 クーポンが1枚付与され（付与から6か月有効・未使用）、特典チケットのロットは付与されない。
+	var coupon uuid.UUID
 	var correctExpiry bool
-	queryRowArgs(t, `SELECT l.id, l.expires_at=r.granted_at + interval '6 months'
-		FROM coaching_referral_rewards r JOIN coaching_ticket_lots l ON l.id=r.lot_id
-		WHERE r.referrer_id=$1 AND l.kind='referral_reward' AND l.purchase_id IS NULL AND l.available=1`,
-		[]any{ownerID}, &lot, &correctExpiry)
+	queryRowArgs(t, `SELECT c.id, c.expires_at=r.granted_at + interval '6 months' AND c.status='unused' AND c.amount_yen=500 AND c.source='referral' AND c.owner_id=$1
+		FROM coaching_referral_rewards r JOIN coaching_coupons c ON c.id=r.coupon_id
+		WHERE r.referrer_id=$1 AND r.lot_id IS NULL`,
+		[]any{ownerID}, &coupon, &correctExpiry)
 	if !correctExpiry {
-		t.Fatal("wrong reward expiry")
+		t.Fatal("wrong reward coupon")
 	}
+	var rewardLots int
+	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_lots WHERE owner_id=$1 AND kind='referral_reward'`, []any{ownerID}, &rewardLots)
+	if rewardLots != 0 {
+		t.Fatalf("reward ticket lots: %d", rewardLots)
+	}
+	// G3：付与の通知はクーポンの文面で届く（「無料チケット」の文言を含まない）。
 	notices := coachingNotifications(t, h, owner)
 	count := 0
 	for _, n := range notices {
 		if strings.Contains(n.Title, "紹介特典") {
 			count++
+			if n.Title != "紹介特典：¥500クーポンをプレゼントしました" || strings.Contains(n.Title+n.Body, "無料チケット") || !strings.Contains(n.Body, "6か月有効") {
+				t.Fatalf("reward notification %+v", n)
+			}
 		}
 	}
 	if count != 1 {
 		t.Fatalf("reward notifications: %d", count)
+	}
+	// G3：紹介進捗 API は特典の種類と有効期限を返し、「無料チケット」の文言を含まない。
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me/coaching/referral", owner, nil); rec.Code != 200 ||
+		!strings.Contains(rec.Body.String(), `"reward_kind":"coupon"`) || strings.Contains(rec.Body.String(), "無料チケット") {
+		t.Fatalf("referral progress %d %s", rec.Code, rec.Body.String())
 	}
 
 	_, afterReward := demoRequester(t, h, admin)
@@ -104,10 +111,10 @@ func TestCoachingReferralFromPackAndCapturedReview(t *testing.T) {
 	// This is the purchase status transition made by the completed refund.
 	execSQLArgs(t, "UPDATE coaching_ticket_purchases SET refunded_yen=amount_yen, status='refunded' WHERE id=$1", pack)
 	assertCount(1)
-	var available int
-	queryRowArgs(t, "SELECT available FROM coaching_ticket_lots WHERE id=$1", []any{lot}, &available)
-	if available != 0 {
-		t.Fatalf("canceled reward still has %d available", available)
+	var couponStatus string
+	queryRowArgs(t, "SELECT status FROM coaching_coupons WHERE id=$1", []any{coupon}, &couponStatus)
+	if couponStatus != "canceled" {
+		t.Fatalf("canceled reward coupon is %s", couponStatus)
 	}
 	checkout(afterReward, code)
 	assertCount(2)

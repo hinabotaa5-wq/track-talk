@@ -1,44 +1,47 @@
 "use client";
 import Link from "next/link";
-import { LoadedReferralCard, ReferralInput, checkReferralInput, type ReferralWarning } from "@/components/coaching-referral";
+import { LoadedReferralCard } from "@/components/coaching-referral";
 import { L } from "@/lib/i18n";
 
 import { SellerNote } from "@/components/seller-note";
-import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
-import { PurchaseConfirm } from "@/components/purchase-confirm";
 import { TicketBalance } from "@/components/ticket-balance";
 import { PageLoading } from "@/components/page-loading";
 
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { ticketReturnPath, ticketStatusLabels, type TicketProduct, type TicketSummary } from "@/lib/coaching-tickets";
+import { ticketStatusLabels, type CouponSummary, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
-import { useMinorDeclaration } from "@/lib/minor-purchase";
-import { ticketPackConfirmRows } from "@/lib/purchase-confirm";
-import { ticketValidityMonths } from "@/lib/review-pricing";
-import { useActionLock } from "@/lib/use-action-lock";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
+
+// チケットの販売は終了した（本体 #1031）。この画面は、発行済みのチケットの残高・履歴と、
+// 紹介特典の ¥500 クーポンの保有状況を見るだけにする（購入の導線は置かない）。
+
+// CouponBalance は、¥500 クーポンの枚数といちばん早い失効日。
+function CouponBalance({ coupons }: { coupons: CouponSummary }) {
+  return (
+    <section className="space-y-1 rounded-xl border border-white/20 bg-white/5 p-3 text-sm" aria-label={L("クーポンの残り")}>
+      <p className="font-semibold">{L("¥{v0}クーポンの残り {n}枚", { v0: coupons.amount_yen.toLocaleString("ja-JP"), n: coupons.available })}</p>
+      {coupons.available > 0 && coupons.next_expires_at ? (
+        <p className="text-xs text-slate-200">{L("いちばん早い有効期限：{v0}。過ぎると使えなくなります。", { v0: formatDateTime(coupons.next_expires_at) })}</p>
+      ) : null}
+      <p className="text-xs text-slate-300">{L("スタンダードの申込みで1回に1枚使えます。チケットとは一緒に使えません。")}</p>
+      {coupons.available > 0 ? (
+        <Link href="/coaching" className="inline-block text-xs text-blue-300 underline">{L("コーチを選んでクーポンを使う")}</Link>
+      ) : (
+        <Link href="/referral" className="inline-block text-xs text-blue-300 underline">{L("紹介でクーポンをもらう方法")}</Link>
+      )}
+    </section>
+  );
+}
 
 function TicketsPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const purchaseID = params.get("purchase");
-  const returnPath = ticketReturnPath(params.get("return_to"));
   const [summary, setSummary] = useState<TicketSummary | null>(null);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [completedReturn, setCompletedReturn] = useState<string | null>(null);
-  const [referralCode, setReferralCode] = useState("");
-  const [referralWarning, setReferralWarning] = useState<ReferralWarning>(false);
-  const { pending, acquire, release } = useActionLock();
-  // 支払い画面へ進む前の最終確認に出している商品。
-  const [confirming, setConfirming] = useState<TicketProduct | null>(null);
-  // 全員の購入前チェック（単発と同じ。毎回未チェックから始める）。
-  const declaration = useMinorDeclaration();
-  const needsDeclaration = true;
 
   const load = useCallback(async () => {
     const data = await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token });
@@ -58,127 +61,26 @@ function TicketsPage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  // 決済画面から戻っただけでは付与済みとみなさず、サーバーの確定を待つ。
-  useEffect(() => {
-    if (!token || !purchaseID) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let attempts = 0;
-    async function check() {
-      try {
-        const purchase = await apiFetch<{ status: string; return_path: string }>(`/v1/coaching/tickets/purchases/${encodeURIComponent(purchaseID!)}`, { token });
-        if (cancelled) return;
-        if (purchase.status !== "pending") {
-          await load();
-          if (cancelled) return;
-          setMessage(L("購入内容を反映しました"));
-          const target = ticketReturnPath(purchase.return_path);
-          setCompletedReturn(target);
-          return;
-        }
-        setMessage(L("お支払いの確認中です。確認が済みしだい元の画面に戻ります。"));
-        if (++attempts < 30) timer = setTimeout(() => void check(), 2000);
-        else setMessage(L("確認に時間がかかっています。少し待ってから再読み込みしてください。追加購入は必要ありません。"));
-      } catch (err) {
-        if (!cancelled) setError(err instanceof ApiRequestError ? err.message : L("購入状況を確認できませんでした。画面を再読み込みしてください。"));
-      }
-    }
-    void check();
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [token, purchaseID, load]);
-
-  async function buy(productID: string) {
-    if (!session || !summary) return;
-    if (needsDeclaration && !declaration.checked) {
-      setError(L("購入前の注意事項を確認して、チェックを入れてください。"));
-      return;
-    }
-    if (!acquire()) return;
-    setError("");
-    const storageKey = `tracktalk-tickets:${session.user.id}:${productID}:${returnPath}`;
-    // 支払い画面へ移るあいだは、ストップウォッチを出したまま確定ボタンも押せないままにする（本体 #917）。
-    let leaving = false;
-    try {
-      const referralCheck = await checkReferralInput(referralCode, token);
-      if (referralCheck !== "ok") {
-        setReferralCode("");
-        setReferralWarning(referralCheck);
-        return;
-      }
-      let key = sessionStorage.getItem(storageKey);
-      if (!key || summary.purchases?.some((p) => p.request_key === key && p.status !== "pending")) {
-        key = crypto.randomUUID();
-        sessionStorage.setItem(storageKey, key);
-      }
-      const result = await apiFetch<{ checkout_url?: string; paid?: boolean; return_path?: string }>("/v1/coaching/tickets/checkout", {
-        method: "POST", token, body: JSON.stringify({ product_id: productID, request_key: key, return_path: returnPath, referral_code: referralCode, ...declaration.body(needsDeclaration) }),
-      });
-      if (result.paid) {
-        sessionStorage.removeItem(storageKey);
-        await load();
-        setCompletedReturn(ticketReturnPath(result.return_path));
-      } else if (result.checkout_url) {
-        leaving = true;
-        window.location.assign(result.checkout_url);
-      }
-    } catch (err) {
-      if (err instanceof ApiRequestError && err.code === "ticket_checkout_expired") sessionStorage.removeItem(storageKey);
-      setError(err instanceof ApiRequestError ? err.message : L("購入画面を開けませんでした。同じボタンで再試行できます。"));
-    } finally { if (!leaving) release(); }
-  }
-
-  // 支払い画面からブラウザの戻るで、移る前の画面がそのまま戻ってきたとき（bfcache）は、待ち表示を解いて押し直せるようにする。
-  // 同じ購入操作は request_key で同じ購入・同じ支払い画面になる。
-  useEffect(() => {
-    const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) release(); };
-    window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
-  }, [release]);
-
   if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
-  if (completedReturn) return <div className="mx-auto max-w-md space-y-5">
-    <h1 className="text-2xl font-bold">{L("購入内容を反映しました")}</h1>
-    <LoadedReferralCard token={token} />
-    <Link className="text-blue-300 underline" href={completedReturn}>{L("元の画面に戻る")}</Link>
-  </div>;
+  const purchases = (summary?.purchases ?? []).filter((p) => p.status !== "pending");
   return <div className="mx-auto max-w-md space-y-5">
-    <h1 className="text-2xl font-bold">{L("コーチングチケット")}</h1>
+    <h1 className="text-2xl font-bold">{L("チケット・クーポン")}</h1>
     <SellerNote />
-    {message ? <p role="status" className="text-sm text-blue-200">{message}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-    <Button type="button" disabled={pending} onClick={() => void load().catch(() => setError(L("読み込めませんでした")))}>{L("チケット情報を再読み込み")}</Button>
+    <Button type="button" onClick={() => void load().catch(() => setError(L("読み込めませんでした")))}>{L("チケット情報を再読み込み")}</Button>
     {summary ? <>
+      {summary.coupons ? <CouponBalance coupons={summary.coupons} /> : null}
       <TicketBalance summary={summary} />
-      {confirming ? (
-        <PurchaseConfirm
-          rows={ticketPackConfirmRows({ quantity: confirming.quantity, amountYen: confirming.amount_yen, validityMonths: summary.validity_months ?? ticketValidityMonths })}
-          confirmLabel={L("確定してお支払いへ")}
-          onConfirm={() => void buy(confirming.id)}
-          onBack={() => { setConfirming(null); setError(""); }}
-          pending={pending}
-          pendingLabel={L("お支払い画面へ移動しています")}
-          confirmDisabled={!declaration.checked}
-        >
-          <ReferralInput token={token} code={referralCode} warning={referralWarning} disabled={pending}
-            onChange={(code) => { setReferralCode(code); setReferralWarning(false); }} />
-          {needsDeclaration ? <MinorPurchaseDeclaration checked={declaration.checked} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
-        </PurchaseConfirm>
-      ) : (summary.products ?? []).map((p) => {
-        return <div key={p.id} className="space-y-2 rounded-xl border border-white/20 p-4">
-          <p className="font-semibold">{p.title}</p>
-          <p className="text-lg font-bold">{L("{v0}（税込）", { v0: formatYen(p.amount_yen) })}</p>
-          {p.quantity > 1 ? <p className="text-sm text-slate-200">{L("1回あたり約{v0}・有効期限{m}か月", { v0: formatYen(Math.round(p.amount_yen / p.quantity)), m: summary.validity_months ?? ticketValidityMonths })}</p> : null}
-          <Button type="button" className="w-full" disabled={pending || !summary.can_purchase || !!purchaseID} onClick={() => { setError(""); declaration.reset(); setConfirming(p); }}>{L("購入内容を確認する")}</Button>
-        </div>;
-      })}
-      {(summary.purchases ?? []).filter((p) => p.status !== "pending").length > 0 ? <section className="space-y-2">
+      <p className="text-sm text-slate-200">{L("チケットの販売は終了しました。発行済みのチケットは有効期限まで利用できます。")}</p>
+      {purchases.length > 0 ? <section className="space-y-2">
         <h2 className="text-sm font-bold">{L("購入したチケット")}</h2>
-        <ul className="space-y-2">{(summary.purchases ?? []).filter((p) => p.status !== "pending").map((p) => <li key={p.id} className="rounded-xl border border-white/15 p-3 text-xs text-slate-200">
+        <ul className="space-y-2">{purchases.map((p) => <li key={p.id} className="rounded-xl border border-white/15 p-3 text-xs text-slate-200">
           <p className="font-semibold text-slate-100">{L("{q}枚 {v0} · {status}", { q: p.quantity, v0: formatYen(p.amount_yen), status: ticketStatusLabels[p.status] })}</p>
           <p>{L("未使用 {a}枚 · 確保中 {r}枚 · 使用済み {c}枚 · 失効 {e}枚", { a: p.available, r: p.reserved, c: p.consumed ?? 0, e: p.expired ?? 0 })}</p>
           <p>{p.expires_at ? L("有効期限：{v0}", { v0: formatDateTime(p.expires_at) }) : L("有効期限：なし（以前に購入した分）")}</p>
         </li>)}</ul>
       </section> : null}
+      <LoadedReferralCard token={token} />
     </> : null}
   </div>;
 }

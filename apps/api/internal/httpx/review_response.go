@@ -327,6 +327,11 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// 確保していたクーポンを使用済にする（本体 #1031）。支払いが0円の依頼の報酬もここで記録する。
+	if err := consumeReviewCoupon(r.Context(), q, rr.ID); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		MapDBError(w, err)
 		return

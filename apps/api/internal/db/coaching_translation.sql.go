@@ -225,7 +225,7 @@ func (q *Queries) ListEnCoachMessages(ctx context.Context) ([]CoachingMessage, e
 }
 
 const listEnCoachReviewRequests = `-- name: ListEnCoachReviewRequests :many
-SELECT r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at, r.question, r.requested_coach_id, r.requested_coach_name, r.base_price_yen, r.use_tickets, r.info_request, r.info_reason, r.info_requested_at, r.info_from_status, r.resubmit_by, r.original_question, r.video_replaced, r.resubmitted_at, r.withdrawn_at, r.withdrawn_by, r.withdrawn_from_status, r.withdraw_reason, r.videos_purged_at, r.retention_hold_at, r.assigned_at, r.started_at, r.timed_out_at, r.canceled_at, r.return_reason, r.reminder_12h_at, r.reminder_4h_at, r.pb, r.goal_time, r.wind_speed, r.body_condition FROM review_requests r
+SELECT r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at, r.question, r.requested_coach_id, r.requested_coach_name, r.base_price_yen, r.use_tickets, r.info_request, r.info_reason, r.info_requested_at, r.info_from_status, r.resubmit_by, r.original_question, r.video_replaced, r.resubmitted_at, r.withdrawn_at, r.withdrawn_by, r.withdrawn_from_status, r.withdraw_reason, r.videos_purged_at, r.retention_hold_at, r.assigned_at, r.started_at, r.timed_out_at, r.canceled_at, r.return_reason, r.reminder_12h_at, r.reminder_4h_at, r.pb, r.goal_time, r.wind_speed, r.body_condition, r.coupon_discount_yen FROM review_requests r
 JOIN profiles p ON p.id = r.coach_id
 WHERE p.locale = 'en'
 ORDER BY r.created_at
@@ -284,6 +284,7 @@ func (q *Queries) ListEnCoachReviewRequests(ctx context.Context) ([]ReviewReques
 			&i.GoalTime,
 			&i.WindSpeed,
 			&i.BodyCondition,
+			&i.CouponDiscountYen,
 		); err != nil {
 			return nil, err
 		}
