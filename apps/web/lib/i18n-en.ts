@@ -2905,7 +2905,7 @@ export const en: Readonly<Record<string, string>> = {
   "このコーチの受付状況が変わりました。別のコーチを選んでください": "This coach's availability has changed. Choose another coach.",
   "この動画はもう送っています（お支払いがまだなら、送った依頼の一覧から払えます）": "You've already sent this video (if you haven't paid yet, you can pay from your list of sent requests)",
   "枠を選んでください": "Choose a slot",
-  "いまは100mだけ受け付けています": "Only 100m is accepted right now",
+  "いまは100m・200m・400mだけ受け付けています": "Only 100m, 200m and 400m are accepted right now",
   "1000文字以内で記入してください": "Keep it to 1000 characters or less",
   "見てほしい点を1つ以上選んでください": "Choose at least one point you'd like reviewed",
   "コーチを選んでください": "Choose a coach",

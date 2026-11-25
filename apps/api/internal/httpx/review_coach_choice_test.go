@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -317,5 +318,146 @@ func TestReviewAndSupportPaidToOperatorAndTransferredMonthly(t *testing.T) {
 	transfers := f.transferList()
 	if len(transfers) != 1 || transfers[0].Get("destination") != "acct_"+coach || transfers[0].Get("amount") != "6700" {
 		t.Fatalf("transfers %v", transfers)
+	}
+}
+
+// 本体 #1035：申込で受け付ける種目は 100m／200m／400m。担当種目に200m・400mを含むコーチは
+// その種目の候補に出て、依頼が届く。価格は種目によらず同じ。800m などの対象外は従来どおり弾く。
+func TestReviewSprintEvents200And400(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h, _ := setupCoachChoice(t)
+	admin := adminToken(t, h)
+	sprinter, tc := onDutyCoach(t, h, admin)
+	short, ts := onDutyCoach(t, h, admin)
+	execSQLArgs(t, `UPDATE coach_profiles SET events=ARRAY['100m','200m','400m'] WHERE profile_id=$1`, sprinter)
+	execSQLArgs(t, `UPDATE coach_profiles SET events=ARRAY['100m'] WHERE profile_id=$1`, short)
+	_, tu := demoRequester(t, h, admin)
+
+	fieldErr := func(label string, r *httptest.ResponseRecorder) string {
+		t.Helper()
+		var v struct {
+			Error struct {
+				Code   string            `json:"code"`
+				Fields map[string]string `json:"fields"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(r.Body.Bytes(), &v)
+		if r.Code != http.StatusUnprocessableEntity || v.Error.Code != "validation_error" || v.Error.Fields["event"] == "" {
+			t.Fatalf("%s: want event field error, got %d %s", label, r.Code, r.Body.String())
+		}
+		return v.Error.Fields["event"]
+	}
+
+	// A1: nominees。200m・400m では担当するコーチだけが出る。対象外の種目は項目エラー。
+	nominees := func(event string) []string {
+		t.Helper()
+		r := doJSON(t, h, "GET", "/v1/coaching/nominees?event="+event, tu, nil)
+		if r.Code != 200 {
+			t.Fatalf("nominees %s %d %s", event, r.Code, r.Body.String())
+		}
+		var out struct {
+			Coaches []struct {
+				ID string `json:"id"`
+			} `json:"coaches"`
+		}
+		_ = json.Unmarshal(r.Body.Bytes(), &out)
+		ids := []string{}
+		for _, c := range out.Coaches {
+			ids = append(ids, c.ID)
+		}
+		return ids
+	}
+	if got := nominees("100m"); len(got) != 2 {
+		t.Fatalf("A1 100m %v", got)
+	}
+	for _, event := range []string{"200m", "400m"} {
+		if got := nominees(event); len(got) != 1 || got[0] != sprinter.String() {
+			t.Fatalf("A1 %s %v", event, got)
+		}
+	}
+	r := doJSON(t, h, "GET", "/v1/coaching/nominees?event=800m", tu, nil)
+	if msg := fieldErr("A1 800m", r); msg != "対応している種目を選んでください" {
+		t.Fatalf("A1 800m message %q", msg)
+	}
+
+	// A2: estimate。200m・400m も成功し、価格は100mと同じ。800m は項目エラー。
+	price := func(event string) int {
+		t.Helper()
+		r := doJSON(t, h, "GET", "/v1/coaching/estimate?tier=coach&event="+event, tu, nil)
+		if r.Code != 200 {
+			t.Fatalf("estimate %s %d %s", event, r.Code, r.Body.String())
+		}
+		var out struct {
+			PriceYen int `json:"price_yen"`
+		}
+		_ = json.Unmarshal(r.Body.Bytes(), &out)
+		return out.PriceYen
+	}
+	base := price("100m")
+	if base != 1000 {
+		t.Fatalf("A2 100m price %d", base)
+	}
+	for _, event := range []string{"200m", "400m"} {
+		if got := price(event); got != base {
+			t.Fatalf("A2 %s price %d want %d", event, got, base)
+		}
+	}
+	r = doJSON(t, h, "GET", "/v1/coaching/estimate?tier=coach&event=800m", tu, nil)
+	if msg := fieldErr("A2 800m", r); msg != "枠と種目を選んでください" {
+		t.Fatalf("A2 800m message %q", msg)
+	}
+
+	// A3: 依頼作成。200m・400m の依頼を作れ、払うと指名したコーチに届き、保存された種目は送った値のまま。
+	for _, event := range []string{"200m", "400m"} {
+		_, tr := demoRequester(t, h, admin)
+		b := reviewBodyFor(t, h, tr)
+		b["event"] = event
+		b["method"] = "card"
+		b["requested_coach_id"] = sprinter.String()
+		created := createReviewWith(t, h, tr, "card", b)
+		if created.Code != 201 {
+			t.Fatalf("A3 %s create %d %s", event, created.Code, created.Body.String())
+		}
+		var v struct {
+			ID    string `json:"id"`
+			Event string `json:"event"`
+		}
+		_ = json.Unmarshal(created.Body.Bytes(), &v)
+		if v.Event != event {
+			t.Fatalf("A3 %s response event %q", event, v.Event)
+		}
+		payChosenReview(t, h, v.ID, "card")
+		var stored string
+		queryRowArgs(t, `SELECT event FROM review_requests WHERE id=$1`, []any{v.ID}, &stored)
+		if stored != event {
+			t.Fatalf("A3 %s stored %q", event, stored)
+		}
+		found := false
+		for _, o := range coachRequests(t, h, tc).Reviewing {
+			found = found || o.ID == v.ID
+		}
+		if !found {
+			t.Fatalf("A3 %s not delivered to the chosen coach", event)
+		}
+	}
+	if len(coachRequests(t, h, ts).Reviewing) != 0 {
+		t.Fatal("A3 delivered to a coach who was not chosen")
+	}
+
+	// A3: 対象外の 800m は新しい文言の項目エラーで、依頼は作られない。
+	var before int
+	queryRowArgs(t, `SELECT count(*) FROM review_requests`, nil, &before)
+	b := reviewBodyFor(t, h, tu)
+	b["event"] = "800m"
+	b["method"] = "card"
+	b["requested_coach_id"] = sprinter.String()
+	r = doJSON(t, h, "POST", "/v1/coaching/requests", tu, b)
+	if msg := fieldErr("A3 800m", r); msg != "いまは100m・200m・400mだけ受け付けています" {
+		t.Fatalf("A3 800m message %q", msg)
+	}
+	var after int
+	queryRowArgs(t, `SELECT count(*) FROM review_requests`, nil, &after)
+	if after != before {
+		t.Fatalf("A3 800m created a request: %d -> %d", before, after)
 	}
 }
