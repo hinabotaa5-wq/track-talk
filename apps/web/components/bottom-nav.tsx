@@ -49,6 +49,8 @@ export function mainTabHref(id: (typeof mainTabs)[number]["id"] | "me" | "home",
 export function activeMainTab(pathname: string) {
   if (pathname === "/" || pathname.startsWith("/reviews/")) return "home";
   if (["/coaching", "/coaches", "/coach", "/guardian", "/me/coaching", "/player"].some((base) => pathname === base || pathname.startsWith(`${base}/`))) return "coaching";
+  // 紹介の説明ページはコーチングの仕組みなので、最後に開いたタブに関係なくコーチタブに固定する（#1028）。配下パスは無いので完全一致のみ。
+  if (pathname === "/referral") return "coaching";
   if (pathname === "/competitions" || pathname.startsWith("/competitions/")) return "competitions";
   if (pathname.startsWith("/prefectures/")) return "competitions";
   if (pathname === "/injury" || pathname.startsWith("/injury/") || pathname === "/me/injury") return "injury";
