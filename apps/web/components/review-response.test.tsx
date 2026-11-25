@@ -81,6 +81,7 @@ it.each(["requester", "coach"] as const)("%s には回答を1枚のドキュメ�
   expect(video.playsInline).toBe(true);
   expect(video.classList).toContain("max-w-[260px]");
   expect(video.classList).toContain("max-h-[300px]");
+  expect(video.classList).toContain("mx-auto");
   expect(container.querySelector("button, textarea, input")).toBeNull();
 });
 

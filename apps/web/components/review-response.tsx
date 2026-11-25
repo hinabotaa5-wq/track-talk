@@ -57,7 +57,7 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
       ) : null}
       {response.demo_video_url ? (
         <DocSection title={L("見本動画")} tone="text-slate-300">
-          <video src={response.demo_video_url} controls playsInline preload="metadata" className="w-full max-w-[260px] max-h-[300px] rounded-lg bg-black" />
+          <video src={response.demo_video_url} controls playsInline preload="metadata" className="mx-auto w-full max-w-[260px] max-h-[300px] rounded-lg bg-black" />
         </DocSection>
       ) : null}
       {response.clarify_reason ? (
