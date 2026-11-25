@@ -58,15 +58,15 @@ it("人数を見て「送信」と入力するまで、全員には送れない"
   await act(async () => send.click());
   const post = fetch.mock.calls.find(([path, init]) => path === "/v1/admin/announcements" && init?.method === "POST")!;
   const payload = JSON.parse(post[1].body as string);
-  expect(payload).toMatchObject({ title: "コーチ機能が始まりました", body: "パーソナル指導を受けられます", url: "/", confirm: "送信" });
+  expect(payload).toMatchObject({ title: "コーチ機能が始まりました", body: "パーソナル指導を受けられます", url: "/coaching", confirm: "送信" });
   expect(payload.id).toMatch(/^[0-9a-f-]{36}$/);
   expect(container.textContent).toContain("ベル 120人、プッシュ 44人に送りました");
 });
 
-it("下部バーと同じ5つのアイコンから通知の移動先を選べる", async () => {
+it("下部バーと同じ4つのアイコンから通知の移動先を選べる", async () => {
   await act(async () => root.render(<AnnouncementsAdmin token="t" />));
   const radios = container.querySelectorAll<HTMLInputElement>('input[type="radio"]');
-  expect([...radios].map((input) => input.value)).toEqual(["/coaching", "/memo", "/", "/competitions", "/injury"]);
+  expect([...radios].map((input) => input.value)).toEqual(["/coaching", "/memo", "/competitions", "/injury"]);
   expect(container.textContent).not.toContain("サイト内のパス");
   await act(async () => {
     type(container.querySelector("input")!, "お知らせ");

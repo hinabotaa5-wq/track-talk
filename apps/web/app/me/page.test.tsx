@@ -107,12 +107,12 @@ it("アプリ内の確認からこの端末をログアウトしてホームへ�
   await renderSignedIn(); await logout();
   expect(mock.unsubscribe).toHaveBeenCalledWith("user-1", expect.any(Function));
   expect(mock.signOut).toHaveBeenCalledWith({ scope: "local" });
-  expect(mock.replace).toHaveBeenCalledWith("/");
+  expect(mock.replace).toHaveBeenCalledWith("/coaching");
 });
 it("認証サーバーがエラーでも端末のセッションが消えていればホームへ戻る", async () => {
   mock.signOut.mockResolvedValue({ error: new Error("offline") });
   await renderSignedIn(); await logout();
-  expect(mock.replace).toHaveBeenCalledWith("/");
+  expect(mock.replace).toHaveBeenCalledWith("/coaching");
 });
 it("セッションが残る失敗ではエラーを表示し、再試行できる", async () => {
   mock.signOut.mockResolvedValue({ error: new Error("failed") });

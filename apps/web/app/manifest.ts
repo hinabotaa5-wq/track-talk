@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "TrackTalk",
     short_name: "TrackTalk",
     description: L("陸上競技を、もっと深く楽しむコミュニティ"),
-    start_url: "/",
+    start_url: "/coaching",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#ffffff",

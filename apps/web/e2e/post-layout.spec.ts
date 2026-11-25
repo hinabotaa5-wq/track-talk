@@ -109,8 +109,9 @@ test("320pxのチャットで長文を小さく折り返し、横にはみ出さ
   expect(Number.parseFloat(dimensions.font)).toBeLessThan(16);
   await page.screenshot({ path: test.info().outputPath("chat.png") });
 });
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
 for (const kind of ["text", "video"] as const) {
-test(`${kind}：画像の下部に詳細文を重ね、タイトル用の別枠を作らない`, async ({ page }) => {
+test.skip(`${kind}：画像の下部に詳細文を重ね、タイトル用の別枠を作らない`, async ({ page }) => {
   // 一覧APIと同じく本文を含めず、写真付き文章もexcerptから描く。
   await page.route("**/api/v1/posts?*", (route) => route.fulfill({ json: {
     posts: [{ ...post, kind, body: undefined, excerpt: post.body }],

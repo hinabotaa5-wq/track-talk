@@ -43,7 +43,8 @@ it("Googleから戻った直後は履歴があっても外部画面へ戻らな�
     await act(async () => root.render(<Header />));
     await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="戻る"]')!.click());
     expect(back).not.toHaveBeenCalled();
-    expect(replace).toHaveBeenCalledWith("/");
+    // 履歴がないときの戻り先はフィードではなくコーチ（#1008）。
+    expect(replace).toHaveBeenCalledWith("/coaching");
     window.history.pushState({}, "", "/posts/new");
     pathname = "/posts/new";
     await act(async () => root.render(<Header />));

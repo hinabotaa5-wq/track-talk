@@ -38,7 +38,7 @@ function OpenContract() {
   const { pending, acquire, release } = useActionLock();
 
   useEffect(() => {
-    if (!loading && !profile?.is_admin) router.replace("/");
+    if (!loading && !profile?.is_admin) router.replace("/coaching");
   }, [loading, profile, router]);
 
   async function open() {

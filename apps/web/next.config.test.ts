@@ -24,13 +24,14 @@ describe("contentSecurityPolicy", () => {
 });
 
 describe("redirects", () => {
-  it("/coaches は /coaching へ（ちょうどだけ・暫定）、既存3件は不変", async () => {
+  it("/coaches と /（フィードを当面閉じる #1008）は /coaching へ（ちょうどだけ・暫定）、/posts も /coaching へ直接", async () => {
     const redirects = await nextConfig.redirects!();
     expect(redirects).toEqual([
       { source: "/about", destination: "/guidelines", permanent: false },
-      { source: "/posts", destination: "/", permanent: false },
+      { source: "/posts", destination: "/coaching", permanent: false },
       { source: "/coach/availability", destination: "/coach", permanent: false },
       { source: "/coaches", destination: "/coaching", permanent: false },
+      { source: "/", destination: "/coaching", permanent: false },
     ]);
   });
 

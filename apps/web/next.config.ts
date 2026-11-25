@@ -76,20 +76,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // ホームはログインに関係なく同じ中身なので、Netlify の端で短くキャッシュする。
-      // 関数がオハイオで動くため、毎回描くと東京の API との往復で遅い。少し古くても画面側が開いたあとに取り直す。
-      // Next.js の Cache-Control は上書きされるので Netlify 専用のヘッダーで指定する。
-      // Netlify の Next.js アダプターはクエリをキャッシュの区別に入れないため、並び替え・検索・ページを Netlify-Vary で足す。
-      {
-        source: "/",
-        headers: [
-          {
-            key: "Netlify-CDN-Cache-Control",
-            value: "public, durable, max-age=60, stale-while-revalidate=3600",
-          },
-          { key: "Netlify-Vary", value: "query=sort|q|page" },
-        ],
-      },
       // 大会の日程と県ページも、ログインに関係なく同じ中身なので端で短くキャッシュする(ホームと同じ理由)。
       {
         source: "/competitions",
@@ -127,11 +113,13 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/about", destination: "/guidelines", permanent: false },
-      { source: "/posts", destination: "/", permanent: false },
+      { source: "/posts", destination: "/coaching", permanent: false },
       // コーチの空き日カレンダーは廃止（2026-11-13）。古いリンク・ブックマークはコーチ画面のトップへ。
       { source: "/coach/availability", destination: "/coach", permanent: false },
       // コーチ一覧は /coaching に統一（2026-11-17）。/coaches ちょうどだけ。詳細 /coaches/[id] は巻き込まない。
       { source: "/coaches", destination: "/coaching", permanent: false },
+      // フィードは当面閉じる（#1008）。/ はクエリ付きも含めてコーチへ。フィードのコードは残し、復帰時はこの行を外す。
+      { source: "/", destination: "/coaching", permanent: false },
     ];
   },
   turbopack: {

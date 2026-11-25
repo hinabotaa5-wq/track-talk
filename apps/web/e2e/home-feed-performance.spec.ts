@@ -3,7 +3,8 @@ test.use({ trace: "retain-on-failure" });
 
 
 
-test("720件を読んでも描画を絞り、過去ページの再取得と戻る位置を保つ", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("720件を読んでも描画を絞り、過去ページの再取得と戻る位置を保つ", async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   // サーバーの初期一覧を古いものとして扱い、固定したブラウザ用データを取得する。

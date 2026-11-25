@@ -99,9 +99,9 @@ test("動画を選んだらすぐ送り始め、送信中も詳細を書け、�
 
   const started = Date.now();
   await button.click();
-  await expect(page).toHaveURL(/\/\?sort=new$/);
+  await expect(page).toHaveURL(/\/coaching\?sort=new$/);
   const saveMs = Date.now() - started;
-  test.info().annotations.push({ type: "保存ボタンを押してからホームまで", description: `${saveMs}ms` });
+  test.info().annotations.push({ type: "保存ボタンを押してから着地まで", description: `${saveMs}ms` });
   expect(mocks.posted).toEqual([{ body: "スタートの確認", kind: "video", video_public_id: "tracktalk/videos/v2", request_key: expect.stringMatching(uuidPattern) }]);
 });
 
@@ -133,7 +133,7 @@ test("署名の取得中にもう一度求めても、取得は1回にまとめ�
 
   await expect(button).toHaveText("投稿する", { timeout: uploadDelayMs + 5000 });
   await button.click();
-  await expect(page).toHaveURL(/\/\?sort=new$/);
+  await expect(page).toHaveURL(/\/coaching\?sort=new$/);
   expect(mocks.posted).toEqual([{ body: "", kind: "video", video_public_id: "tracktalk/videos/v2", request_key: expect.stringMatching(uuidPattern) }]);
   expect(mocks.signs()).toBe(2);
 });
@@ -158,6 +158,6 @@ test("大きな動画は、配信用の変換ができるまで投稿ボタン�
   await expect(button).toHaveText("投稿する", { timeout: 15000 });
   expect(mocks.statuses()).toBe(3);
   await button.click();
-  await expect(page).toHaveURL(/\/\?sort=new$/);
+  await expect(page).toHaveURL(/\/coaching\?sort=new$/);
   expect(mocks.posted).toEqual([{ body: "", kind: "video", video_public_id: "tracktalk/videos/v1", request_key: expect.stringMatching(uuidPattern) }]);
 });

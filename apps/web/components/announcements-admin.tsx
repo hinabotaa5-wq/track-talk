@@ -40,7 +40,7 @@ export function AnnouncementsAdmin({ token }: { token: string | null }) {
   const confirm = useConfirm();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [url, setURL] = useState("/");
+  const [url, setURL] = useState("/coaching");
   const [pending, setPending] = useState<Pending | null>(null);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState<"" | "test" | "open" | "send" | "cancel">("");
@@ -62,7 +62,7 @@ export function AnnouncementsAdmin({ token }: { token: string | null }) {
     void load();
   }, [load]);
 
-  const draft = { title: title.trim(), body: body.trim(), url: url.trim() || "/" };
+  const draft = { title: title.trim(), body: body.trim(), url: url.trim() || "/coaching" };
   const filled = draft.title !== "" && draft.body !== "";
 
   async function sendTest() {
@@ -161,7 +161,7 @@ export function AnnouncementsAdmin({ token }: { token: string | null }) {
         </label>
         <fieldset disabled={pending !== null} className="space-y-2">
           <legend className="text-sm text-slate-200">タップしたときに開くページ</legend>
-          <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="お知らせをタップしたときに開くページ">
+          <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="お知らせをタップしたときに開くページ">
             {mainTabs.map(({ href, label, icon: Icon }) => (
               <label key={href} className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border p-2 text-xs ${url === href ? "border-blue-400 bg-blue-500/20 text-blue-200" : "border-white/20 text-slate-200"}`}>
                 <input className="sr-only peer" type="radio" name="announcement-destination" value={href} checked={url === href} onChange={() => setURL(href)} />

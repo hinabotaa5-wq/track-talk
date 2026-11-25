@@ -93,7 +93,8 @@ test("大会のサブ画面にはヘッダーの戻るだけを残す", async ({
   await expect(page.locator("main").getByRole("button", { name: /戻る/ })).toHaveCount(0);
 });
 
-test("投稿ボタンと4つのタブを幅320pxで1行に並べる", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("投稿ボタンと4つのタブを幅320pxで1行に並べる", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/?sort=new");
   const nav = page.getByRole("navigation", { name: "投稿の並び替え" });
@@ -175,7 +176,8 @@ test("今日の大会アイコンをホーム以外の通常ページにも表�
   }
 });
 
-test("投稿を左へ横送りすると続きが追加され、先の投稿も残る", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("投稿を左へ横送りすると続きが追加され、先の投稿も残る", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 640 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   // CIのAPIに投稿がある場合も、古いSSRデータをブラウザの固定テストデータで更新させる。
@@ -243,7 +245,8 @@ test("投稿を左へ横送りすると続きが追加され、先の投稿も�
   }).toBeLessThan(3);
 });
 
-test("レビューは商品を縦スクロールで見られる", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("レビューは商品を縦スクロールで見られる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/v1/products?**", (route) => route.fulfill({ json: {
     products: Array.from({ length: 12 }, (_, index) => ({ id: `product-${index}`, brand: "テスト", name: `シューズ${index}`, kind: "shoe", review_count: 0, avg_rating: 0, image_url: "" })),
@@ -262,7 +265,8 @@ test("レビューは商品を縦スクロールで見られる", async ({ page 
   expect(await track.evaluate((el) => el.scrollLeft)).toBe(0);
 });
 
-test("縦長・横長・写真・YouTubeを同じ4:3の枠で切り抜いて横送りする", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("縦長・横長・写真・YouTubeを同じ4:3の枠で切り抜いて横送りする", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 640 });
   await page.clock.setFixedTime(Date.now() + 120_000);
   await page.route("**/api/v1/posts?**", (route) => route.fulfill({ json: {
@@ -323,7 +327,8 @@ test("縦長・横長・写真・YouTubeを同じ4:3の枠で切り抜いて横�
   }).toBeLessThanOrEqual(0);
 });
 
-test("フィードを更新しても投稿の大きさと配置を保つ", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("フィードを更新しても投稿の大きさと配置を保つ", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.clock.setFixedTime(Date.now() + 120_000);
   await page.route("**/api/v1/posts?**", (route) => route.fulfill({ json: {
@@ -351,7 +356,8 @@ test("フィードを更新しても投稿の大きさと配置を保つ", async
   await expect.poll(layout).toEqual(before);
 });
 
-test("均一グリッドでも新しい順・人気順・募集と固定タブを保つ", async ({ page }) => {
+// フィードを当面閉じたため skip（#1008）。フィード復帰時に戻す。
+test.skip("均一グリッドでも新しい順・人気順・募集と固定タブを保つ", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 640 });
   await page.clock.setFixedTime(Date.now() + 120_000);
   const newOrder = ["newest", "middle", "oldest", "fourth", "fifth", "sixth", "seventh", "eighth"];

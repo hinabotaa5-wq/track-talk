@@ -8,9 +8,9 @@ describe("mainTabHref", () => {
     expect(activeMainTab("/me/sense")).toBe("memo");
     expect(activeMainTab("/injury/hamstring-strain")).toBe("injury");
   });
-  it("下のメニューは コーチ→メモ→フィード→大会→ケガ の順", () => {
-    expect(mainTabs.map((tab) => tab.label)).toEqual(["コーチ", "メモ", "フィード", "大会", "ケガ"]);
-    expect(mainTabs.map((tab) => tab.id)).toEqual(["coaching", "memo", "home", "competitions", "injury"]);
+  it("下のメニューは コーチ→メモ→大会→ケガ の順（フィードは当面閉じる #1008）", () => {
+    expect(mainTabs.map((tab) => tab.label)).toEqual(["コーチ", "メモ", "大会", "ケガ"]);
+    expect(mainTabs.map((tab) => tab.id)).toEqual(["coaching", "memo", "competitions", "injury"]);
   });
 
   it("ログインしていなくても、マイページ以外のタブはそのまま開ける", () => {
