@@ -74,7 +74,7 @@ class CouponTest(unittest.TestCase):
 
     def test_coupon_status_and_migration(self):
         self.assertEqual(counts.STATUS_COLUMNS[("coaching_coupons", "status")], ("unused", "reserved", "used", "expired", "canceled"))
-        self.assertEqual(counts.EXPECTED_MIGRATION, 192)
+        self.assertEqual(counts.EXPECTED_MIGRATION, 193)
 
 
 class ConnectionTest(unittest.TestCase):

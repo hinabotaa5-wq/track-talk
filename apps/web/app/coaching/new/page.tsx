@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { loginPathFrom } from "@/lib/safe-next";
-import { useMinorDeclaration } from "@/lib/minor-purchase";
+import { purchaseNoticeShown, useMinorDeclaration } from "@/lib/minor-purchase";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import {
@@ -77,7 +77,7 @@ function athleteInfoBody(info: ReviewAthleteInfo): Record<ReviewAthleteInfoKey, 
 }
 
 export default function NewReviewRequestPage() {
-  const { session, token, loading } = useAuth();
+  const { session, token, loading, profile } = useAuth();
   const router = useRouter();
   const [me, setMe] = useState<CoachingMe | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -124,8 +124,8 @@ export default function NewReviewRequestPage() {
   const chosenKind = method === "tickets" ? ticketKind : null;
   const chosenExpiry = ticketExpiryFor(ticketSummary, chosenKind);
   const cashPayment = !!estimate?.payments && cashPrice > 0;
-  // 18歳未満が自分で払うときだけ、宣言のチェックを出して必須にする。
-  const needsDeclaration = cashPayment;
+  // 未成年（の可能性がある人）が自分で払うときだけ、宣言のチェックを出して必須にする（本体 #1045）。
+  const needsDeclaration = cashPayment && purchaseNoticeShown(profile);
   // 申し込めるか。古い API（review_open を返さない）では、これまでどおり招待コードの有無で見る。
   const reviewOpen = !!(me?.review_open ?? me?.demo);
   // 最終確認を出しているか。お金かチケットが動く申込みだけ確認を挟む（デモ版はそのまま送る）。

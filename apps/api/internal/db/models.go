@@ -1222,6 +1222,7 @@ type Profile struct {
 	Event                 *string    `json:"event"`
 	PushEverSubscribed    bool       `json:"push_ever_subscribed"`
 	Locale                string     `json:"locale"`
+	BirthYear             *int32     `json:"birth_year"`
 }
 
 type PushOutbox struct {

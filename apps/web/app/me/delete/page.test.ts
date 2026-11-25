@@ -140,6 +140,9 @@ describe("DeleteAccountPage", () => {
     const purchaseNotice = paragraphs.find((p) => p.includes("新しい購入前チェックの記録"));
     expect(purchaseNotice).toContain("最後の完了した取引から5年間（完了した取引がない場合は、最後のチェックの記録から5年間）");
     expect(purchaseNotice).not.toContain("23歳になる月の末日まで");
+    // 購入前チェックは未成年（の可能性がある人）だけに求める（本体 #1045）。
+    expect(purchaseNotice).toContain("未成年の方・年齢を確認できない方の購入で残したもの");
+    expect(text).not.toContain("年齢にかかわらず");
     expect(text).not.toContain("オンラインコーチングの提供中は、あなたの指導の契約とやりとりも削除されます");
     await view.unmount();
   });
@@ -162,6 +165,8 @@ describe("DeleteAccountPage", () => {
       const purchaseNotice = paragraphs.find((p) => p.includes("the new pre-purchase check records"));
       expect(purchaseNotice).toContain("for 5 years from the last completed transaction (or from the last check record if no transaction was completed)");
       expect(purchaseNotice).not.toContain("until the last day of the month you turn 23");
+      expect(purchaseNotice).toContain("made only for purchases by minors and by users whose age could not be confirmed");
+      expect(text).not.toContain("Regardless of age");
       expect(text).not.toContain("If you're providing online coaching");
       await view.unmount();
     } finally {

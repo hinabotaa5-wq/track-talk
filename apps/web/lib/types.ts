@@ -287,6 +287,12 @@ export type Profile = {
   // いまの版の説明で、海外の事業者に預けることに同意済みなら true。
   overseas_consent?: boolean;
   documents_consent?: boolean;
+  // 登録した生まれた年（本体 #1045）。未登録なら null。
+  birth_year?: number | null;
+  // 年の情報（birth_year か旧方式の生まれた年月）があれば true。false の人はプロフィール画面で年を登録するまで、ほかの画面へ進めない。
+  birth_year_known?: boolean;
+  // 購入前チェック「未成年の方は保護者に許可を取ってください」を出す相手なら true（API が profile から判定）。
+  purchase_notice_required?: boolean;
   created_at: string;
   updated_at?: string;
 };

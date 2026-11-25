@@ -4,7 +4,8 @@ import { L } from "@/lib/i18n";
 import { useEffect } from "react";
 import { purchaseNoticeLabel } from "@/lib/minor-purchase";
 
-// 全ユーザーが購入のたびに確認するチェック。画面を開くたび未チェックから始め、APIでも検証する。
+// 未成年（の可能性がある人）が購入のたびに確認するチェック（本体 #1045。出すかは lib/minor-purchase.ts の purchaseNoticeShown）。
+// 画面を開くたび未チェックから始め、APIでも検証する。
 // onShown は画面に出した時に呼ぶ（表示した時刻を証跡として残すため）。
 export function MinorPurchaseDeclaration({ checked, onChange, onShown, disabled }: { checked: boolean; onChange: (checked: boolean) => void; onShown?: () => void; disabled?: boolean }) {
   useEffect(() => {

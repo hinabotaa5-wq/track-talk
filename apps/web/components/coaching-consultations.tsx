@@ -7,6 +7,7 @@ import { reportConfirmOptions, useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
+import { useAuth } from "@/components/auth-provider";
 import { ReviewPayNotice } from "@/components/review-pay-notice";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature } from "@/lib/cloudinary-upload";
@@ -14,7 +15,7 @@ import { canClarify, consultationStatus, type Consultation, type ConsultationRoo
 import { athleteText, coachText, originalTextClass, type DisplayedText } from "@/lib/coaching-display";
 import { coachingConsultationEnabled, coachingMessagingEnabled, consultationClosedNote, messagingClosedNote } from "@/lib/features";
 import { formatChatDateTime, formatDateTime, formatYen } from "@/lib/format";
-import { useMinorDeclaration } from "@/lib/minor-purchase";
+import { purchaseNoticeShown, useMinorDeclaration } from "@/lib/minor-purchase";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
@@ -29,6 +30,9 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   const roomPath = `${base}/${kind === "review" ? (guardianToken ? "reviews" : "requests") : "contracts"}/${rootID}/consultations`;
   const [data, setData] = useState<ConsultationRoom | null>(null);
   const [error, setError] = useState("");
+  // 動画添削のあとの追加質問の支払いで、購入前チェックを出す相手か（本体 #1045。未成年の可能性がある人だけ）。
+  const { profile } = useAuth();
+  const noticeShown = purchaseNoticeShown(profile);
   const load = useCallback(async () => {
     const d = await apiFetch<ConsultationRoom>(roomPath, { token });
     setData(d);
@@ -62,7 +66,7 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
     <p className="text-sm text-slate-200">{L("新しい質問1件に、コーチが1回答えます。回答への確認は7日以内に1回無料です。会話はこの部屋に残ります。")}</p>
     <p className="text-xs text-slate-300">{L("コーチの受諾は24時間以内、受諾後の回答は12時間以内。辞退・未回答の期限切れはチケット返却または全額返金します。やりとりは終了後1年間保存します。")}</p>
     </> : null}
-    {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash"} />)}
+    {data.consultations.filter((c) => c.status !== "draft").map((c) => <ConsultationCard key={c.id} consultation={c} kind={kind} sendEnabled={sendEnabled} role={data.role} base={base} token={token} guardian={!!guardianToken} reload={load} needsDeclaration={kind === "review" && c.funding === "cash" && noticeShown} />)}
     {!sendEnabled ? <p className="text-xs text-slate-300">{kind === "review" ? L(consultationClosedNote) : L(messagingClosedNote)}</p> : null}
     {canCompose && (draft || data.can_purchase && !open) ? <ConsultationDraft key={draft?.id ?? "new"} kind={kind} draft={draft} roomPath={roomPath} token={token} minor={draft?.minor ?? !!data.minor} price={draft?.price_yen ?? data.price_yen} requiresVideo={data.requires_video} reload={load} /> : null}
     {canCompose && !data.can_purchase && !draft && !open ? <p className="text-xs text-slate-300">{data.block_reason}</p> : null}
@@ -81,9 +85,10 @@ async function uploadVideo(file: File, token: string | null): Promise<string> {
 function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo, reload }: {
   kind: "review" | "contract"; draft?: Consultation; roomPath: string; token: string | null; minor: boolean; price: number; requiresVideo: boolean; reload: () => Promise<void>;
 }) {
-  // 18歳未満が動画添削のあとの追加質問をその場で払うときは、購入のたびの宣言が要る。送るたびにチェックなしから始める。
-  // 動画添削のあとの追加質問は都度払いのみ（チケット不可）なので funding はつねに cash。
-  const needsDeclaration = kind === "review";
+  // 未成年（の可能性がある人）が動画添削のあとの追加質問をその場で払うときは、購入のたびの宣言が要る（本体 #1045）。
+  // 送るたびにチェックなしから始める。動画添削のあとの追加質問は都度払いのみ（チケット不可）なので funding はつねに cash。
+  const { profile } = useAuth();
+  const needsDeclaration = kind === "review" && purchaseNoticeShown(profile);
   const declaration = useMinorDeclaration();
   const declared = declaration.checked;
   const [body, setBody] = useState(draft?.question ?? "");
@@ -157,7 +162,7 @@ function Translated({ shown, lang }: { shown: DisplayedText; lang: "ja" | "en" }
   </>;
 }
 function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, token, guardian, reload, needsDeclaration }: { consultation: Consultation; kind: "review" | "contract"; sendEnabled: boolean; role: ConsultationRoom["role"]; base: string; token: string | null; guardian: boolean; reload: () => Promise<void>; needsDeclaration: boolean }) {
-  // 支払い画面を開き直すときも、18歳未満は毎回チェックが要る。
+  // 支払い画面を開き直すときも、未成年（の可能性がある人）は毎回チェックが要る（本体 #1045）。
   const declaration = useMinorDeclaration();
   const declared = declaration.checked;
   const [body, setBody] = useState(""); const [file, setFile] = useState<File | null>(null); const [error, setError] = useState(""); const [reported, setReported] = useState(false);

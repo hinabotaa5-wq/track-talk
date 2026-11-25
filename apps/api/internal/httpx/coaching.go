@@ -113,6 +113,8 @@ func (s *Server) writeCoachingMe(w http.ResponseWriter, r *http.Request, p db.Pr
 		"demo":         p.CoachingDemo,
 		// 動画添削を申し込めるか（支払いのある環境では誰でも。本体 #569）。サポートプランは demo のまま。
 		"review_open": s.reviewOpenTo(p),
+		// 購入前チェックを出す相手か（本体 #1045）。profileJSON と同じ判定。
+		"purchase_notice_required": purchaseNoticeRequired(p, time.Now()),
 	}
 	if p.BirthMonth != nil {
 		out["birth_month"] = p.BirthMonth.Format("2006-01")

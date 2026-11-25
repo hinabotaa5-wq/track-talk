@@ -9,10 +9,10 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { t, L } from "@/lib/i18n";
 import { useLocale } from "@/components/locale-provider";
 import { appEvents } from "@/lib/practice-events";
-import { profileIncomplete } from "@/lib/profile-gate";
+import { birthYearMissing, profileIncomplete } from "@/lib/profile-gate";
 import { trackEvent } from "@/lib/analytics";
 import { isReservedNickname, reservedNicknameMessage } from "@/lib/reserved-nickname";
-import { nicknameSchema } from "@/lib/validators";
+import { birthYearError, nicknameSchema, normalizeBirthYear } from "@/lib/validators";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -27,6 +27,9 @@ export default function ProfilePage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // 生まれた年（本体 #1045）。年の情報がまだない人にだけ欄を出し、登録したら二度と出さない。
+  const [birthYear, setBirthYear] = useState("");
+  const [birthYearMessage, setBirthYearMessage] = useState("");
   const form = useForm<z.infer<typeof nicknameSchema>>({
     resolver: zodResolver(nicknameSchema),
     defaultValues: { nickname: "", nickname_public: false, event: "" as never },
@@ -55,13 +58,27 @@ export default function ProfilePage() {
       form.setError("nickname", { type: "reserved", message: reservedNicknameMessage });
       return;
     }
-    // ニックネームか種目がまだの人が決め終えたら、ほかの画面へ進めるのでホームへ送る。
+    // ニックネーム・種目・生まれた年のどれかがまだの人が決め終えたら、ほかの画面へ進めるのでホームへ送る。
     const firstTime = profileIncomplete(profile);
+    // 表示言語の初期値は、ニックネームか種目がまだの登録直後だけ保存する（年だけがまだの既存の人は変えない）。
+    const onboarding = !profile?.nickname?.trim() || !profile?.event;
+    const needsYear = birthYearMissing(profile);
+    setBirthYearMessage("");
+    if (needsYear) {
+      const problem = birthYearError(birthYear);
+      if (problem) {
+        setBirthYearMessage(problem);
+        return;
+      }
+    }
+    const body: Record<string, unknown> = { ...values };
+    if (onboarding) body.locale = locale;
+    if (needsYear) body.birth_year = Number(normalizeBirthYear(birthYear));
     try {
       await apiFetch("/v1/me", {
         method: "PATCH",
         token,
-        body: JSON.stringify(firstTime ? { ...values, locale } : values),
+        body: JSON.stringify(body),
       });
       if (firstTime) trackEvent("onboarding_completed");
       await refreshProfile();
@@ -75,11 +92,18 @@ export default function ProfilePage() {
         form.setError("nickname", { type: "reserved", message: e.message });
         return;
       }
+      if (e instanceof ApiRequestError && e.fields?.birth_year) {
+        setBirthYearMessage(e.fields.birth_year);
+        return;
+      }
       setError(e instanceof ApiRequestError ? e.message : L("更新に失敗しました。"));
     }
   }
 
   const incomplete = profileIncomplete(profile);
+  const askBirthYear = birthYearMissing(profile);
+  // ニックネームと種目は決めてあり、生まれた年だけがまだの人（以前から使っている人）。
+  const onlyBirthYear = askBirthYear && !!profile?.nickname?.trim() && !!profile?.event;
 
   if (loading || !session) {
     return <PageLoading screen label={t(locale, "common.loading")} />;
@@ -87,8 +111,8 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4">
-      <h1 className="text-2xl font-bold">{incomplete ? t(locale, "profile.onboardingTitle") : t(locale, "profile.settingsTitle")}</h1>
-      {incomplete ? <p className="text-sm text-slate-200">{t(locale, "profile.onboardingHint")}</p> : null}
+      <h1 className="text-2xl font-bold">{onlyBirthYear ? t(locale, "profile.birthYearTitle") : incomplete ? t(locale, "profile.onboardingTitle") : t(locale, "profile.settingsTitle")}</h1>
+      {onlyBirthYear ? <p className="text-sm text-slate-200">{t(locale, "profile.birthYearOnlyHint")}</p> : incomplete ? <p className="text-sm text-slate-200">{t(locale, "profile.onboardingHint")}</p> : null}
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <Input placeholder={t(locale, "profile.nickname")} aria-label={t(locale, "profile.nickname")} {...form.register("nickname")} />
         {overLimit ? (
@@ -113,6 +137,25 @@ export default function ProfilePage() {
           </select>
         </label>
         {form.formState.errors.event ? <p className="text-sm text-red-400">{form.formState.errors.event.message}</p> : null}
+        {askBirthYear ? (
+          <div className="space-y-1">
+            <label className="block text-sm font-medium">
+              {t(locale, "profile.birthYear")}
+              <Input
+                className="mt-1"
+                inputMode="numeric"
+                autoComplete="bday-year"
+                maxLength={4}
+                placeholder={t(locale, "profile.birthYearPlaceholder")}
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
+                aria-invalid={birthYearMessage ? true : undefined}
+              />
+            </label>
+            <p className="text-xs text-slate-300">{t(locale, "profile.birthYearHint")}</p>
+            {birthYearMessage ? <p role="alert" className="text-sm text-red-400">{birthYearMessage}</p> : null}
+          </div>
+        ) : null}
         <label className="flex items-center gap-2 text-sm text-slate-200">
           <input type="checkbox" className="size-4 accent-blue-500" {...form.register("nickname_public")} />
           {t(locale, "profile.nicknamePublic")}

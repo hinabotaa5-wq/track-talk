@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   upload: vi.fn(),
   me: { demo: true, birth_month: "2011-01", is_minor: true, guardian: null, push_devices: 0 } as Record<string, unknown>,
   router: { replace: vi.fn(), push: vi.fn() },
-  auth: { session: {} as Record<string, unknown> | null, token: "token" as string | null, loading: false },
+  auth: { session: {} as Record<string, unknown> | null, token: "token" as string | null, loading: false, profile: null as Record<string, unknown> | null },
 }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router }));
@@ -33,6 +33,7 @@ beforeEach(() => {
   mocks.auth.session = {};
   mocks.auth.token = "token";
   mocks.auth.loading = false;
+  mocks.auth.profile = null;
   window.history.replaceState(null, "", "/coaching/new");
   mocks.api.mockImplementation(async (path: string) => {
     if (path === "/v1/me/coaching") return mocks.me;
@@ -70,10 +71,18 @@ it("18歳未満は保護者の同意がなくても依頼の画面を開け、�
   expect(box?.closest("label")?.textContent).toBe("未成年の方は保護者に許可を取ってください");
 });
 
-it("18歳以上にも購入前チェックを出す", async () => {
+it("成人と確定できる人には購入前チェックを出さない。未成年の可能性がある人には出す（本体 #1045）", async () => {
   mocks.me = { demo: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.auth.profile = { purchase_notice_required: false };
   await render();
   expect(container.querySelector("form")).not.toBeNull();
+  expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+  expect(container.textContent).not.toContain("未成年の方は保護者に許可を取ってください");
+  expect(container.textContent).not.toContain("未成年の方は、保護者の同意のチェックが必要です。");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  mocks.auth.profile = { purchase_notice_required: true };
+  await render();
   expect(container.querySelector('input[type="checkbox"]')).not.toBeNull();
   expect(container.textContent).toContain("未成年の方は保護者に許可を取ってください");
 });

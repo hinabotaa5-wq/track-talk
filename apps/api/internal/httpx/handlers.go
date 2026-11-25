@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/hinata/track-talk/apps/api/internal/db"
+	"github.com/hinata/track-talk/apps/api/internal/jst"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -107,9 +109,40 @@ func profileJSON(p db.Profile) map[string]any {
 		// 投稿マスターのバッジを投稿の詳細に出すかどうか
 		"post_master_badge_public": p.PostMasterBadgePublic,
 		"is_admin":                 p.IsAdmin,
+		// 登録した生まれた年（本体 #1045）。未登録なら null。
+		"birth_year": p.BirthYear,
+		// 年の情報（birth_year か、旧方式の birth_month）があれば true。false の人はプロフィール画面で年を登録するまで、ほかの画面へ進めない。
+		"birth_year_known": birthYearKnown(p),
+		// 購入前チェック「未成年の方は保護者に許可を取ってください」を出す相手なら true（API でも同じ判定で検証する）。
+		"purchase_notice_required": purchaseNoticeRequired(p, time.Now()),
 		"created_at":               p.CreatedAt,
 		"updated_at":               p.UpdatedAt,
 	}
+}
+
+// parseBirthYear は、生まれた年（4桁の西暦。数値でも文字列でもよい）を受け取り、1900〜日本時間の今年の範囲かを確かめる。
+func parseBirthYear(raw json.RawMessage, now time.Time) (int32, string) {
+	value := strings.TrimSpace(string(raw))
+	if value == "" || value == "null" || value == `""` {
+		return 0, "生まれた年を入力してください"
+	}
+	value = strings.TrimSpace(strings.Trim(value, `"`))
+	if value == "" {
+		return 0, "生まれた年を入力してください"
+	}
+	if len(value) != 4 {
+		return 0, "生まれた年は西暦4桁で入力してください"
+	}
+	for _, c := range value {
+		if c < '0' || c > '9' {
+			return 0, "生まれた年は西暦4桁で入力してください"
+		}
+	}
+	year, _ := strconv.Atoi(value)
+	if year < 1900 || year > now.In(jst.Zone).Year() {
+		return 0, "生まれた年が正しくありません"
+	}
+	return int32(year), ""
 }
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
@@ -147,6 +180,8 @@ type profileReq struct {
 	Event          string `json:"event"`
 	// 表示言語。空ならそのまま、ja / en 以外は 400。
 	Locale string `json:"locale"`
+	// 生まれた年（本体 #1045）。年の情報がまだない人は必須、ある人が送ると 409（本人は変えられない）。
+	BirthYear json.RawMessage `json:"birth_year"`
 }
 
 func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +217,22 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		locale = &req.Locale
 	}
+	// 生まれた年は、年の情報がまだない人は必ず登録する。登録済み（旧方式の生まれた年月を含む）の人は変えられない。
+	var birthYear *int32
+	sentBirthYear := len(req.BirthYear) > 0 && string(req.BirthYear) != "null"
+	if birthYearKnown(p) {
+		if sentBirthYear {
+			Error(w, http.StatusConflict, "conflict", birthYearRegisteredMessage)
+			return
+		}
+	} else {
+		year, message := parseBirthYear(req.BirthYear, time.Now())
+		if message != "" {
+			FieldError(w, map[string]string{"birth_year": message})
+			return
+		}
+		birthYear = &year
+	}
 	reserved := isReservedNickname(nickname)
 	updated, err := s.q.UpdateProfile(r.Context(), db.UpdateProfileParams{
 		ID:               p.ID,
@@ -189,8 +240,17 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		NicknamePublic:   req.NicknamePublic,
 		Event:            event,
 		Locale:           locale,
+		BirthYear:        birthYear,
 		ReservedNickname: reserved,
 	})
+	// 同時に年を登録した別のリクエストが先に通ったときも、行が返らない。
+	if birthYear != nil && errors.Is(err, pgx.ErrNoRows) {
+		current, getErr := s.q.GetProfileByID(r.Context(), p.ID)
+		if getErr == nil && birthYearKnown(current) {
+			Error(w, http.StatusConflict, "conflict", birthYearRegisteredMessage)
+			return
+		}
+	}
 	if reserved && errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusUnprocessableEntity, "nickname_reserved", reservedNicknameMessage)
 		return
@@ -201,6 +261,9 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	JSON(w, http.StatusOK, profileJSON(updated))
 }
+
+// birthYearRegisteredMessage は、生まれた年を登録済みの人が送り直したときの文面。
+const birthYearRegisteredMessage = "生まれた年はすでに登録されています。変更はお問い合わせからお願いします"
 
 type localeReq struct {
 	Locale string `json:"locale"`
