@@ -310,7 +310,7 @@ func (s *Server) notifyUnresubmitted(ctx context.Context, rr db.ExpireUnresubmit
 	}
 	// 文面は表題1行だけにし、終了の理由とお支払いの扱いは依頼の画面で見せる（本体 #609）。
 	s.pushQuietly(ctx, rr.RequesterID, notifyReview, push.Message{
-		Title: "スタンダードプランの依頼が終了しました",
+		Title: "スタンダードの依頼が終了しました",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
 	}, 24*time.Hour)

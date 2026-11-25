@@ -23,7 +23,7 @@ import { ReferralBanner } from "../coaches/referral-banner";
 // 名前・写真・記録・種目・紹介文・実績・SNS はプロフィールデータから出し、コードに個人の固定文言を書かない。
 // 固定の文は流れ（3ステップ）・よくある質問だけ（すべて L() でキー化）。
 // 並び（#991）：紹介バナー → 切り替え＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋下部固定 CTA）。
-// 継続プランは休眠させたので（本体 #1007）、切り替えの選択肢はスタンダードプランだけ。?tab=support で開かれてもスタンダードプラン側を出し、
+// 継続プランは休眠させたので（本体 #1007）、切り替えの選択肢はスタンダードだけ。?tab=support で開かれてもスタンダード側を出し、
 // 「継続プランは準備中です」は描画しない（通常一覧の coach-tabs.tsx と同じ）。
 // 外すもの：コーチカードの2列一覧・種目チップの絞り込み。
 
@@ -81,7 +81,7 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
   // 初回読み込み中は、通常一覧と同じくストップウォッチだけにする。
   if (!result) return <PageLoading screen label={L("読み込み中...")} />;
 
-  const views = [{ id: "video", label: L("スタンダードプラン") }] as const;
+  const views = [{ id: "video", label: L("スタンダード") }] as const;
 
   return (
     <div className="mx-auto max-w-md space-y-6 pb-32">

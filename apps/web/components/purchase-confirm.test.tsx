@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 
-const rows = [{ label: "内容", value: "スタンダードプラン" }];
+const rows = [{ label: "内容", value: "スタンダード" }];
 async function render(props: { pending?: boolean; pendingLabel?: string; onConfirm?: () => void; onBack?: () => void }) {
   await act(async () => root.render(
     <PurchaseConfirm rows={rows} confirmLabel="確定してお支払いへ" onConfirm={props.onConfirm ?? (() => {})} onBack={props.onBack ?? (() => {})}

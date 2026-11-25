@@ -38,7 +38,7 @@ describe("purchase-confirm", () => {
     ]);
   });
 
-  it("英語辞書で 1 review の表記が消え、One ticket covers one Standard Plan request. 相当になっている", () => {
+  it("英語辞書で 1 review の表記が消え、One ticket covers one Standard request. 相当になっている", () => {
     installEnglish(en);
     setActiveLocale("en");
     const rows = ticketPackConfirmRows({
@@ -48,7 +48,7 @@ describe("purchase-confirm", () => {
     });
     const contentRow = rows.find((r) => r.label === "Message" || r.label === "内容");
     expect(contentRow).toBeDefined();
-    expect(contentRow?.value).toContain("6 Standard Plan tickets (One ticket covers one Standard Plan request.)");
+    expect(contentRow?.value).toContain("6 Standard tickets (One ticket covers one Standard request.)");
     expect(contentRow?.value).toContain("Only the purchaser can use them.");
     expect(contentRow?.value).not.toContain("1 review");
 
@@ -150,7 +150,7 @@ describe("purchase-confirm", () => {
     setActiveLocale("ja");
     const rows = ticketPackConfirmRows({ quantity: 6, amountYen: 5000, validityMonths: 6, now: new Date("2026-11-20T10:00:00+09:00") });
     expect(rows.map((r) => r.label)).toEqual(["内容", "総額", "有効期限", "払戻し"]);
-    expect(rows[0].value).toBe("スタンダードプランのチケット6枚（1枚でスタンダードプラン1件）。購入した本人だけが使えます。譲ることはできません。");
+    expect(rows[0].value).toBe("スタンダードのチケット6枚（1枚でスタンダード1件）。購入した本人だけが使えます。譲ることはできません。");
     expect(rows[1].value).toBe("5,000円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
     expect(rows[2].value).toContain("2027/05/20 10:00");
     expect(rows[2].value).toContain("申し込んだ依頼が終了して戻るチケットも、有効期限を過ぎていれば失効します。");

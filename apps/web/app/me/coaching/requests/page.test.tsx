@@ -37,7 +37,7 @@ async function render() { await act(async () => root.render(<Page />)); }
 it("依頼0件では案内文とコーチ一覧リンクを出し、新しく頼むと /coaching/new リンクは出さない", async () => {
   mocks.api.mockResolvedValue({ requests: [], meta: {} });
   await render();
-  expect(container.querySelector("h1")?.textContent).toBe("スタンダードプランの依頼");
+  expect(container.querySelector("h1")?.textContent).toBe("スタンダードの依頼");
   expect(container.textContent).toContain("まだ依頼はありません。");
   expect(container.textContent).toContain("から依頼できます。");
   const coachList = container.querySelector('a[href="/coaching"]');
@@ -51,7 +51,7 @@ it("依頼0件では案内文とコーチ一覧リンクを出し、新しく頼
 it("依頼が1件あるときは案内文も新しく頼むも出さず、依頼行は詳細へリンクする", async () => {
   mocks.api.mockResolvedValue({ requests: [oneRequest], meta: {} });
   await render();
-  expect(container.querySelector("h1")?.textContent).toBe("スタンダードプランの依頼");
+  expect(container.querySelector("h1")?.textContent).toBe("スタンダードの依頼");
   expect(container.textContent).not.toContain("まだ依頼はありません。");
   expect(container.textContent).not.toContain("から依頼できます。");
   expect(container.textContent).not.toContain("新しく頼む");

@@ -6,7 +6,7 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 // コーチタブの特集ページ（本体 #985、#991 で並びを変更）。特集コーチ1人の詳細だけを取り、一覧・種目チップは出さない。
-// 並び：紹介バナー → 切り替え（スタンダードプランのみ、本体 #1007）＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋固定 CTA）。
+// 並び：紹介バナー → 切り替え（スタンダードのみ、本体 #1007）＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋固定 CTA）。
 const apiFetch = vi.fn();
 const auth = { token: null as string | null };
 const flags = { supportList: false };
@@ -90,8 +90,8 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   expect(before(about(), steps())).toBe(true);
   expect(before(steps(), faq)).toBe(true);
   expect(faq?.textContent).toContain("よくある質問");
-  // 切り替えと選手・コーチの丸ボタン。選択肢はスタンダードプランだけ（本体 #1007）。
-  expect(switchButton("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
+  // 切り替えと選手・コーチの丸ボタン。選択肢はスタンダードだけ（本体 #1007）。
+  expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
   expect(switchButton("継続プラン")).toBeUndefined();
   expect(container.querySelector('a[href="/player"][aria-label="選手"]')).not.toBeNull();
   expect(container.querySelector('a[href="/coach"][aria-label="コーチ"]')).not.toBeNull();
@@ -119,17 +119,17 @@ it("写真が未登録でも、コーチについての先頭に頭文字の丸�
   expect(Array.from(about()?.querySelectorAll('ul[aria-label="記録と対応種目"] li') ?? []).map((li) => li.textContent)).toContain("対応種目 100m・200m・400m");
 });
 
-// 本体 #1007 B2：継続プランは休眠。?tab=support で開いてもスタンダードプラン側（特集コンテンツと固定 CTA）を出し、
+// 本体 #1007 B2：継続プランは休眠。?tab=support で開いてもスタンダード側（特集コンテンツと固定 CTA）を出し、
 // 「継続プランは準備中です」は出さない。一覧フラグの真偽にかかわらない。
 for (const supportList of [true, false]) {
-  it(`?tab=support で開いてもスタンダードプラン側を出し、継続プランの選択肢・準備中表示を出さない（一覧フラグ=${supportList}）`, async () => {
+  it(`?tab=support で開いてもスタンダード側を出し、継続プランの選択肢・準備中表示を出さない（一覧フラグ=${supportList}）`, async () => {
     flags.supportList = supportList;
     nav.search = "tab=support";
     await render();
     const options = [...container.querySelectorAll('[role="group"][aria-label="コーチの一覧を切り替える"] a')].map((a) => a.textContent);
-    expect(options).toEqual(["スタンダードプラン"]);
-    expect(switchButton("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
-    expect(switchButton("スタンダードプラン")?.getAttribute("href")).toBe("/coaching");
+    expect(options).toEqual(["スタンダード"]);
+    expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
+    expect(switchButton("スタンダード")?.getAttribute("href")).toBe("/coaching");
     expect(container.textContent).not.toContain("継続プラン");
     expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
     expect(about()).not.toBeNull();
@@ -168,7 +168,7 @@ it("英語表示では固定文を英語で出す", async () => {
   await render();
   expect(container.textContent).toContain("Request video feedback ¥1,000");
   expect(container.textContent).toContain("Returned within 24 hours");
-  expect(container.textContent).toContain("Standard Plan");
+  expect(container.textContent).toContain("Standard");
   expect(container.textContent).toContain("FAQ");
   expect(container.textContent).not.toContain("よくある質問");
 });

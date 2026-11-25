@@ -23,7 +23,7 @@ import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 type ReviewEntry = { key: "card" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string; enabled: boolean };
 
 // どのプランの文脈で開いたか（本体 #694）。継続プランは休眠させたので（本体 #1007）、
-// クエリが tab=support でもつねにスタンダードプラン（動画添削）の文脈とし、継続プランの節（CoachServicePlans）は描画しない。
+// クエリが tab=support でもつねにスタンダード（動画添削）の文脈とし、継続プランの節（CoachServicePlans）は描画しない。
 // 詳細の中に切り替えは置かない。
 type PlanContext = "video";
 
@@ -211,7 +211,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         </section>
         {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
           <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>
-          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。スタンダードプランの申込み1件につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
+          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。スタンダードの申込み1件につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
           <Link
             href={ticketPurchaseHref}
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition hover:bg-blue-500 active:scale-[0.98]"

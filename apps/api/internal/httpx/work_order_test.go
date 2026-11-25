@@ -19,7 +19,7 @@ type workOrderTermsView struct {
 	PaymentDue string `json:"payment_due"`
 }
 
-// フォーム添削を打診するときは、引き受ける前に極短の取引条件(8行・版7)を見せ、引き受けたら書き留める。
+// フォーム添削を打診するときは、引き受ける前に極短の取引条件(8行・版8)を見せ、引き受けたら書き留める。
 func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupStripeConfig(t, nil)
@@ -39,7 +39,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &accepted); err != nil || rec.Code != 200 {
 		t.Fatalf("accept %d %s", rec.Code, rec.Body.String())
 	}
-	if accepted.WorkOrder.TermsVersion != 7 || accepted.WorkOrder.Terms.AmountYen != 700 || len(accepted.WorkOrder.Terms.Items) != 8 {
+	if accepted.WorkOrder.TermsVersion != 8 || accepted.WorkOrder.Terms.AmountYen != 700 || len(accepted.WorkOrder.Terms.Items) != 8 {
 		t.Fatalf("work order after accept: %s", rec.Body.String())
 	}
 
@@ -66,7 +66,7 @@ func TestReviewOfferShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil || detail.WorkOrder == nil || detail.WorkOrder.Terms.AmountYen != 700 {
 		t.Fatalf("detail %d %s", rec.Code, rec.Body.String())
 	}
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "スタンダードプランの依頼が届きました")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "スタンダードの依頼が届きました")
 	if !strings.Contains(rec.Body.String(), `"delivered_at"`) {
 		t.Fatalf("detail has no delivered_at: %s", rec.Body.String())
 	}
@@ -140,9 +140,9 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if got := terms.Items[2]; got.Label != "内容" || strings.Contains(got.Value, "補足1回") {
 		t.Fatalf("consultation content must keep its own diff: %+v", got)
 	}
-	// 本体 #1007 D4：内容行の表示名はスタンダードプラン。
-	if got := terms.Items[2]; got.Value != "スタンダードプランの追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える" {
-		t.Fatalf("consultation content must use the Standard Plan name: %+v", got)
+	// 本体 #1007 D4：内容行の表示名はスタンダード。
+	if got := terms.Items[2]; got.Value != "スタンダードの追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える" {
+		t.Fatalf("consultation content must use the Standard name: %+v", got)
 	}
 	consultationAction(t, h, coach, c.ID, "accept", nil)
 	var wo struct {
@@ -156,11 +156,11 @@ func TestReviewConsultationShowsAndRecordsWorkOrderTerms(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("work orders %d", count)
 	}
-	// 本体 #1007 D4：書き留める版は7で、保存される委託内容はスタンダードプラン表記（旧「1回プラン」を含まない）。
+	// 本体 #1007 D4・#1018：書き留める版は8で、保存される委託内容はスタンダード表記（旧「1回プラン」を含まない）。
 	var version int
 	var saved string
 	queryRowArgs(t, `SELECT terms_version, terms::text FROM coach_work_orders WHERE consultation_id=$1`, []any{c.ID}, &version, &saved)
-	if version != 7 || !strings.Contains(saved, "スタンダードプランの追加質問") || strings.Contains(saved, "1回プラン") {
+	if version != 8 || !strings.Contains(saved, "スタンダードの追加質問") || strings.Contains(saved, "1回プラン") {
 		t.Fatalf("saved work order version %d terms %s", version, saved)
 	}
 	assertWorkOrderDelivered(t, h, coach, "consultation_id", c.ID, "/coach/requests/"+root+"#work-order", "追加質問が届きました")
@@ -183,5 +183,5 @@ func TestWorkOrderDeliveredEvenWhenNotificationsOff(t *testing.T) {
 	}
 	buySixTickets(t, h, owner)
 	request := ticketReview(t, h, owner)
-	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "スタンダードプランの依頼が届きました")
+	assertWorkOrderDelivered(t, h, coach, "review_request_id", request, "/coach/requests/"+request+"#work-order", "スタンダードの依頼が届きました")
 }

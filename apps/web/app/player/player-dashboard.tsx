@@ -21,7 +21,7 @@ type CountKey = "player_one_time_count" | "player_personal_count" | "player_supp
 type TileCounts = Partial<Record<CountKey, number>>;
 
 const tiles: { href: string; label: string; Icon: LucideIcon; countKey?: CountKey }[] = [
-  { href: "/me/coaching/requests", label: "スタンダードプラン", Icon: ClipboardCheck, countKey: "player_one_time_count" },
+  { href: "/me/coaching/requests", label: "スタンダード", Icon: ClipboardCheck, countKey: "player_one_time_count" },
   { href: "/me/coaching/tickets", label: "チケット", Icon: Ticket, countKey: "player_ticket_count" },
   { href: "/me/push", label: "通知", Icon: BellRing },
 ];

@@ -313,7 +313,7 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	// 返却の Push は待ちに入れて送り、送れなかったら tick が送り直す（本体 #421 F04）。有効期限は24時間。
 	s.queuePush(r.Context(), rr.RequesterID, notifyReview, push.Message{
-		Title: "スタンダードプランの返答が届きました",
+		Title: "スタンダードの返答が届きました",
 		Body:  "コーチからのアドバイスを見てみましょう",
 		URL:   "/coaching/requests/" + rr.ID.String(),
 		Tag:   "review-" + rr.ID.String(),
@@ -460,7 +460,7 @@ func (s *Server) askHelpful(ctx context.Context) (int, error) {
 	for _, row := range rows {
 		s.notifyReview(ctx, row.RequesterID, row.ID, "review_helpful_ask", push.Message{
 			Title: "アドバイスは役に立ちましたか",
-			Body:  "1週間前のスタンダードプランについて教えてください",
+			Body:  "1週間前のスタンダードについて教えてください",
 			URL:   "/coaching/requests/" + row.ID.String(),
 			Tag:   "review-" + row.ID.String(),
 		})

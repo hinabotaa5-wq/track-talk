@@ -10,7 +10,7 @@ export function CoachAboutView() {
     <div className="mx-auto max-w-md space-y-7">
       <section className="space-y-3">
         <p className="text-sm font-semibold text-blue-300">{L("TrackTalkのコーチ機能")}</p>
-        <p className="rounded-xl border border-blue-300/30 bg-blue-500/15 p-3 text-sm font-semibold text-blue-200">{L("コーチを募集しています。スタンダードプランは開始していて、申込みとチケットの購入ができます。")}</p>
+        <p className="rounded-xl border border-blue-300/30 bg-blue-500/15 p-3 text-sm font-semibold text-blue-200">{L("コーチを募集しています。スタンダードは開始していて、申込みとチケットの購入ができます。")}</p>
         <h1 className="text-2xl font-bold leading-relaxed">{L("あなたの陸上経験を、")}<br />{L("誰かの次の一歩に。")}</h1>
         <p className="text-sm leading-relaxed text-slate-200">{L("「フォームを見てほしい」「大会に向けて何をすればいい？」。そんな選手の悩みに、競技や指導で培った経験を生かして応える機能です。動画や文章でのアドバイスを通じて、自分が対応できる形で活動できます。")}</p>
       </section>
@@ -18,15 +18,15 @@ export function CoachAboutView() {
       <section className="space-y-4" aria-labelledby="coach-ways">
         <h2 id="coach-ways" className="text-lg font-bold">{L("関わり方")}</h2>
         <article className="space-y-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
-          <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("スタンダードプラン")}</h3>
-          <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容を送り、必要に応じて動画を添えます。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1回1,000円で、コーチの報酬はその70％（700円）です。利用者がチケットで申し込んだスタンダードプランも、報酬は同じ700円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
+          <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("スタンダード")}</h3>
+          <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容を送り、必要に応じて動画を添えます。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1回1,000円で、コーチの報酬はその70％（700円）です。利用者がチケットで申し込んだスタンダードも、報酬は同じ700円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
           <p className="text-sm leading-relaxed text-slate-200">{L("受付をオンにすると、申込みが対応中の一覧に届きます。届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください。")}</p>
         </article>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">{L("自分のペースで、責任を持って")}</h2>
-        <p className="text-sm leading-relaxed text-slate-200">{L("スタンダードプランは受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。")}</p>
+        <p className="text-sm leading-relaxed text-slate-200">{L("スタンダードは受付のオン・オフで調整できます。期限を過ぎると新規受付は自動でオフになります。届いた依頼は期限まで対応できます。")}</p>
         <p className="text-sm leading-relaxed text-slate-200">{L("やり取りや支払いはTrackTalk上で行います。未成年の利用者の購入には、保護者の許可の確認など、所定の手続きがあります。")}</p>
       </section>
 

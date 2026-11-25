@@ -29,11 +29,12 @@ const reviewTicketUnits int32 = 1
 const ticketValidityMonths = 6
 
 // ticketWordingVersion は、チケットの購入画面・最終確認・規約に表示している文面の版（本体 #572 v3、プラン改名で v4、スタンダードプランへの改名で v5（本体 #1007））。
+// v6: 表示名から「プラン」を外し「スタンダード」とした（本体 #1018）。
 // 購入の確定時に購入ごとに残し、文面の版と購入を突き合わせられるようにする（証拠化）。
-const ticketWordingVersion = "v5"
+const ticketWordingVersion = "v6"
 
 // チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
-const ticketSalesClosedMessage = "チケットの新規販売は終了しました。スタンダードプラン・追加質問は申込み時にカードでお支払いください"
+const ticketSalesClosedMessage = "チケットの新規販売は終了しました。スタンダード・追加質問は申込み時にカードでお支払いください"
 
 type ticketRuleError struct{ code, message string }
 
@@ -336,7 +337,7 @@ func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
 	}
 	// 先に購入記録を確定。同じ操作を再送しても同じ購入・決済画面になり、通知が先着しても受け取れる。
 	page := s.cfg.WebBaseURL + "/me/coaching/tickets"
-	sess, err := s.stripe.CreateCheckoutSession(r.Context(), stripe.CheckoutParams{Name: fmt.Sprintf("スタンダードプランのチケット%d枚", purchase.Quantity), AmountYen: int(purchase.AmountYen),
+	sess, err := s.stripe.CreateCheckoutSession(r.Context(), stripe.CheckoutParams{Name: fmt.Sprintf("スタンダードのチケット%d枚", purchase.Quantity), AmountYen: int(purchase.AmountYen),
 		SuccessURL: page + "?purchase=" + purchase.ID.String(), CancelURL: page + "?cancelled=1&return_to=" + url.QueryEscape(purchase.ReturnPath), Reference: purchase.ID.String(),
 		Metadata: map[string]string{"kind": "tickets", "purchase_id": purchase.ID.String()}, ExpiresAt: purchase.SessionExpiresAt,
 		PaymentMethodTypes: []string{"card"}, IdempotencyKey: "ticket-checkout-" + purchase.ID.String()})
@@ -574,7 +575,7 @@ func reissueExpiredRewardLot(ctx context.Context, q *db.Queries, lot db.Coaching
 		return nil
 	}
 	title := "紹介特典：期限切れの無料チケットを出し直しました"
-	body := "運営者・コーチの都合で終わったスタンダードプランで使った分を出し直しました。新しい特典チケット：" + referralRewardTerms
+	body := "運営者・コーチの都合で終わったスタンダードで使った分を出し直しました。新しい特典チケット：" + referralRewardTerms
 	url, role := "/me/coaching/tickets", "player"
 	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
 		ID: uuid.New(), RecipientID: *lot.OwnerID, Title: &title, Body: &body, Url: &url, CoachingRole: &role,

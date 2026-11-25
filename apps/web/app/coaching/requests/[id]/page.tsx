@@ -208,7 +208,7 @@ function ReviewRequestView() {
 
   async function cancelReview() {
     if (!await confirmDialog({
-      title: L("スタンダードプランの依頼をキャンセルしますか？"),
+      title: L("スタンダードの依頼をキャンセルしますか？"),
       body: request?.status === "awaiting_payment"
         ? L("まだお支払いは済んでいません。取り消すと、この依頼ではお支払いができなくなります。")
         : L("お支払いは全額返金・取消し、チケットは返還します。"),
@@ -292,7 +292,7 @@ function ReviewRequestView() {
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold">{L("スタンダードプラン")}</h1>
+          <h1 className="text-2xl font-bold">{L("スタンダード")}</h1>
           <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
           {request.status === "in_review" ? (
             <p className="text-sm text-slate-300">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
