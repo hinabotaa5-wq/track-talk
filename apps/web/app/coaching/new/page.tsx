@@ -12,6 +12,7 @@ import { PurchaseConfirm } from "@/components/purchase-confirm";
 import { TicketBalance } from "@/components/ticket-balance";
 import { ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { UploadProgress } from "@/components/upload-progress";
 import { apiFetch, apiErrorText, ApiRequestError } from "@/lib/api";
@@ -29,7 +30,7 @@ import {
 import { initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPriceYen, ticketPackPriceYen } from "@/lib/review-pricing";
-import { reviewConfirmRows } from "@/lib/purchase-confirm";
+import { reviewAthleteInfoKeys, reviewAthleteInfoLabel, reviewConfirmRows, type ReviewAthleteInfo, type ReviewAthleteInfoKey } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { looksLikeContact } from "@/lib/solicitation";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -59,6 +60,22 @@ const chip = (on: boolean) =>
     on ? "border-blue-400 bg-blue-500/30 text-white" : "border-white/25 bg-white/10 text-slate-200"
   }`;
 
+// 選手情報（任意）の上限と入力例（本体 #1013 補足）。サーバーの上限と同じ。
+const athleteInfoLimits: Record<ReviewAthleteInfoKey, number> = { pb: 100, goal_time: 100, wind_speed: 50, body_condition: 300 };
+function athleteInfoPlaceholder(key: ReviewAthleteInfoKey): string {
+  switch (key) {
+    case "pb": return L("例：11秒20（2025年）");
+    case "goal_time": return L("例：10秒台");
+    case "wind_speed": return L("例：+1.2、向かい風で強い");
+    case "body_condition": return L("例：前日に脚が張っていた");
+  }
+}
+
+// 送る形：空白だけ・未入力は null（サーバーも NULL で保存する）。
+function athleteInfoBody(info: ReviewAthleteInfo): Record<ReviewAthleteInfoKey, string | null> {
+  return Object.fromEntries(reviewAthleteInfoKeys.map((key) => [key, info[key]?.trim() || null])) as Record<ReviewAthleteInfoKey, string | null>;
+}
+
 export default function NewReviewRequestPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
@@ -67,6 +84,8 @@ export default function NewReviewRequestPage() {
   const tier = "coach";
   const [event, setEvent] = useState<CoachEvent>(reviewEvents[0]);
   const [question, setQuestion] = useState("");
+  const [athleteInfo, setAthleteInfo] = useState<ReviewAthleteInfo>({});
+  const [athleteInfoContact, setAthleteInfoContact] = useState<ReviewAthleteInfoKey | null>(null);
   const [referralCode, setReferralCode] = useState("");
   const [referralWarning, setReferralWarning] = useState<ReferralWarning>(false);
   const [contactBlocked, setContactBlocked] = useState(false);
@@ -263,6 +282,14 @@ export default function NewReviewRequestPage() {
       if (input instanceof HTMLTextAreaElement) input.focus();
       return;
     }
+    const contactKey = reviewAthleteInfoKeys.find((key) => looksLikeContact(athleteInfo[key] ?? ""));
+    if (contactKey) {
+      setError("");
+      setAthleteInfoContact(contactKey);
+      const input = e.currentTarget.elements.namedItem(contactKey);
+      if (input instanceof HTMLElement) input.focus();
+      return;
+    }
     if (!validate()) return;
     if (needsConfirm) { setConfirming(true); return; }
     void send();
@@ -271,7 +298,7 @@ export default function NewReviewRequestPage() {
   function validate(): boolean {
     if (!estimate) { setError(L("料金と受付状況を確認してから送信してください。")); return false; }
     if (!coach) { setError(L("コーチを選んでください。")); return false; }
-    if (question.trim() && !guard.allow(question)) return false;
+    if (question.trim() && !guard.allow([question, ...reviewAthleteInfoKeys.map((key) => athleteInfo[key] ?? "")].join("\n"))) return false;
     if (!question.trim()) {
       setError(L("相談内容を記入してください"));
       return false;
@@ -319,7 +346,7 @@ export default function NewReviewRequestPage() {
       const created = await apiFetch<ReviewRequest>("/v1/coaching/requests", {
         method: "POST",
         token,
-        body: JSON.stringify({ tier, event, question: question.trim(), video_public_id: videoPublicID,
+        body: JSON.stringify({ tier, event, question: question.trim(), ...athleteInfoBody(athleteInfo), video_public_id: videoPublicID,
           method, use_tickets: method === "tickets", ticket_kind: chosenKind ?? undefined, referral_code: cashPayment ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration) }),
       });
       if (created.checkout_url) {
@@ -367,7 +394,7 @@ export default function NewReviewRequestPage() {
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind })}
+            rows={reviewConfirmRows({ method, priceYen: totalPrice, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind, athleteInfo })}
             confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : L("確定してお支払いへ")}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}
@@ -423,6 +450,41 @@ export default function NewReviewRequestPage() {
             ) : null}
             <span className="block text-xs text-slate-300">{L("{length}/1000文字", { length: question.length })}</span>
           </div>
+
+          {/* 選手情報（任意・本体 #1013 補足）。コーチが回答の型に沿って答えやすくするため。 */}
+          <fieldset className="space-y-3 text-sm">
+            <legend className="font-semibold">{L("選手情報（任意）")}</legend>
+            {reviewAthleteInfoKeys.map((key) => (
+              <label key={key} className="block space-y-1">
+                <span className="block text-xs font-semibold text-slate-300">{reviewAthleteInfoLabel(key)}</span>
+                {key === "body_condition" ? (
+                  <Textarea
+                    name={key}
+                    rows={2}
+                    value={athleteInfo[key] ?? ""}
+                    onChange={(e) => { setAthleteInfo({ ...athleteInfo, [key]: e.target.value }); setAthleteInfoContact(null); }}
+                    placeholder={athleteInfoPlaceholder(key)}
+                    maxLength={athleteInfoLimits[key]}
+                    aria-invalid={athleteInfoContact === key || undefined}
+                    disabled={pending}
+                  />
+                ) : (
+                  <Input
+                    name={key}
+                    value={athleteInfo[key] ?? ""}
+                    onChange={(e) => { setAthleteInfo({ ...athleteInfo, [key]: e.target.value }); setAthleteInfoContact(null); }}
+                    placeholder={athleteInfoPlaceholder(key)}
+                    maxLength={athleteInfoLimits[key]}
+                    aria-invalid={athleteInfoContact === key || undefined}
+                    disabled={pending}
+                  />
+                )}
+                {athleteInfoContact === key ? (
+                  <span role="alert" className="block text-sm text-red-400">{L("外部の連絡先（URL・メール・SNS IDなど）は送れません。")}</span>
+                ) : null}
+              </label>
+            ))}
+          </fieldset>
 
           <label className="block space-y-1 text-sm">
             <span className="font-semibold">{L("動画（任意・{maxReviewSeconds}秒まで）", { maxReviewSeconds })}</span>

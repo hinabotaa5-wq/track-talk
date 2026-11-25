@@ -186,6 +186,10 @@ func translationResponseBody() map[string]any {
 		"fix_points": []string{"踏切が近いので半足ぶん手前で踏み切りましょう", "抜き脚の膝を高く"},
 		"drill":      "ミニハードル5台を1.5m間隔で3セット",
 		"hitokoto":   "次は抜き脚だけ意識してみましょう",
+		// 回答の新しい型（本体 #1013）で必須になった3欄。翻訳の対象外。
+		"cue":              "地面を真下に押す",
+		"success_criteria": "接地の瞬間に膝が足首の真上にそろって見える",
+		"next_video":       "真横・5m離れて、1台目から3台目まで",
 	}
 }
 

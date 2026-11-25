@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -74,11 +75,13 @@ func newDemoCode() (string, error) {
 
 func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 	return map[string]any{
-		"id":                 rr.ID,
-		"tier":               rr.Tier,
-		"event":              rr.Event,
-		"focus":              rr.Focus,
-		"question":           rr.Question,
+		"id":       rr.ID,
+		"tier":     rr.Tier,
+		"event":    rr.Event,
+		"focus":    rr.Focus,
+		"question": rr.Question,
+		// 申込で選手が任意で書いた選手情報（本体 #1013 補足）。未入力は null。
+		"pb": rr.Pb, "goal_time": rr.GoalTime, "wind_speed": rr.WindSpeed, "body_condition": rr.BodyCondition,
 		"started_at":         rr.StartedAt,
 		"canceled_at":        rr.CanceledAt,
 		"status":             rr.Status,
@@ -248,6 +251,24 @@ func (s *Server) joinCoachingDemo(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"demo": true})
 }
 
+// optionalRequestText は、申込の任意入力を1つ確かめる。空白だけ・未入力は nil（NULL で保存）。
+// 上限を超える・連絡先らしき文字列があるときは fields にその項目の誤りを入れる。
+func optionalRequestText(fields map[string]string, key string, value *string, limit int) *string {
+	if value == nil {
+		return nil
+	}
+	v := strings.TrimSpace(*value)
+	if v == "" {
+		return nil
+	}
+	if utf8.RuneCountInString(v) > limit {
+		fields[key] = fmt.Sprintf("%d文字以内で記入してください", limit)
+	} else if looksLikeContact(v) {
+		fields[key] = "URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは書けません"
+	}
+	return &v
+}
+
 type reviewRequestReq struct {
 	Tier          string   `json:"tier"`
 	Event         string   `json:"event"`
@@ -263,6 +284,11 @@ type reviewRequestReq struct {
 	ReferralCode string `json:"referral_code"`
 	// 選手が選んだコーチ。おまかせ(REVIEW_RANDOM_ASSIGN_ENABLED)を止めている間は必須。
 	RequestedCoachID *uuid.UUID `json:"requested_coach_id"`
+	// 選手が任意で書ける選手情報（本体 #1013 補足）。空白だけ・未入力は NULL で保存する。
+	PB            *string `json:"pb"`
+	GoalTime      *string `json:"goal_time"`
+	WindSpeed     *string `json:"wind_speed"`
+	BodyCondition *string `json:"body_condition"`
 	// 18歳未満が自分で払うときの、購入のたびの宣言（minor_purchase.go）。
 	minorDeclarationReq
 }
@@ -312,6 +338,11 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 			fields["focus"] = "見てほしい点を1つ以上選んでください"
 		}
 	}
+	// 選手情報は、相談内容の経路・動画のみの経路のどちらでも、値があれば長さと連絡先だけを確かめる。
+	pb := optionalRequestText(fields, "pb", req.PB, 100)
+	goalTime := optionalRequestText(fields, "goal_time", req.GoalTime, 100)
+	windSpeed := optionalRequestText(fields, "wind_speed", req.WindSpeed, 50)
+	bodyCondition := optionalRequestText(fields, "body_condition", req.BodyCondition, 300)
 	if req.VideoPublicID != "" && !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
 	}
@@ -420,6 +451,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Question:         question,
 		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
 		BasePriceYen: reviewPriceYen, UseTickets: useTickets,
+		Pb: pb, GoalTime: goalTime, WindSpeed: windSpeed, BodyCondition: bodyCondition,
 		VideoPublicID: video,
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。

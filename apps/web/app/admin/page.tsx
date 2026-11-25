@@ -370,7 +370,11 @@ function CoachProbationAdmin({ token }: { token: string | null }) {
                 直す点{r.fix_points.length > 1 ? i + 1 : ""}: {f}
               </p>
             ))}
+            {/* 回答の新しい型の3欄（本体 #1013）。この型より前の返答は null なので出さない。 */}
+            {r.cue ? <p className="whitespace-pre-wrap">キュー: {r.cue}</p> : null}
             <p className="whitespace-pre-wrap">ドリル: {r.drill}</p>
+            {r.success_criteria ? <p className="whitespace-pre-wrap">成功の目安: {r.success_criteria}</p> : null}
+            {r.next_video ? <p className="whitespace-pre-wrap">次に撮る動画: {r.next_video}</p> : null}
             {r.clarification ? <p className="whitespace-pre-wrap">補足: {r.clarification}</p> : null}
             {r.hidden_at ? null : (
               <button type="button" onClick={() => void hide(r.request_id)} className="text-red-300 underline">

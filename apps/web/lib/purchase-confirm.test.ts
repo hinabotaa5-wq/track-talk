@@ -223,4 +223,31 @@ describe("reviewConfirmRows の申込内容の行（本体 #845）", () => {
       setActiveLocale("ja");
     }
   });
+
+  // 本体 #1013 補足 B4: 選手情報は入力がある項目だけ、相談内容の直後に行を足す。
+  it("選手情報は入力がある項目だけ相談内容の直後に行を出す", () => {
+    setActiveLocale("ja");
+    const input = {
+      method: "card" as const,
+      priceYen: 1000,
+      hasVideo: true,
+      question: "相談",
+      eventLabel: "100m",
+      videoFileName: "run.mp4",
+      videoFileSizeBytes: 1,
+    };
+    const labelsOf = (rows: ReturnType<typeof reviewConfirmRows>) => rows.map((r) => r.label);
+    const none = labelsOf(reviewConfirmRows(input));
+    for (const label of ["PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]) expect(none).not.toContain(label);
+    expect(labelsOf(reviewConfirmRows({ ...input, athleteInfo: { pb: " ", goal_time: "" } }))).toEqual(none);
+    const rows = reviewConfirmRows({ ...input, athleteInfo: { pb: "11秒20", goal_time: "10秒台", wind_speed: "+1.2", body_condition: "脚が張っていた" } });
+    const labels = labelsOf(rows);
+    const at = labels.indexOf("相談内容");
+    expect(labels.slice(at, at + 5)).toEqual(["相談内容", "PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]);
+    expect(rows.slice(at + 1, at + 5).map((r) => r.value)).toEqual(["11秒20", "10秒台", "+1.2", "脚が張っていた"]);
+    const partial = labelsOf(reviewConfirmRows({ ...input, athleteInfo: { wind_speed: "+1.2" } }));
+    expect(partial.slice(at, at + 2)).toEqual(["相談内容", "風速"]);
+    expect(partial).toHaveLength(none.length + 1);
+  });
 });
+

@@ -720,6 +720,10 @@ export type ReviewResponse =
       fix_points: string[];
       drill: string;
       hitokoto: string | null;
+      // 回答の新しい型の3欄（本体 #1013）。この型より前の返答は null で、表示では節ごと出さない。訳は付かない。
+      cue?: string | null;
+      success_criteria?: string | null;
+      next_video?: string | null;
       demo_video_url: string | null;
       created_at: string;
       clarify_reason: ClarifyReason | null;
@@ -760,6 +764,11 @@ export type ReviewRequest = {
   event: CoachEvent;
   focus: ReviewFocus[];
   question?: string;
+  // 申込で選手が任意で書いた選手情報（本体 #1013 補足）。未入力は null。
+  pb?: string | null;
+  goal_time?: string | null;
+  wind_speed?: string | null;
+  body_condition?: string | null;
   status: ReviewStatus;
   due_at: string;
   created_at: string;
@@ -813,6 +822,11 @@ export type CoachProbationResponse = {
   good_point: string;
   fix_points: string[];
   drill: string;
+  hitokoto?: string | null;
+  // 回答の新しい型の3欄（本体 #1013）。この型より前の返答は null。
+  cue?: string | null;
+  success_criteria?: string | null;
+  next_video?: string | null;
   clarification: string | null;
   created_at: string;
   hidden_at: string | null;

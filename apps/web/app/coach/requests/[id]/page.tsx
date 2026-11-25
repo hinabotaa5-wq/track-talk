@@ -73,6 +73,9 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
   const [fix1, setFix1] = useState("");
   const [drill, setDrill] = useState("");
   const [hitokoto, setHitokoto] = useState("");
+  const [cue, setCue] = useState("");
+  const [success, setSuccess] = useState("");
+  const [nextVideo, setNextVideo] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const uploaded = useRef<{ file: File; id: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -94,7 +97,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!guard.allow([good, fix1, drill, hitokoto].join("\n"))) return;
+    if (!guard.allow([hitokoto, good, fix1, cue, drill, success, nextVideo].join("\n"))) return;
     if (!acquire()) return;
     setErrors({});
     try {
@@ -113,7 +116,16 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
       const sent = await apiFetch<CoachReviewRequest>(`/v1/coaching/requests/${request.id}/response`, {
         method: "POST",
         token,
-        body: JSON.stringify({ good_point: good, fix_points: [fix1], drill, hitokoto, demo_video_public_id: demo }),
+        body: JSON.stringify({
+          hitokoto,
+          good_point: good,
+          fix_points: [fix1],
+          cue,
+          drill,
+          success_criteria: success,
+          next_video: nextVideo,
+          demo_video_public_id: demo,
+        }),
       });
       onSent(sent);
     } catch (err) {
@@ -131,10 +143,14 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
         {t(locale, "coach.detail.contactNote")}
       </p>
       {guard.warning}
-      <Field label={t(locale, "coach.detail.good")} value={good} onChange={setGood} error={errors.good_point} />
-      <Field label={t(locale, "coach.detail.fix1")} value={fix1} onChange={setFix1} error={errors.fix_points} />
-      <Field label={t(locale, "coach.detail.drill")} value={drill} onChange={setDrill} error={errors.drill} />
-      <Field label={t(locale, "coach.detail.hitokoto")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} />
+      {/* 回答の型（本体 #1013）：一言診断→良い点→ボトルネック→キュー→ドリル→成功の目安→次に撮る動画。長く書かせず、型で濃くする。 */}
+      <Field label={L("一言診断")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} placeholder={L("結論を1行で")} />
+      <Field label={t(locale, "coach.detail.good")} value={good} onChange={setGood} error={errors.good_point} placeholder={L("残すべき所を1つ")} />
+      <Field label={L("ボトルネック")} value={fix1} onChange={setFix1} error={errors.fix_points} placeholder={L("一番の課題を1つ。なぜ遅くなるかまで書く")} />
+      <Field label={L("キュー")} value={cue} onChange={setCue} error={errors.cue} placeholder={L("直し方の合言葉を1つ（例：地面を真下に押す）")} />
+      <Field label={t(locale, "coach.detail.drill")} value={drill} onChange={setDrill} error={errors.drill} placeholder={L("ドリル名と回数（例：壁押しドリル 10秒×3本）")} />
+      <Field label={L("成功の目安")} value={success} onChange={setSuccess} error={errors.success_criteria} placeholder={L("できたら動画でこう見える、を書く")} />
+      <Field label={L("次に撮る動画")} value={nextVideo} onChange={setNextVideo} error={errors.next_video} placeholder={L("角度・距離を指定する（例：真横・5m離れて）")} />
       <label className="block space-y-1 text-sm">
         <span className="font-semibold">{t(locale, "coach.detail.demoVideo", { seconds: maxReviewSeconds })}</span>
         <input
@@ -152,6 +168,27 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
         {pending ? t(locale, "common.sending") : t(locale, "coach.detail.sendResponse")}
       </Button>
     </form>
+  );
+}
+
+// 申込で選手が任意で書いた選手情報（本体 #1013 補足）。値のある項目だけを、相談内容と並べて出す。
+function AthleteInfo({ request }: { request: CoachReviewRequest }) {
+  const rows = [
+    { label: L("PB（自己ベスト）"), value: request.pb },
+    { label: L("目標タイム"), value: request.goal_time },
+    { label: L("風速"), value: request.wind_speed },
+    { label: L("その時の体のコンディション"), value: request.body_condition },
+  ].filter((row): row is { label: string; value: string } => Boolean(row.value));
+  if (rows.length === 0) return null;
+  return (
+    <dl aria-label={L("選手情報")} className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.label} className="space-y-0.5">
+          <dt className="text-xs font-semibold text-slate-300">{row.label}</dt>
+          <dd className="whitespace-pre-wrap break-words text-sm">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -236,6 +273,7 @@ export default function CoachReviewRequestPage() {
           {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
           <p className="text-xs text-slate-300"><time dateTime={request.created_at}>{formatDateTime(request.created_at)}</time></p>
         </div>
+        <AthleteInfo request={request} />
       </section>
 
       {sent === "info" && request.info_request ? <SentBanner text={t(locale, "coach.detail.infoSent")} /> : null}

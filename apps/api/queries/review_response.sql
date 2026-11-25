@@ -1,6 +1,6 @@
 -- name: CreateReviewResponse :one
-INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, hitokoto)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, hitokoto, cue, success_criteria, next_video)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: MarkReviewReturned :one
@@ -125,6 +125,9 @@ SELECT
     rs.fix_points,
     rs.drill,
     rs.hitokoto,
+    rs.cue,
+    rs.success_criteria,
+    rs.next_video,
     rs.clarification,
     rs.created_at,
     rs.hidden_at

@@ -357,3 +357,149 @@ func TestCoachDutyToggleStopsNewRequestsOnly(t *testing.T) {
 		t.Fatalf("offers after resuming %+v", offers)
 	}
 }
+
+// TestReviewRequestAthleteInfo は、申込の任意4項目（本体 #1013 補足：PB・目標タイム・風速・その時の体のコンディション）を確かめる。
+func TestReviewRequestAthleteInfo(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setup(t)
+	tadmin := adminToken(t, h)
+	_, tc := onDutyCoach(t, h, tadmin)
+	type infoView struct {
+		ID            string  `json:"id"`
+		PB            *string `json:"pb"`
+		GoalTime      *string `json:"goal_time"`
+		WindSpeed     *string `json:"wind_speed"`
+		BodyCondition *string `json:"body_condition"`
+	}
+	info := map[string]any{
+		"pb":             "11秒20（2025年）",
+		"goal_time":      "10秒台",
+		"wind_speed":     "+1.2",
+		"body_condition": "前日に脚が張っていた",
+	}
+	create := func(tu string, body map[string]any) *httptest.ResponseRecorder {
+		t.Helper()
+		return doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body)
+	}
+	assertInfo := func(label, body string, want map[string]any) {
+		t.Helper()
+		var got infoView
+		if err := json.Unmarshal([]byte(body), &got); err != nil {
+			t.Fatalf("%s json %v %s", label, err, body)
+		}
+		for key, ptr := range map[string]*string{"pb": got.PB, "goal_time": got.GoalTime, "wind_speed": got.WindSpeed, "body_condition": got.BodyCondition} {
+			w, ok := want[key].(string)
+			if !ok {
+				if ptr != nil || !strings.Contains(body, `"`+key+`":null`) {
+					t.Fatalf("%s %s want null: %s", label, key, body)
+				}
+				continue
+			}
+			if ptr == nil || *ptr != w {
+				t.Fatalf("%s %s want %q: %s", label, key, w, body)
+			}
+		}
+		// 本補足で作らないことにした項目は、応答のキーにも出さない。
+		for _, k := range []string{`"goal_meet"`, `"filming_context"`} {
+			if strings.Contains(body, k) {
+				t.Fatalf("%s has %s: %s", label, k, body)
+			}
+		}
+	}
+
+	// A6: 上限超過・連絡先らしき文字列は、その項目の名前つきで validation_error。上限ちょうどは通る長さ。
+	_, tv := demoRequester(t, h, tadmin)
+	limits := map[string]int{"pb": 100, "goal_time": 100, "wind_speed": 50, "body_condition": 300}
+	for key, limit := range limits {
+		body := reviewBodyFor(t, h, tv)
+		body[key] = strings.Repeat("あ", limit+1)
+		if rec := create(tv, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"validation_error"`) || !strings.Contains(rec.Body.String(), `"`+key+`"`) {
+			t.Fatalf("A6 long %s: %d %s", key, rec.Code, rec.Body.String())
+		}
+		body = reviewBodyFor(t, h, tv)
+		body[key] = "090-1234-5678"
+		if rec := create(tv, body); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"`+key+`"`) {
+			t.Fatalf("A6 contact %s: %d %s", key, rec.Code, rec.Body.String())
+		}
+	}
+	atLimit := map[string]any{}
+	for key, limit := range limits {
+		atLimit[key] = strings.Repeat("あ", limit)
+	}
+	body := reviewBodyFor(t, h, tv)
+	for k, v := range atLimit {
+		body[k] = v
+	}
+	rec := create(tv, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("A6 at limit %d %s", rec.Code, rec.Body.String())
+	}
+	assertInfo("A6 at limit", rec.Body.String(), atLimit)
+
+	// A5: 相談内容のある経路で4項目を送ると保存され、申込応答とコーチ側 GET に入る。
+	_, tu := demoRequester(t, h, tadmin)
+	body = reviewBodyFor(t, h, tu)
+	delete(body, "focus")
+	body["question"] = "スタートの出だしで腰が落ちる気がします"
+	for k, v := range info {
+		body[k] = v
+	}
+	rec = create(tu, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("A5 create %d %s", rec.Code, rec.Body.String())
+	}
+	assertInfo("A5 create", rec.Body.String(), info)
+	var created infoView
+	_ = json.Unmarshal(rec.Body.Bytes(), &created)
+	assertInfo("A5 requester get", doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+created.ID, tu, nil).Body.String(), info)
+	coachGet := func(label, id string, want map[string]any) {
+		t.Helper()
+		for _, o := range coachRequests(t, h, tc).Reviewing {
+			if o.ID == id {
+				if rec := doJSON(t, h, http.MethodPost, "/v1/coach/requests/"+id+"/start", tc, nil); rec.Code != http.StatusOK {
+					t.Fatalf("%s start %d %s", label, rec.Code, rec.Body.String())
+				}
+			}
+		}
+		rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests/"+id, tc, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s coach get %d %s", label, rec.Code, rec.Body.String())
+		}
+		assertInfo(label+" coach get", rec.Body.String(), want)
+	}
+	coachGet("A5", created.ID, info)
+
+	// A5: 送らない・空白だけのときは null。
+	_, tn := demoRequester(t, h, tadmin)
+	body = reviewBodyFor(t, h, tn)
+	body["wind_speed"] = "   "
+	rec = create(tn, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("A5 none %d %s", rec.Code, rec.Body.String())
+	}
+	assertInfo("A5 none", rec.Body.String(), map[string]any{})
+	var none infoView
+	_ = json.Unmarshal(rec.Body.Bytes(), &none)
+	coachGet("A5 none", none.ID, map[string]any{})
+
+	// A7: 動画のみ経路（question なし・見てほしい点だけ）でも4項目が保存される。
+	_, to := demoRequester(t, h, tadmin)
+	body = reviewBodyFor(t, h, to)
+	for k, v := range info {
+		body[k] = v
+	}
+	rec = create(to, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("A7 create %d %s", rec.Code, rec.Body.String())
+	}
+	assertInfo("A7 create", rec.Body.String(), info)
+	var videoOnly infoView
+	_ = json.Unmarshal(rec.Body.Bytes(), &videoOnly)
+	var stored [4]*string
+	queryRowArgs(t, `SELECT pb, goal_time, wind_speed, body_condition FROM review_requests WHERE id = $1`, []any{videoOnly.ID}, &stored[0], &stored[1], &stored[2], &stored[3])
+	for i, want := range []string{"11秒20（2025年）", "10秒台", "+1.2", "前日に脚が張っていた"} {
+		if stored[i] == nil || *stored[i] != want {
+			t.Fatalf("A7 stored[%d] %v", i, stored[i])
+		}
+	}
+}
