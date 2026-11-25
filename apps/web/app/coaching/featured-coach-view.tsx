@@ -4,7 +4,7 @@ import { L } from "@/lib/i18n";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { PageLoading } from "@/components/page-loading";
@@ -23,8 +23,11 @@ import { ReferralBanner } from "../coaches/referral-banner";
 // 名前・写真・記録・種目・紹介文・実績・SNS はプロフィールデータから出し、コードに個人の固定文言を書かない。
 // 固定の文は流れ（3ステップ）・よくある質問だけ（すべて L() でキー化）。
 // 並び（#991）：紹介バナー → 切り替え＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋下部固定 CTA）。
-// 継続プランは休眠させたので（本体 #1007）、切り替えの選択肢はスタンダードだけ。?tab=support で開かれてもスタンダード側を出し、
-// 「継続プランは準備中です」は描画しない（通常一覧の coach-tabs.tsx と同じ）。
+// 切り替えは通常一覧（coach-tabs.tsx）と同じ「スタンダード」と「プレミアム」の2択（本体 #1026）。
+// プレミアム選択中は特集コンテンツと固定 CTA を出さず、「プレミアムは準備中です」の一文だけを出す（価格・説明・申込みの導線は出さない）。
+// 紹介バナーと切り替え＋選手・コーチのボタンの行はプレミアム選択中も出す。スタンダードに戻してもコーチ情報は取り直さない。
+// 継続プランは休眠させたので（本体 #1007）、継続プランの選択肢は出さない。?tab=support で開かれてもスタンダード側を出し、
+// 「継続プランは準備中です」は描画しない。
 // 外すもの：コーチカードの2列一覧・種目チップの絞り込み。
 
 // 記録の欄は自由記入なので、区切り（改行・読点・スラッシュ・全角スラッシュ）でチップに分ける。
@@ -33,7 +36,7 @@ export function recordChips(text: string | null): string[] {
 }
 
 type Loaded = { coach: PublicCoach | null } | { error: true };
-type Tab = "video";
+type Tab = "video" | "premium";
 
 export function FeaturedCoachView({ coachID }: { coachID: string }) {
   return (
@@ -45,8 +48,10 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
 
 function FeaturedCoachTabs({ coachID }: { coachID: string }) {
   const pathname = usePathname();
+  const params = useSearchParams();
   const base = pathname === "/coaches" ? "/coaches" : "/coaching";
-  const tab: Tab = "video";
+  // 直接リンク・共有 URL でプレミアム側から開けるよう、初回だけ URL を見る。以後はその場の状態が正本。
+  const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "premium" ? "premium" : "video"));
   const [result, setResult] = useState<Loaded>();
   const { token } = useAuth();
   const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean }>();
@@ -81,7 +86,17 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
   // 初回読み込み中は、通常一覧と同じくストップウォッチだけにする。
   if (!result) return <PageLoading screen label={L("読み込み中...")} />;
 
-  const views = [{ id: "video", label: L("スタンダード") }] as const;
+  const views = [
+    { id: "video", label: L("スタンダード") },
+    { id: "premium", label: L("プレミアム") },
+  ] as const;
+  const hrefOf = (id: Tab) => (id === "premium" ? `${base}?tab=premium` : base);
+  // その場の状態で即座に切り替え、URL は書き換えるだけにする（router.replace は読み込みが挟まるので使わない）。
+  function select(next: Tab) {
+    if (next === tab) return;
+    setTab(next);
+    window.history.replaceState(null, "", hrefOf(next));
+  }
 
   return (
     <div className="mx-auto max-w-md space-y-6 pb-32">
@@ -95,14 +110,18 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
               initialPillStatic
               views={views}
               current={tab}
-              onSelect={() => {}}
-              href={() => base}
+              onSelect={select}
+              href={hrefOf}
             />
           </div>
           <CoachSelfButton />
         </div>
       </MotionConfig>
-      <FeaturedContent result={result} showTickets={!(ticketSales?.canPurchase === false && ticketSales.token === token)} />
+      {tab === "premium" ? (
+        <p className="py-8 text-center text-sm text-slate-200">{L("プレミアムは準備中です")}</p>
+      ) : (
+        <FeaturedContent result={result} showTickets={!(ticketSales?.canPurchase === false && ticketSales.token === token)} />
+      )}
     </div>
   );
 }

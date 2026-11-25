@@ -6,7 +6,7 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 // コーチタブの特集ページ（本体 #985、#991 で並びを変更）。特集コーチ1人の詳細だけを取り、一覧・種目チップは出さない。
-// 並び：紹介バナー → 切り替え（スタンダードのみ、本体 #1007）＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋固定 CTA）。
+// 並び：紹介バナー → 切り替え（スタンダード／プレミアム、本体 #1026）＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋固定 CTA）。
 const apiFetch = vi.fn();
 const auth = { token: null as string | null };
 const flags = { supportList: false };
@@ -50,6 +50,10 @@ const link = (text: string) => Array.from(container.querySelectorAll("a")).find(
 const about = () => container.querySelector('section[aria-labelledby="featured-about"]');
 const steps = () => container.querySelector('[data-testid="featured-steps"]');
 const switchButton = (label: string) => [...container.querySelectorAll('[role="group"][aria-label="コーチの一覧を切り替える"] a')].find((a) => a.textContent === label) as HTMLAnchorElement | undefined;
+const switchOptions = () => [...container.querySelectorAll('[role="group"][aria-label="コーチの一覧を切り替える"] a')].map((a) => a.textContent);
+const cta = () => container.querySelector('[data-testid="featured-cta"]');
+const faqSection = () => container.querySelector('section[aria-labelledby="featured-faq"]');
+const coachFetches = () => apiFetch.mock.calls.filter(([path]) => path === "/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f").length;
 const before = (a: Element | null | undefined, b: Element | null | undefined) => Boolean(a && b && a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 it("紹介バナー → 切り替え → コーチについて（顔写真・記録チップ）→ 3ステップ → よくある質問 の順に出し、固定 CTA（¥1,000、特集コーチ指名で依頼へ）を出す", async () => {
@@ -90,8 +94,11 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   expect(before(about(), steps())).toBe(true);
   expect(before(steps(), faq)).toBe(true);
   expect(faq?.textContent).toContain("よくある質問");
-  // 切り替えと選手・コーチの丸ボタン。選択肢はスタンダードだけ（本体 #1007）。
+  // F1：切り替えと選手・コーチの丸ボタン。選択肢はスタンダード／プレミアムの2択（本体 #1026）。
+  expect(switchOptions()).toEqual(["スタンダード", "プレミアム"]);
   expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
+  expect(switchButton("プレミアム")?.getAttribute("href")).toBe("/coaching?tab=premium");
+  expect(container.textContent).not.toContain("プレミアムは準備中です");
   expect(switchButton("継続プラン")).toBeUndefined();
   expect(container.querySelector('a[href="/player"][aria-label="選手"]')).not.toBeNull();
   expect(container.querySelector('a[href="/coach"][aria-label="コーチ"]')).not.toBeNull();
@@ -119,15 +126,70 @@ it("写真が未登録でも、コーチについての先頭に頭文字の丸�
   expect(Array.from(about()?.querySelectorAll('ul[aria-label="記録と対応種目"] li') ?? []).map((li) => li.textContent)).toContain("対応種目 100m・200m・400m");
 });
 
-// 本体 #1007 B2：継続プランは休眠。?tab=support で開いてもスタンダード側（特集コンテンツと固定 CTA）を出し、
+// F2
+it("「プレミアム」を押すと準備中の一文だけになり、特集コンテンツと固定 CTA を消す。紹介バナーと円ボタンは残り、取り直さない", async () => {
+  await render();
+  const replaceState = vi.spyOn(window.history, "replaceState");
+  await act(async () => switchButton("プレミアム")!.click());
+  expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaching?tab=premium");
+  replaceState.mockRestore();
+  expect(switchButton("プレミアム")?.getAttribute("aria-current")).toBe("page");
+  expect(container.textContent).toContain("プレミアムは準備中です");
+  expect(about()).toBeNull();
+  expect(steps()).toBeNull();
+  expect(faqSection()).toBeNull();
+  expect(cta()).toBeNull();
+  expect(link("動画添削を依頼する")).toBeUndefined();
+  expect(link("チケットを買う")).toBeUndefined();
+  expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/player"][aria-label="選手"]')).not.toBeNull();
+  expect(container.querySelector('a[href="/coach"][aria-label="コーチ"]')).not.toBeNull();
+  // 準備中の一文のほかに価格・案内・導線を出さない。
+  const notice = [...container.querySelectorAll("p")].find((p) => p.textContent === "プレミアムは準備中です");
+  expect(notice).not.toBeUndefined();
+  expect(container.textContent).not.toMatch(/[¥$]/);
+  expect(coachFetches()).toBe(1);
+});
+
+// F3
+it("プレミアムからスタンダードに戻すと特集コンテンツと CTA が戻り、取り直さない", async () => {
+  await render();
+  const replaceState = vi.spyOn(window.history, "replaceState");
+  await act(async () => switchButton("プレミアム")!.click());
+  await act(async () => switchButton("スタンダード")!.click());
+  expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaching");
+  replaceState.mockRestore();
+  expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
+  expect(container.textContent).not.toContain("プレミアムは準備中です");
+  expect(about()).not.toBeNull();
+  expect(steps()).not.toBeNull();
+  expect(faqSection()).not.toBeNull();
+  expect(cta()).not.toBeNull();
+  expect(link("動画添削を依頼する ¥1,000")).not.toBeUndefined();
+  expect(coachFetches()).toBe(1);
+});
+
+// F4
+it("?tab=premium で開くと、読み込み後にプレミアム側から出す", async () => {
+  nav.search = "tab=premium";
+  await render();
+  expect(switchOptions()).toEqual(["スタンダード", "プレミアム"]);
+  expect(switchButton("プレミアム")?.getAttribute("aria-current")).toBe("page");
+  expect(container.textContent).toContain("プレミアムは準備中です");
+  expect(about()).toBeNull();
+  expect(cta()).toBeNull();
+  expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
+  expect(coachFetches()).toBe(1);
+});
+
+// F5（本体 #1007 B2 を書き換え）：継続プランは休眠。?tab=support で開いてもスタンダード側（特集コンテンツと固定 CTA）を出し、
 // 「継続プランは準備中です」は出さない。一覧フラグの真偽にかかわらない。
 for (const supportList of [true, false]) {
   it(`?tab=support で開いてもスタンダード側を出し、継続プランの選択肢・準備中表示を出さない（一覧フラグ=${supportList}）`, async () => {
     flags.supportList = supportList;
     nav.search = "tab=support";
     await render();
-    const options = [...container.querySelectorAll('[role="group"][aria-label="コーチの一覧を切り替える"] a')].map((a) => a.textContent);
-    expect(options).toEqual(["スタンダード"]);
+    expect(switchOptions()).toEqual(["スタンダード", "プレミアム"]);
     expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
     expect(switchButton("スタンダード")?.getAttribute("href")).toBe("/coaching");
     expect(container.textContent).not.toContain("継続プラン");
@@ -168,8 +230,10 @@ it("英語表示では固定文を英語で出す", async () => {
   await render();
   expect(container.textContent).toContain("Request video feedback ¥1,000");
   expect(container.textContent).toContain("Returned within 24 hours");
-  expect(container.textContent).toContain("Standard");
+  expect([...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent)).toEqual(["Standard", "Premium"]);
   expect(container.textContent).toContain("FAQ");
+  await act(async () => ([...container.querySelectorAll('[role="group"] a')].find((a) => a.textContent === "Premium") as HTMLAnchorElement).click());
+  expect(container.textContent).toContain("Premium is in preparation");
   expect(container.textContent).not.toContain("よくある質問");
 });
 
