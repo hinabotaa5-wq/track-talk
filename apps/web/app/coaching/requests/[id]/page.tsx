@@ -330,7 +330,7 @@ function ReviewRequestView() {
             controls
             playsInline
             preload="metadata"
-            className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
+            className="mx-auto w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
           />
         ) : request.videos_purged ? (
           <p className="text-sm text-slate-200">{reviewVideosPurgedNote()}</p>

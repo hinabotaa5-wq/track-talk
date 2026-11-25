@@ -227,7 +227,7 @@ export default function CoachReviewRequestPage() {
             controls
             playsInline
             preload="metadata"
-            className="w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
+            className="mx-auto w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
           />
         ) : null}
         <div className="space-y-1">

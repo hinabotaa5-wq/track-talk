@@ -304,6 +304,7 @@ it("依頼内容（動画→相談文）は吹き出しにせず上にまとめ�
   expect(video.getAttribute("poster")).toBe("https://example.com/run.jpg");
   expect(video.classList).toContain("max-w-[260px]");
   expect(video.classList).toContain("max-h-[300px]");
+  expect(video.classList).toContain("mx-auto");
   expect(video.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   const response = [...container.querySelectorAll("h3")].find((h) => h.textContent === "良い点")!.closest("article")!;
   expect(question.compareDocumentPosition(response) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
