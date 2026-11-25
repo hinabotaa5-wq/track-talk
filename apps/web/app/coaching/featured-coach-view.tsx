@@ -177,11 +177,11 @@ function FeaturedContent({ result }: { result: Loaded }) {
           <div className="flex gap-2">
             {open ? (
               <Link href={`/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`} className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]">
-                {L("動画添削を依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
+                {L("このコーチに依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
               </Link>
             ) : (
               <span aria-disabled="true" className="flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400">
-                {L("動画添削を依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
+                {L("このコーチに依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
               </span>
             )}
           </div>

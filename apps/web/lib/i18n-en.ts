@@ -3149,7 +3149,7 @@ export const en: Readonly<Record<string, string>> = {
   "受付が止まっているときはどうなりますか？": "What if requests are paused?",
   "受付停止中は依頼できません。受付が再開すると、このページの表示が「受付中」に変わります。": "You can't send a request while requests are paused. When they reopen, this page will show \"Accepting\".",
   "現在は受付を停止しています": "Requests are paused right now",
-  "動画添削を依頼する ¥{v0}": "Request video feedback ¥{v0}",
+  "このコーチに依頼する ¥{v0}": "Request this coach ¥{v0}",
   "チケットを買う": "Buy tickets",
   // 本体 #1031：紹介特典の ¥500 クーポンとチケット販売終了。
   "¥500クーポン": "¥500 coupon",

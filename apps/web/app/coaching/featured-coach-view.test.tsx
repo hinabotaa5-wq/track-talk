@@ -105,7 +105,7 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   // 継続プランの文言を出さない。
   expect(container.textContent).not.toContain("継続プランは準備中です");
   expect(link("継続プランを見る")).toBeUndefined();
-  const requestLink = link("動画添削を依頼する ¥1,000");
+  const requestLink = link("このコーチに依頼する ¥1,000");
   expect(requestLink?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
   expect(requestLink?.className).toContain("bg-[#EF442D]");
   expect(requestLink?.className).not.toContain("bg-blue-600");
@@ -139,7 +139,7 @@ it("「プレミアム」を押すと準備中の一文だけになり、特集�
   expect(steps()).toBeNull();
   expect(faqSection()).toBeNull();
   expect(cta()).toBeNull();
-  expect(link("動画添削を依頼する")).toBeUndefined();
+  expect(link("このコーチに依頼する")).toBeUndefined();
   expect(link("チケットを買う")).toBeUndefined();
   expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
   expect(container.querySelector('a[href="/player"][aria-label="選手"]')).not.toBeNull();
@@ -165,7 +165,7 @@ it("プレミアムからスタンダードに戻すと特集コンテンツと 
   expect(steps()).not.toBeNull();
   expect(faqSection()).not.toBeNull();
   expect(cta()).not.toBeNull();
-  expect(link("動画添削を依頼する ¥1,000")).not.toBeUndefined();
+  expect(link("このコーチに依頼する ¥1,000")).not.toBeUndefined();
   expect(coachFetches()).toBe(1);
 });
 
@@ -197,7 +197,7 @@ for (const supportList of [true, false]) {
     expect(about()).not.toBeNull();
     expect(steps()).not.toBeNull();
     expect(container.querySelector('[data-testid="featured-cta"]')).not.toBeNull();
-    expect(link("動画添削を依頼する ¥1,000")).not.toBeUndefined();
+    expect(link("このコーチに依頼する ¥1,000")).not.toBeUndefined();
     expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f"]);
   });
 }
@@ -206,8 +206,8 @@ it("受付停止中は、CTA を停止表示にし、依頼へ進めない", asy
   apiFetch.mockImplementation(async () => ({ ...coach, on_duty: false }));
   await render();
   expect(container.textContent).toContain("現在は受付を停止しています");
-  expect(link("動画添削を依頼する")).toBeUndefined();
-  expect(container.querySelector('[aria-disabled="true"]')?.textContent).toBe("動画添削を依頼する ¥1,000");
+  expect(link("このコーチに依頼する")).toBeUndefined();
+  expect(container.querySelector('[aria-disabled="true"]')?.textContent).toBe("このコーチに依頼する ¥1,000");
 });
 
 it("チケットの新規販売を止めている間は「チケットを買う」を出さない", async () => {
@@ -228,7 +228,8 @@ it("英語表示では固定文を英語で出す", async () => {
   installEnglish(en);
   setActiveLocale("en");
   await render();
-  expect(container.textContent).toContain("Request video feedback ¥1,000");
+  expect(link("Request this coach ¥1,000")?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
+  expect(container.textContent).not.toContain("Request video feedback");
   expect(container.textContent).toContain("Returned within 24 hours");
   expect([...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent)).toEqual(["Standard", "Premium"]);
   expect(container.textContent).toContain("FAQ");
