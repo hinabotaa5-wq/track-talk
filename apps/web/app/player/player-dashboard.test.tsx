@@ -239,17 +239,17 @@ it("T3：利用者 A のタイル件数のあと B に切り替えると、B の
   auth.token = "tok-a";
   apiFetch.mockResolvedValueOnce(counts({ one: 1, personal: 2, support: 3, ticket: 4 }));
   await render();
-  expect(badges()).toEqual(["1", "2", "3", "4", null]);
+  expect(badges()).toEqual(["1", "4", null]);
 
   const b = deferredCounts();
   apiFetch.mockReturnValueOnce(b.promise);
   await switchUser("tok-b", "user-b");
-  expect(badges()).toEqual([null, null, null, null, null]);
-  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual([null, null, null, null, null]);
+  expect(badges()).toEqual([null, null, null]);
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual([null, null, null]);
   expect(apiFetch).toHaveBeenLastCalledWith("/v1/me/coaching/action-counts", { token: "tok-b" });
 
-  await act(async () => { b.resolve(counts({ support: 5 })); });
-  expect(badges()).toEqual([null, null, "5", null, null]);
+  await act(async () => { b.resolve(counts({ ticket: 5 })); });
+  expect(badges()).toEqual([null, "5", null]);
 });
 
 it("T3：切替前に出した A の取得が切替後に返っても、B の画面には出さない", async () => {
@@ -261,16 +261,16 @@ it("T3：切替前に出した A の取得が切替後に返っても、B の画
   apiFetch.mockReturnValueOnce(b.promise);
   await switchUser("tok-b", "user-b");
   await act(async () => { a.resolve(counts({ one: 9, ticket: 9 })); });
-  expect(badges()).toEqual([null, null, null, null, null]);
-  await act(async () => { b.resolve(counts({ personal: 1 })); });
-  expect(badges()).toEqual([null, "1", null, null, null]);
+  expect(badges()).toEqual([null, null, null]);
+  await act(async () => { b.resolve(counts({ ticket: 1 })); });
+  expect(badges()).toEqual([null, "1", null]);
 });
 
 it("T4：pageshow（persisted）で現在の利用者の件数を取り直し、persisted でなければ取り直さない", async () => {
   auth.session = { user: { id: "user-a" } };
   apiFetch.mockResolvedValueOnce(counts({ one: 1 }));
   await render();
-  expect(badges()).toEqual(["1", null, null, null, null]);
+  expect(badges()).toEqual(["1", null, null]);
   apiFetch.mockClear();
   await firePageshow(false);
   expect(apiFetch).not.toHaveBeenCalled();
@@ -278,7 +278,7 @@ it("T4：pageshow（persisted）で現在の利用者の件数を取り直し、
   await firePageshow(true);
   expect(apiFetch).toHaveBeenCalledTimes(1);
   expect(apiFetch).toHaveBeenCalledWith("/v1/me/coaching/action-counts", { token: "tok" });
-  expect(badges()).toEqual([null, null, null, "2", null]);
+  expect(badges()).toEqual([null, "2", null]);
 });
 
 it("T12：同じ利用者のまま token 文字列だけが変わったら、バッジを消さずに取り直し、完了後に新しい値へ更新する", async () => {
@@ -288,8 +288,8 @@ it("T12：同じ利用者のまま token 文字列だけが変わったら、バ
   const next = deferredCounts();
   apiFetch.mockReturnValueOnce(next.promise);
   await switchUser("tok-2", "user-a");
-  expect(badges()).toEqual(["1", null, null, "2", null]);
+  expect(badges()).toEqual(["1", "2", null]);
   expect(apiFetch).toHaveBeenLastCalledWith("/v1/me/coaching/action-counts", { token: "tok-2" });
-  await act(async () => { next.resolve(counts({ personal: 3 })); });
-  expect(badges()).toEqual([null, "3", null, null, null]);
+  await act(async () => { next.resolve(counts({ ticket: 3 })); });
+  expect(badges()).toEqual([null, "3", null]);
 });
