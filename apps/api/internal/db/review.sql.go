@@ -518,6 +518,74 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 	return i, err
 }
 
+const listCoachCompleted = `-- name: ListCoachCompleted :many
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
+WHERE coach_id = $1::uuid
+  AND status IN ('returned', 'clarifying')
+ORDER BY returned_at DESC NULLS LAST, id DESC
+LIMIT 100
+`
+
+// コーチの履歴（本体 #1014）。返却済み（returned）と補足回答待ち（clarifying）を、返却の新しい順に最大100件。
+func (q *Queries) ListCoachCompleted(ctx context.Context, coachID uuid.UUID) ([]ReviewRequest, error) {
+	rows, err := q.db.Query(ctx, listCoachCompleted, coachID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReviewRequest
+	for rows.Next() {
+		var i ReviewRequest
+		if err := rows.Scan(
+			&i.ID,
+			&i.RequesterID,
+			&i.Tier,
+			&i.Event,
+			&i.Focus,
+			&i.VideoPublicID,
+			&i.Status,
+			&i.DueAt,
+			&i.CoachID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ReturnedAt,
+			&i.Question,
+			&i.RequestedCoachID,
+			&i.RequestedCoachName,
+			&i.BasePriceYen,
+			&i.UseTickets,
+			&i.InfoRequest,
+			&i.InfoReason,
+			&i.InfoRequestedAt,
+			&i.InfoFromStatus,
+			&i.ResubmitBy,
+			&i.OriginalQuestion,
+			&i.VideoReplaced,
+			&i.ResubmittedAt,
+			&i.WithdrawnAt,
+			&i.WithdrawnBy,
+			&i.WithdrawnFromStatus,
+			&i.WithdrawReason,
+			&i.VideosPurgedAt,
+			&i.RetentionHoldAt,
+			&i.AssignedAt,
+			&i.StartedAt,
+			&i.TimedOutAt,
+			&i.CanceledAt,
+			&i.ReturnReason,
+			&i.Reminder12hAt,
+			&i.Reminder4hAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCoachReviewing = `-- name: ListCoachReviewing :many
 SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
 WHERE coach_id = $1::uuid

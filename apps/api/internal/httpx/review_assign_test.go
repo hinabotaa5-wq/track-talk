@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,5 +128,170 @@ func TestReviewStartLocksCancellation(t *testing.T) {
 	}
 	if rec := doJSON(t, h, "POST", athletePath+"/response", coach, responseBody()); rec.Code != http.StatusOK {
 		t.Fatalf("response after start: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// 履歴（本体 #1014）の要素。一覧では動画を出さないので、動画のキーは生の JSON で有無を見る。
+type completedItemView struct {
+	ID         string  `json:"id"`
+	Status     string  `json:"status"`
+	ReturnedAt *string `json:"returned_at"`
+}
+
+// coachRequestsRaw は、GET /v1/coach/requests をキーごとに読む。
+func coachRequestsRaw(t *testing.T, h http.Handler, tc string) map[string]json.RawMessage {
+	t.Helper()
+	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", tc, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("coach requests %d %s", rec.Code, rec.Body.String())
+	}
+	var out map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func coachCompleted(t *testing.T, h http.Handler, tc string) []completedItemView {
+	t.Helper()
+	var out []completedItemView
+	if err := json.Unmarshal(coachRequestsRaw(t, h, tc)["completed"], &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// seedHistoryReview は、履歴のテスト用に依頼を SQL で作る（依頼した人は別人のランダムな ID。actionSeed で外部キーを外す）。
+// returnedAgo が "" なら returned_at は入れない。動画は付けておく（一覧に出ないことを確かめるため）。
+func seedHistoryReview(t *testing.T, coach uuid.UUID, status, returnedAgo string) string {
+	t.Helper()
+	id := uuid.NewString()
+	actionSeed(t, `INSERT INTO review_requests (id, requester_id, tier, event, focus, question, video_public_id, status, due_at, coach_id,
+			returned_at, info_request, info_requested_at, info_from_status, resubmit_by)
+		VALUES ($1, gen_random_uuid(), 'coach', '100m', ARRAY['start'], 'スタートを見てください', $2, $3, now() + interval '1 day', $4,
+			CASE WHEN $5 = '' THEN NULL ELSE now() - $5::interval END,
+			CASE WHEN $3 = 'needs_info' THEN '質問' END, CASE WHEN $3 = 'needs_info' THEN now() END,
+			CASE WHEN $3 = 'needs_info' THEN 'in_review' END, CASE WHEN $3 = 'needs_info' THEN now() + interval '1 day' END)`,
+		id, coachingVideoID(), status, coach, returnedAgo)
+	return id
+}
+
+// #1014 A1〜A5・A8：履歴（completed）の中身と並び。一覧では動画を出さない（運営者決定 2026-11-25）。
+func TestCoachRequestsCompleted(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setup(t)
+	admin := adminToken(t, h)
+	coachID, coach := approvedReviewCoach(t, h, admin)
+	otherID, _ := approvedReviewCoach(t, h, admin)
+
+	returnedOld := seedHistoryReview(t, coachID, "returned", "3 hours")
+	returnedNew := seedHistoryReview(t, coachID, "returned", "1 hour")
+	clarifying := seedHistoryReview(t, coachID, "clarifying", "2 hours")
+	seedHistoryReview(t, coachID, "in_review", "")
+	seedHistoryReview(t, coachID, "needs_info", "")
+	seedHistoryReview(t, coachID, "expired", "")
+	withdrawn := seedHistoryReview(t, coachID, "expired", "")
+	execSQLArgs(t, `UPDATE review_requests SET withdrawn_at = now(), withdrawn_from_status = 'in_review' WHERE id = $1`, withdrawn) // 辞退済み
+	seedHistoryReview(t, otherID, "returned", "30 minutes")                                                                         // A4：別のコーチ
+
+	raw := coachRequestsRaw(t, h, coach)
+	// A8：offers・reviewing は従来どおり。reviewing は動画付き、returned_at は null。
+	if string(raw["offers"]) != "[]" {
+		t.Fatalf("A8 offers = %s", raw["offers"])
+	}
+	var reviewing []map[string]json.RawMessage
+	if err := json.Unmarshal(raw["reviewing"], &reviewing); err != nil {
+		t.Fatal(err)
+	}
+	if len(reviewing) != 2 {
+		t.Fatalf("A8 reviewing = %d件, want 2（in_review・needs_info）", len(reviewing))
+	}
+	for _, item := range reviewing {
+		var id string
+		_ = json.Unmarshal(item["id"], &id)
+		if id == returnedOld || id == returnedNew || id == clarifying {
+			t.Fatalf("A1 returned/clarifying in reviewing: %s", id)
+		}
+		if v, ok := item["returned_at"]; !ok || string(v) != "null" {
+			t.Fatalf("reviewing returned_at = %s (present %v)", v, ok)
+		}
+		if v := string(item["video_url"]); v == "" || v == "null" {
+			t.Fatalf("A8 reviewing video_url = %q", v)
+		}
+	}
+
+	// A1・A2・A3・A4・A5：returned と clarifying だけが、returned_at の新しい順。
+	got := coachCompleted(t, h, coach)
+	want := []string{returnedNew, clarifying, returnedOld}
+	if len(got) != len(want) {
+		t.Fatalf("completed = %+v, want %v", got, want)
+	}
+	for i, item := range got {
+		if item.ID != want[i] {
+			t.Fatalf("A5 order[%d] = %s, want %s (all %+v)", i, item.ID, want[i], got)
+		}
+		if item.ReturnedAt == nil || *item.ReturnedAt == "" {
+			t.Fatalf("A1 returned_at missing: %+v", item)
+		}
+	}
+	if got[1].Status != "clarifying" {
+		t.Fatalf("A2 status = %s", got[1].Status)
+	}
+	// 一覧では動画を出さない：video_url・thumbnail_url・demo_video_url のキーが付かない。
+	var completedRaw []map[string]json.RawMessage
+	if err := json.Unmarshal(raw["completed"], &completedRaw); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range completedRaw {
+		for _, key := range []string{"video_url", "thumbnail_url", "demo_video_url"} {
+			if _, ok := item[key]; ok {
+				t.Fatalf("completed has %s: %v", key, item)
+			}
+		}
+	}
+}
+
+// #1014 A6：上限100件。
+func TestCoachRequestsCompletedLimit(t *testing.T) {
+	h := setup(t)
+	admin := adminToken(t, h)
+	coachID, coach := approvedReviewCoach(t, h, admin)
+	actionSeed(t, `INSERT INTO review_requests (id, requester_id, tier, event, focus, question, status, due_at, coach_id, returned_at)
+		SELECT gen_random_uuid(), gen_random_uuid(), 'coach', '100m', ARRAY['start'], 'スタートを見てください', 'returned', now(), $1,
+			now() - make_interval(mins => g)
+		FROM generate_series(1, 101) AS g`, coachID)
+	got := coachCompleted(t, h, coach)
+	if len(got) != 100 {
+		t.Fatalf("A6 completed = %d件, want 100", len(got))
+	}
+	// 一番古い（101分前）が落ちる。
+	var oldest string
+	queryRowArgs(t, `SELECT id::text FROM review_requests WHERE coach_id = $1 ORDER BY returned_at LIMIT 1`, []any{coachID}, &oldest)
+	for _, item := range got {
+		if item.ID == oldest {
+			t.Fatalf("A6 oldest must be cut")
+		}
+	}
+}
+
+// #1014 A7：未承認コーチ・コーチでない人には completed を返さない。
+func TestCoachRequestsCompletedRequiresApprovedCoach(t *testing.T) {
+	h := setup(t)
+	// コーチでない人。
+	stranger := token(t, uuid.New())
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", stranger, nil); rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "completed") {
+		t.Fatalf("A7 non-coach: %d %s", rec.Code, rec.Body.String())
+	}
+	// 申し込んだだけで未承認のコーチ。返却済みの依頼が担当に付いていても見せない。
+	pendingID := uuid.New()
+	pending := token(t, pendingID)
+	body := coachApplicationBody()
+	body["tier"] = "coach"
+	if rec := doJSON(t, h, http.MethodPost, "/v1/coach/applications", pending, body); rec.Code != http.StatusOK {
+		t.Fatalf("apply %d %s", rec.Code, rec.Body.String())
+	}
+	seedHistoryReview(t, pendingID, "returned", "1 hour")
+	if rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", pending, nil); rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "completed") {
+		t.Fatalf("A7 pending coach: %d %s", rec.Code, rec.Body.String())
 	}
 }

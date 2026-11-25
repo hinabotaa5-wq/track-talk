@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
 
-// コーチ向けメニューのタイル（カレンダー廃止後は9タイル）を大きくし、画面にちょうど収める（本体 #580）。
+// コーチ向けメニューのタイル（カレンダー廃止・継続プラン休眠（#1007）・履歴追加（#1014）後は8タイル）を大きくし、画面にちょうど収める（本体 #580）。
 // NEXT_PUBLIC_COACHING_ENABLED=true のプレビューで実行する（起動手順は docs/coach-availability.md と同じ）。データと認証はテスト用。
 // #563 の高さ合わせ（JS で正方形の一辺を実測）は廃止し、タイルは横幅駆動（3列 1fr＋正方形）にする。
 // 縦の余りは行ギャップ拡大（最大 +8px）→上下パディング拡大（最大 28px）→中央寄せの順で吸収し、
@@ -32,7 +32,7 @@ async function setup(page: Page, withOffers: boolean) {
     const pathname = new URL(route.request().url()).pathname;
     let body: unknown = {};
     if (pathname.endsWith("/coach/me")) body = { application, rating: { count: 3, average: 4.5, paused: false } };
-    else if (pathname.endsWith("/me")) body = { id: userID, nickname: "サンプル選手", event: "100m", mfa_required: false };
+    else if (pathname.endsWith("/me")) body = { id: userID, nickname: "サンプル選手", event: "100m", mfa_required: false, overseas_consent: true, documents_consent: true };
     else if (pathname.endsWith("/coach/requests")) {
       body = {
         offers: [],
@@ -50,7 +50,7 @@ async function setup(page: Page, withOffers: boolean) {
   });
   await page.goto("/coach");
   await expect(page.locator("#startup-splash")).toHaveCount(0);
-  await expect(page.locator("nav.grid a")).toHaveCount(9);
+  await expect(page.locator("nav.grid a")).toHaveCount(8);
   await expect(page.locator("footer").getByText("コーチをやめる")).toBeVisible();
   if (withOffers) await expect(page.getByRole("link", { name: "対応中（2件）" })).toBeVisible();
   await expect(page.locator(".screen-loader")).toBeHidden();
@@ -115,7 +115,7 @@ async function measure(page: Page) {
       tileHeights: tileRects.map((t) => t.height),
       tileLefts: tileRects.map((t) => t.left),
       tileTops: tileRects.map((t) => t.top),
-      rowTops: [0, 3, 6].map((i) => tileRects[i].top), lastRowBottom: tileRects[8].bottom,
+      rowTops: [0, 3, 6].map((i) => tileRects[i].top), lastRowBottom: tileRects[7].bottom,
       labels, badges, icons,
       scrollHeight: document.documentElement.scrollHeight, innerHeight: window.innerHeight,
       bodyScrollWidth: document.body.scrollWidth, innerWidth: window.innerWidth,
@@ -142,7 +142,7 @@ function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measu
   }
   // 全ラベルが1行に収まり、折り返し・はみ出しがない。
   // 英語の長いラベルは ellipsis で見た目にはみ出さない設計（折り返しはしない）。
-  expect(m.labels).toHaveLength(9);
+  expect(m.labels).toHaveLength(8);
   for (const label of m.labels) {
     expect(label).not.toBeNull();
     expect(label!.whiteSpace).toBe("nowrap");
@@ -155,18 +155,20 @@ function expectTiles(page: { width: number }, m: Awaited<ReturnType<typeof measu
       expect(fits || ellipsized).toBe(true);
     }
   }
-  // バッジは切れていない。固定の5つ（添削中・追加相談・契約申込みの件数、特商法・報酬口座の点）に、
-  // 期限アラートありの時は届いた依頼の件数が加わる（モックの件数どおり）。
+  // バッジは切れていない。今のタイル（#1007 で届いた相談・継続プラン・特商法・身元を外し、#1014 で最後尾に履歴）では、
+  // 対応中・追加相談・契約申込みの件数と、報酬・口座の点の4つ（モックの件数どおり）。感想・履歴にはバッジを付けない。
   const badged = m.badges.filter((b) => b !== null);
   expect(m.badges[0]).not.toBeNull();
-  expect(badged).toHaveLength(5);
+  expect(badged).toHaveLength(4);
+  expect(m.badges[6]).toBeNull();
+  expect(m.badges[7]).toBeNull();
   for (let i = 0; i < m.badges.length; i++) {
     const badge = m.badges[i];
     if (badge === null) continue;
     expect(badge.shown).toBe(true);
     expect(badge.clipped).toBe(false);
-    // 件数バッジ（届いた依頼・添削中・追加相談・契約申込み）は h-5、注意の点（特商法・報酬口座）は size-3。
-    const expectedH = i === 5 || i === 6 ? 12 : 20;
+    // 件数バッジ（対応中・追加相談・契約申込み）は h-5、注意の点（報酬・口座、インデックス3）は size-3。
+    const expectedH = i === 3 ? 12 : 20;
     expect(Math.abs(badge.h - expectedH)).toBeLessThanOrEqual(1);
     expect(badge.top).toBeGreaterThanOrEqual(m.navTop - 1);
   }
@@ -187,7 +189,7 @@ async function expectFooterReachable(page: Page) {
 }
 
 for (const viewport of [{ width: 360, height: 740 }, { width: 390, height: 844 }, { width: 430, height: 932 }]) {
-  test(`${viewport.width}px 幅で9タイルが大きく正方形に並び、ラベル・バッジ・縦バランスが保たれる（#580）`, async ({ page }) => {
+  test(`${viewport.width}px 幅で8タイルが大きく正方形に並び、ラベル・バッジ・縦バランスが保たれる（#580）`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await setup(page, false);
     const m = await measure(page);
@@ -283,7 +285,7 @@ async function setupSaveToggle(page: Page, saveOk: boolean, locale: "ja" | "en")
     }
     let body: unknown = {};
     if (pathname.endsWith("/coach/me")) body = { application: stopped, rating: { count: 3, average: 4.5, paused: false } };
-    else if (pathname.endsWith("/me")) body = { id: userID, nickname: "サンプル選手", event: "100m", mfa_required: false, locale: locale === "en" ? "ja" : "en" };
+    else if (pathname.endsWith("/me")) body = { id: userID, nickname: "サンプル選手", event: "100m", mfa_required: false, overseas_consent: true, documents_consent: true, locale: locale === "en" ? "ja" : "en" };
     else if (pathname.endsWith("/coach/requests")) {
       body = { offers: [], reviewing: [reviewRequest("r1")] };
     } else if (pathname.endsWith("/coach/consultations")) body = { consultations: [{ id: "c1", status: "open" }] };
@@ -298,7 +300,7 @@ async function setupSaveToggle(page: Page, saveOk: boolean, locale: "ja" | "en")
   });
   await page.goto("/coach");
   await expect(page.locator("#startup-splash")).toHaveCount(0);
-  await expect(page.locator("nav.grid a")).toHaveCount(9);
+  await expect(page.locator("nav.grid a")).toHaveCount(8);
   await expect(page.locator(".screen-loader")).toBeHidden();
   const switchName = locale === "en" ? "Accepting" : "受付中";
   await page.getByRole("switch", { name: switchName }).click();
