@@ -164,16 +164,30 @@ it("利用設定の案内を表示せず、購入できない場合は購入を�
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
 
-it("販売を止めている間も終了を案内し、残りの枚数と有効期限は出す（本体 #569）", async () => {
+// 本体 #1021：販売終了の案内枠は出さない（販売終了は商品と購入ボタンが出ないことで伝わる）。
+it("販売を止めている間も残りの枚数と有効期限は出す（本体 #569）", async () => {
   mocks.api.mockResolvedValue({
     ...initial, products: [], can_purchase: false, sales_open: false, balance: { available: 3, reserved: 0 },
     next_expiry: { expires_at: "2027-05-01T00:00:00Z", available: 3 },
     purchase_block_reason: "チケットの販売は準備中です",
   });
   await render();
-  expect(container.textContent).toContain("チケットの販売は準備中です");
+  expect(container.textContent).not.toContain("チケットの販売は準備中です");
   expect(container.textContent).toContain("チケットの残り 3枚");
   expect(container.textContent).toContain("いちばん早い有効期限");
+  expect(reviewButton()).toBeUndefined();
+});
+
+it("販売停止中で残高0枚・購入履歴なしでも、案内枠なしで見出しと再読み込みボタンを出す（本体 #1021）", async () => {
+  mocks.api.mockResolvedValue({
+    ...initial, products: [], purchases: [], can_purchase: false, sales_open: false, balance: { available: 0, reserved: 0 },
+    next_expiry: null, purchase_block_reason: "チケットの販売は準備中です",
+  });
+  await render();
+  expect(container.textContent).not.toContain("チケットの販売は準備中です");
+  expect(container.querySelector(".border-amber-400\\/40")).toBeNull();
+  expect(container.querySelector("h1")?.textContent).toBe("コーチングチケット");
+  expect([...container.querySelectorAll("button")].some((b) => b.textContent === "チケット情報を再読み込み")).toBe(true);
   expect(reviewButton()).toBeUndefined();
 });
 
