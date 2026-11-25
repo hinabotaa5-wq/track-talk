@@ -358,7 +358,8 @@ func TestReviewWithoutBirthMonthRecordsNotice(t *testing.T) {
 }
 
 // 項目3：18歳以上は、4経路のどれでも宣言なしで進め、宣言の記録も未成年の印も残らない（カードだけの設定）。
-func TestAdultNeedsNoticeOnReviewPaths(t *testing.T) {
+// 購入前チェックは未成年（の可能性がある人）だけに求める（本体 #1045 の T8・T11）。
+func TestAdultNeedsNoNoticeOnReviewPaths(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
 	admin := adminToken(t, h)
@@ -368,6 +369,7 @@ func TestAdultNeedsNoticeOnReviewPaths(t *testing.T) {
 	body := reviewBodyFor(t, h, tu)
 	body["method"] = "card"
 	body["requested_coach_id"] = coach.String()
+	delete(body, "guardian_permission")
 	r := doJSON(t, h, "POST", "/v1/coaching/requests", tu, body)
 	if r.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", r.Code, r.Body.String())
@@ -375,24 +377,24 @@ func TestAdultNeedsNoticeOnReviewPaths(t *testing.T) {
 	var root string
 	queryRowArgs(t, `SELECT id::text FROM review_requests WHERE requester_id = $1`, []any{adult}, &root)
 	execSQLArgs(t, `UPDATE review_payments SET session_expires_at = now() WHERE request_id = $1`, root)
-	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/checkout", tu, map[string]any{"method": "card", "guardian_permission": true}); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coaching/requests/"+root+"/checkout", tu, map[string]any{"method": "card"}); r.Code != 200 {
 		t.Fatalf("reopen %d %s", r.Code, r.Body.String())
 	}
 	payChosenReview(t, h, root, "card")
 	answerOffer(t, h, tc, root)
 	c := consultationDraft(t, h, tu, "/v1/coaching/requests/"+root+"/consultations", uuid.NewString(), "次の大会ではどこを意識しますか")
-	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", tu, map[string]any{"guardian_permission": true}); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/submit", tu, nil); r.Code != 200 {
 		t.Fatalf("submit %d %s", r.Code, r.Body.String())
 	}
 	execSQLArgs(t, `UPDATE coaching_consultations SET checkout_url = NULL, checkout_session_id = NULL WHERE id = $1`, c.ID)
-	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/checkout", tu, map[string]any{"guardian_permission": true}); r.Code != 200 {
+	if r := doJSON(t, h, "POST", "/v1/coaching/consultations/"+c.ID+"/checkout", tu, nil); r.Code != 200 {
 		t.Fatalf("consultation reopen %d %s", r.Code, r.Body.String())
 	}
 	var declarations, minorPayments, minorConsultations int
 	queryRowArgs(t, `SELECT count(*) FROM minor_purchase_declarations WHERE minor_id = $1`, []any{adult}, &declarations)
 	queryRowArgs(t, `SELECT count(*) FROM review_payments WHERE request_id = $1 AND minor`, []any{root}, &minorPayments)
 	queryRowArgs(t, `SELECT count(*) FROM coaching_consultations WHERE id = $1 AND minor`, []any{c.ID}, &minorConsultations)
-	if declarations != 4 || minorPayments != 0 || minorConsultations != 0 {
+	if declarations != 0 || minorPayments != 0 || minorConsultations != 0 {
 		t.Fatalf("adult declarations=%d minor payments=%d minor consultations=%d", declarations, minorPayments, minorConsultations)
 	}
 }

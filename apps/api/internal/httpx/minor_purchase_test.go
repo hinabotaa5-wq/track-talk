@@ -137,8 +137,8 @@ func TestMinorPurchaseNeedsDeclarationNotGuardianConsent(t *testing.T) {
 	}
 }
 
-// 18歳以上は宣言を求めず、記録も残さない。支払いに未成年の印も付かない。
-func TestAdultPurchaseRecordsNotice(t *testing.T) {
+// 18歳以上は宣言を求めず、記録も残さない。支払いに未成年の印も付かない（本体 #1045 の T8）。
+func TestAdultPurchaseRecordsNoNotice(t *testing.T) {
 	allowPayPayForTest(t)
 	fakeCoachingCloudinary(t)
 	h, _ := setupCoachChoice(t)
@@ -148,6 +148,7 @@ func TestAdultPurchaseRecordsNotice(t *testing.T) {
 	body := reviewBodyFor(t, h, tu)
 	body["method"] = "paypay"
 	body["requested_coach_id"] = coach.String()
+	delete(body, "guardian_permission")
 	rec := doJSON(t, h, "POST", "/v1/coaching/requests", tu, body)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("adult create %d %s", rec.Code, rec.Body.String())
@@ -159,7 +160,7 @@ func TestAdultPurchaseRecordsNotice(t *testing.T) {
 	queryRowArgs(t, `SELECT count(*) FROM minor_purchase_declarations WHERE minor_id = $1`, []any{adult}, &declarations)
 	queryRowArgs(t, `SELECT count(*) FROM guardian_notices WHERE minor_id = $1`, []any{adult}, &notices)
 	queryRowArgs(t, `SELECT count(*) FROM review_payments WHERE request_id = $1 AND minor`, []any{created.ID}, &minorPayments)
-	if declarations != 1 || notices != 0 || minorPayments != 0 {
+	if declarations != 0 || notices != 0 || minorPayments != 0 {
 		t.Fatalf("adult declarations=%d notices=%d minor payments=%d", declarations, notices, minorPayments)
 	}
 	var me struct {
