@@ -18,7 +18,8 @@ import (
 )
 
 // 添削の返答・評価。
-// コーチは良い点1つ、直す点1〜2つ、ドリル1つ、ひとこと1つ（各300字）と、任意で見本動画を返す。
+// コーチは回答の型（本体 #1013）どおり、一言診断（hitokoto）・良い点1つ・ボトルネック（fix_points、UIは1つ・APIは1〜2つ）・
+// キュー・ドリル・成功の目安・次に撮る動画（各300字・必須）と、任意で見本動画を返す。
 // ★の評価と、7日後の「役に立ちましたか」も扱う。
 
 const maxResponseChars = 300
@@ -54,11 +55,15 @@ func (s *Server) reviewResponseJSON(rs db.ReviewResponse) map[string]any {
 		return map[string]any{"hidden": true, "created_at": rs.CreatedAt}
 	}
 	out := map[string]any{
-		"hidden":               false,
-		"good_point":           rs.GoodPoint,
-		"fix_points":           rs.FixPoints,
-		"drill":                rs.Drill,
-		"hitokoto":             rs.Hitokoto,
+		"hidden":     false,
+		"good_point": rs.GoodPoint,
+		"fix_points": rs.FixPoints,
+		"drill":      rs.Drill,
+		"hitokoto":   rs.Hitokoto,
+		// 回答の新しい型の3欄（本体 #1013）。000191 より前の返答は null で、表示側で節ごと隠す。訳は付けない。
+		"cue":                  rs.Cue,
+		"success_criteria":     rs.SuccessCriteria,
+		"next_video":           rs.NextVideo,
 		"created_at":           rs.CreatedAt,
 		"clarify_reason":       rs.ClarifyReason,
 		"clarify_body":         rs.ClarifyBody,
@@ -150,6 +155,8 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := s.coachRequestJSON(rr, coachSeesVideo(rr))
+	// 申込で選手が任意で書いた選手情報（本体 #1013 補足）。相談内容と並べて詳細でだけ見せる。未入力は null。
+	out["pb"], out["goal_time"], out["wind_speed"], out["body_condition"] = rr.Pb, rr.GoalTime, rr.WindSpeed, rr.BodyCondition
 	if err := s.withResponse(r.Context(), out, rr.ID); err != nil {
 		MapDBError(w, err)
 		return
@@ -179,6 +186,9 @@ type reviewResponseReq struct {
 	FixPoints         []string `json:"fix_points"`
 	Drill             string   `json:"drill"`
 	Hitokoto          string   `json:"hitokoto"`
+	Cue               string   `json:"cue"`
+	SuccessCriteria   string   `json:"success_criteria"`
+	NextVideo         string   `json:"next_video"`
 	DemoVideoPublicID string   `json:"demo_video_public_id"`
 }
 
@@ -200,6 +210,9 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	good := strings.TrimSpace(req.GoodPoint)
 	drill := strings.TrimSpace(req.Drill)
 	hitokoto := strings.TrimSpace(req.Hitokoto)
+	cue := strings.TrimSpace(req.Cue)
+	success := strings.TrimSpace(req.SuccessCriteria)
+	nextVideo := strings.TrimSpace(req.NextVideo)
 	fixes := []string{}
 	for _, f := range req.FixPoints {
 		if f = strings.TrimSpace(f); f != "" {
@@ -228,6 +241,15 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	if e := responseTextError("ひとこと", hitokoto); e != "" {
 		fields["hitokoto"] = e
+	}
+	if e := responseTextError("キュー", cue); e != "" {
+		fields["cue"] = e
+	}
+	if e := responseTextError("成功の目安", success); e != "" {
+		fields["success_criteria"] = e
+	}
+	if e := responseTextError("次に撮る動画", nextVideo); e != "" {
+		fields["next_video"] = e
 	}
 	var demo *string
 	if req.DemoVideoPublicID != "" {
@@ -281,6 +303,9 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		Drill:             drill,
 		DemoVideoPublicID: demo,
 		Hitokoto:          &hitokoto,
+		Cue:               &cue,
+		SuccessCriteria:   &success,
+		NextVideo:         &nextVideo,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {

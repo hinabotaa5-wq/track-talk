@@ -31,7 +31,8 @@ const baseResponse = {
 
 it("返答にひとことがあればひとこと欄を表示する", async () => {
   await act(async () => root.render(<ReviewResponseView response={baseResponse} />));
-  expect(container.textContent).toContain("ひとこと");
+  // 本体 #1013: ひとことは「一言診断」として表示する。
+  expect(container.textContent).toContain("一言診断");
   expect(container.textContent).toContain("次は抜き脚だけ意識してみましょう");
 });
 
@@ -39,7 +40,7 @@ it("ひとことが無い過去の返答はひとこと欄を出さずに表示�
   const past = { ...baseResponse, hitokoto: null } as unknown as ReviewResponse;
   await act(async () => root.render(<ReviewResponseView response={past} />));
   expect(container.textContent).toContain("腕振りが良い");
-  expect(container.textContent).not.toContain("ひとこと");
+  expect(container.textContent).not.toContain("一言診断");
 });
 
 // 本体 #916 B1・B4: 海外コーチの回答3点は、和訳があれば和訳を主に・英語の原文を併記する。訳が無い項目・コーチ本人の画面は原文だけ。
@@ -71,7 +72,7 @@ it.each(["requester", "coach"] as const)("%s には回答を1枚のドキュメ�
   expect(container.children).toHaveLength(1);
   expect(doc.querySelector("h2")?.textContent).toBe(viewer === "coach" ? "あなたの回答" : "テストコーチコーチの回答");
   expect(doc.querySelector("img") !== null).toBe(viewer === "requester");
-  expect([...doc.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["良い点", "直す点 1", "直す点 2", "おすすめのドリル", "ひとこと", "見本動画"]);
+  expect([...doc.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["一言診断", "良い点", "ボトルネック 1", "ボトルネック 2", "おすすめのドリル", "見本動画"]);
   expect(doc.className).not.toContain("max-w-[85%]");
   expect(container.querySelectorAll("time")).toHaveLength(1);
   expect(doc.querySelector("time")?.getAttribute("datetime")).toBe(baseResponse.created_at);
@@ -87,7 +88,7 @@ it.each(["requester", "coach"] as const)("%s には回答を1枚のドキュメ�
 
 it("任意項目なしの返答は3項目だけで、直す点に番号を付けない", async () => {
   await act(async () => root.render(<ReviewResponseView response={{ ...baseResponse, hitokoto: null, demo_video_url: null }} />));
-  expect([...container.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["良い点", "直す点", "おすすめのドリル"]);
+  expect([...container.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["良い点", "ボトルネック", "おすすめのドリル"]);
   expect(container.querySelector("video")).toBeNull();
   expect(container.querySelector("h2")?.textContent).toBe("コーチの回答");
 });
@@ -111,4 +112,32 @@ it("非表示の返答は案内1枚だけで本文・日時・動画を出さな
   expect(container.textContent).toBe("この返答は運営が非表示にしました。");
   expect(container.children).toHaveLength(1);
   expect(container.querySelector("time, video, h2")).toBeNull();
+});
+
+// 本体 #1013 B3: 回答の新しい型は 一言診断→良い点→ボトルネック→キュー→ドリル→成功の目安→次に撮る動画→見本動画 の順で出す。
+it.each(["requester", "coach"] as const)("B3: %s には新しい型の返答を7要素＋見本動画の順で出す", async (viewer) => {
+  const v2 = {
+    ...baseResponse,
+    cue: "地面を真下に押す",
+    success_criteria: "接地の瞬間に膝が足首の真上にそろって見える",
+    next_video: "真横・5m離れて、1台目から3台目まで",
+    demo_video_url: "https://example.com/demo.mp4",
+  };
+  await act(async () => root.render(<ReviewResponseView viewer={viewer} response={v2} />));
+  const doc = container.querySelector("article")!;
+  expect([...doc.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["一言診断", "良い点", "ボトルネック", "キュー", "おすすめのドリル", "成功の目安", "次に撮る動画", "見本動画"]);
+  const bodies = [...doc.querySelectorAll("section > p")].map((p) => p.textContent);
+  expect(bodies).toEqual(["次は抜き脚だけ意識してみましょう", "腕振りが良い", "接地を直す", "地面を真下に押す", "もも上げ", "接地の瞬間に膝が足首の真上にそろって見える", "真横・5m離れて、1台目から3台目まで"]);
+});
+
+it("B3: 新しい3欄が null の過去の返答は、その節を出さず、一言診断（ひとこと）は先頭に出す", async () => {
+  const past = { ...baseResponse, cue: null, success_criteria: null, next_video: null };
+  await act(async () => root.render(<ReviewResponseView response={past} />));
+  expect([...container.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["一言診断", "良い点", "ボトルネック", "おすすめのドリル"]);
+  for (const label of ["キュー", "成功の目安", "次に撮る動画"]) {
+    expect(container.textContent).not.toContain(label);
+  }
+  // キー自体が無い（000191 より前の応答の形）ときも同じ。
+  await act(async () => root.render(<ReviewResponseView response={baseResponse} />));
+  expect([...container.querySelectorAll("h3")].map((h) => h.textContent)).toEqual(["一言診断", "良い点", "ボトルネック", "おすすめのドリル"]);
 });

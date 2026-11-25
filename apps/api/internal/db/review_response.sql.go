@@ -13,9 +13,9 @@ import (
 )
 
 const createReviewResponse = `-- name: CreateReviewResponse :one
-INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, hitokoto)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto
+INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, hitokoto, cue, success_criteria, next_video)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video
 `
 
 type CreateReviewResponseParams struct {
@@ -26,6 +26,9 @@ type CreateReviewResponseParams struct {
 	Drill             string     `json:"drill"`
 	DemoVideoPublicID *string    `json:"demo_video_public_id"`
 	Hitokoto          *string    `json:"hitokoto"`
+	Cue               *string    `json:"cue"`
+	SuccessCriteria   *string    `json:"success_criteria"`
+	NextVideo         *string    `json:"next_video"`
 }
 
 func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResponseParams) (ReviewResponse, error) {
@@ -37,6 +40,9 @@ func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResp
 		arg.Drill,
 		arg.DemoVideoPublicID,
 		arg.Hitokoto,
+		arg.Cue,
+		arg.SuccessCriteria,
+		arg.NextVideo,
 	)
 	var i ReviewResponse
 	err := row.Scan(
@@ -55,6 +61,9 @@ func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResp
 		&i.HiddenAt,
 		&i.ClarifyBody,
 		&i.Hitokoto,
+		&i.Cue,
+		&i.SuccessCriteria,
+		&i.NextVideo,
 	)
 	return i, err
 }
@@ -82,7 +91,7 @@ func (q *Queries) GetCoachRatingSummary(ctx context.Context, coachID uuid.UUID) 
 }
 
 const getCoachReviewRequest = `-- name: GetCoachReviewRequest :one
-SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at, pb, goal_time, wind_speed, body_condition FROM review_requests
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status IN ('in_review', 'needs_info', 'returned', 'clarifying')
@@ -135,6 +144,10 @@ func (q *Queries) GetCoachReviewRequest(ctx context.Context, arg GetCoachReviewR
 		&i.ReturnReason,
 		&i.Reminder12hAt,
 		&i.Reminder4hAt,
+		&i.Pb,
+		&i.GoalTime,
+		&i.WindSpeed,
+		&i.BodyCondition,
 	)
 	return i, err
 }
@@ -191,7 +204,7 @@ func (q *Queries) GetReviewRating(ctx context.Context, requestID uuid.UUID) (Rev
 }
 
 const getReviewResponse = `-- name: GetReviewResponse :one
-SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto FROM review_responses
+SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video FROM review_responses
 WHERE request_id = $1
 `
 
@@ -214,6 +227,9 @@ func (q *Queries) GetReviewResponse(ctx context.Context, requestID uuid.UUID) (R
 		&i.HiddenAt,
 		&i.ClarifyBody,
 		&i.Hitokoto,
+		&i.Cue,
+		&i.SuccessCriteria,
+		&i.NextVideo,
 	)
 	return i, err
 }
@@ -244,6 +260,9 @@ SELECT
     rs.fix_points,
     rs.drill,
     rs.hitokoto,
+    rs.cue,
+    rs.success_criteria,
+    rs.next_video,
     rs.clarification,
     rs.created_at,
     rs.hidden_at
@@ -261,19 +280,22 @@ LIMIT 100
 `
 
 type ListCoachProbationRow struct {
-	RequestID     uuid.UUID  `json:"request_id"`
-	CoachID       *uuid.UUID `json:"coach_id"`
-	CoachNickname *string    `json:"coach_nickname"`
-	Nth           int32      `json:"nth"`
-	Tier          string     `json:"tier"`
-	Event         string     `json:"event"`
-	GoodPoint     string     `json:"good_point"`
-	FixPoints     []string   `json:"fix_points"`
-	Drill         string     `json:"drill"`
-	Hitokoto      *string    `json:"hitokoto"`
-	Clarification *string    `json:"clarification"`
-	CreatedAt     time.Time  `json:"created_at"`
-	HiddenAt      *time.Time `json:"hidden_at"`
+	RequestID       uuid.UUID  `json:"request_id"`
+	CoachID         *uuid.UUID `json:"coach_id"`
+	CoachNickname   *string    `json:"coach_nickname"`
+	Nth             int32      `json:"nth"`
+	Tier            string     `json:"tier"`
+	Event           string     `json:"event"`
+	GoodPoint       string     `json:"good_point"`
+	FixPoints       []string   `json:"fix_points"`
+	Drill           string     `json:"drill"`
+	Hitokoto        *string    `json:"hitokoto"`
+	Cue             *string    `json:"cue"`
+	SuccessCriteria *string    `json:"success_criteria"`
+	NextVideo       *string    `json:"next_video"`
+	Clarification   *string    `json:"clarification"`
+	CreatedAt       time.Time  `json:"created_at"`
+	HiddenAt        *time.Time `json:"hidden_at"`
 }
 
 // 各コーチの最初の20本の返答。運営が読んで、問題がないかを確かめる（試用期間）。
@@ -297,6 +319,9 @@ func (q *Queries) ListCoachProbation(ctx context.Context) ([]ListCoachProbationR
 			&i.FixPoints,
 			&i.Drill,
 			&i.Hitokoto,
+			&i.Cue,
+			&i.SuccessCriteria,
+			&i.NextVideo,
 			&i.Clarification,
 			&i.CreatedAt,
 			&i.HiddenAt,
@@ -356,7 +381,7 @@ SET status = 'returned',
 WHERE id = $1
   AND coach_id = $2::uuid
   AND status = 'clarifying'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at, pb, goal_time, wind_speed, body_condition
 `
 
 type MarkReviewClarifiedParams struct {
@@ -406,6 +431,10 @@ func (q *Queries) MarkReviewClarified(ctx context.Context, arg MarkReviewClarifi
 		&i.ReturnReason,
 		&i.Reminder12hAt,
 		&i.Reminder4hAt,
+		&i.Pb,
+		&i.GoalTime,
+		&i.WindSpeed,
+		&i.BodyCondition,
 	)
 	return i, err
 }
@@ -418,7 +447,7 @@ WHERE id = $1
   AND requester_id = $2
   AND status = 'returned'
   AND returned_at > now()-interval '7 days'
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at, pb, goal_time, wind_speed, body_condition
 `
 
 type MarkReviewClarifyingParams struct {
@@ -468,6 +497,10 @@ func (q *Queries) MarkReviewClarifying(ctx context.Context, arg MarkReviewClarif
 		&i.ReturnReason,
 		&i.Reminder12hAt,
 		&i.Reminder4hAt,
+		&i.Pb,
+		&i.GoalTime,
+		&i.WindSpeed,
+		&i.BodyCondition,
 	)
 	return i, err
 }
@@ -482,7 +515,7 @@ WHERE id = $1
   AND status = 'in_review'
   AND started_at IS NOT NULL
   AND due_at > now()
-RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at
+RETURNING id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at, pb, goal_time, wind_speed, body_condition
 `
 
 type MarkReviewReturnedParams struct {
@@ -533,6 +566,10 @@ func (q *Queries) MarkReviewReturned(ctx context.Context, arg MarkReviewReturned
 		&i.ReturnReason,
 		&i.Reminder12hAt,
 		&i.Reminder4hAt,
+		&i.Pb,
+		&i.GoalTime,
+		&i.WindSpeed,
+		&i.BodyCondition,
 	)
 	return i, err
 }
@@ -545,7 +582,7 @@ SET clarify_body = $1::text,
 WHERE request_id = $3
   AND clarify_requested_at IS NULL
   AND hidden_at IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video
 `
 
 type RequestReviewClarificationParams struct {
@@ -574,6 +611,9 @@ func (q *Queries) RequestReviewClarification(ctx context.Context, arg RequestRev
 		&i.HiddenAt,
 		&i.ClarifyBody,
 		&i.Hitokoto,
+		&i.Cue,
+		&i.SuccessCriteria,
+		&i.NextVideo,
 	)
 	return i, err
 }
@@ -608,7 +648,7 @@ SET clarification = $1::text,
 WHERE request_id = $2
   AND clarify_requested_at IS NOT NULL
   AND clarification IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video
 `
 
 type SaveReviewClarificationParams struct {
@@ -635,6 +675,9 @@ func (q *Queries) SaveReviewClarification(ctx context.Context, arg SaveReviewCla
 		&i.HiddenAt,
 		&i.ClarifyBody,
 		&i.Hitokoto,
+		&i.Cue,
+		&i.SuccessCriteria,
+		&i.NextVideo,
 	)
 	return i, err
 }

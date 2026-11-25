@@ -1061,3 +1061,85 @@ it("#959: 動画送信・取り込み・保存からStripe遷移まで確認画�
     expectOverlayOnly();
   } finally { vi.unstubAllGlobals(); }
 });
+
+// 本体 #1013 補足 B4: 申込フォームに任意4欄（PB・目標タイム・風速・その時の体のコンディション）が出て、
+// 入力した項目だけが確認画面の行と送信内容に入る。未入力の項目は確認行に出ず、送信内容では null。
+it.each([true, false])("B4: 選手情報の任意4欄を確認画面と送信内容に渡す（入力あり=%s）", async (filled) => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c1")]);
+  const mockRead = mocks.api.getMockImplementation()!;
+  mocks.api.mockImplementation(async (path: string, options?: unknown) => {
+    if (path === "/v1/coaching/requests") return { id: "r1" };
+    return mockRead(path, options);
+  });
+  await render();
+  const form = container.querySelector("form")!;
+  const info = [...form.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent === "選手情報（任意）")!;
+  expect([...info.querySelectorAll("label > span")].map((s) => s.textContent)).toEqual(["PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]);
+  // 相談内容の下に置く。
+  expectAfter(info, form.querySelector("#review-question"));
+  const inputs = [...info.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")];
+  expect(inputs.map((i) => i.name)).toEqual(["pb", "goal_time", "wind_speed", "body_condition"]);
+  expect(inputs.map((i) => i.required)).toEqual([false, false, false, false]);
+  expect(inputs.map((i) => i.maxLength)).toEqual([100, 100, 50, 300]);
+  const setValue = async (el: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+    await act(async () => {
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  await setValue(form.querySelector("textarea")!, "大会前の練習について相談したいです");
+  if (filled) {
+    await setValue(inputs[0], "11秒20（2025年）");
+    await setValue(inputs[2], "+1.2");
+    await setValue(inputs[3], "前日に脚が張っていた");
+  }
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async () => form.requestSubmit());
+  const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
+  const labels = [...confirm.querySelectorAll("dt")].map((d) => d.textContent);
+  const at = labels.indexOf("相談内容");
+  if (filled) {
+    expect(labels.slice(at, at + 4)).toEqual(["相談内容", "PB（自己ベスト）", "風速", "その時の体のコンディション"]);
+    const value = (label: string) => [...confirm.querySelectorAll("dt")].find((d) => d.textContent === label)!.nextElementSibling!.textContent;
+    expect(value("PB（自己ベスト）")).toBe("11秒20（2025年）");
+    expect(value("風速")).toBe("+1.2");
+    expect(value("その時の体のコンディション")).toBe("前日に脚が張っていた");
+  }
+  for (const label of filled ? ["目標タイム"] : ["PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]) {
+    expect(labels).not.toContain(label);
+  }
+  await act(async () => confirm.querySelector("button")!.click());
+  const request = mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests")!;
+  const body = JSON.parse(request[1].body);
+  expect(body.question).toBe("大会前の練習について相談したいです");
+  expect({ pb: body.pb, goal_time: body.goal_time, wind_speed: body.wind_speed, body_condition: body.body_condition }).toEqual(
+    filled
+      ? { pb: "11秒20（2025年）", goal_time: null, wind_speed: "+1.2", body_condition: "前日に脚が張っていた" }
+      : { pb: null, goal_time: null, wind_speed: null, body_condition: null },
+  );
+  expect(body).not.toHaveProperty("goal_meet");
+  expect(body).not.toHaveProperty("filming_context");
+});
+
+it("B4: 選手情報に連絡先らしき文字列があると確認画面に進まず、その欄に指摘が出る", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewOpen([reviewCoach("c1")]);
+  await render();
+  const form = container.querySelector("form")!;
+  const textarea = form.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "相談です");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const goal = form.querySelector<HTMLInputElement>('input[name="goal_time"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(goal, "090-1234-5678");
+    goal.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async () => form.requestSubmit());
+  expect(container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')).toBeNull();
+  expect(goal.closest("label")!.querySelector('[role="alert"]')?.textContent).toContain("外部の連絡先");
+});

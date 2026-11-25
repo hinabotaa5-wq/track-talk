@@ -8,7 +8,9 @@ import type { ReactNode } from "react";
 // 回答ドキュメントに出すコーチ（顔写真と名前）。コーチ本人の画面では渡さない。
 export type ReviewResponseCoach = { nickname: string | null; photo_url: string } | null | undefined;
 
-// コーチの返答（良い点・直す点・ドリル・ひとこと・見本動画・確認質問と補足）。利用者とコーチの両方の画面で使う。
+// コーチの返答。利用者とコーチの両方の画面で使う。
+// 並びは回答の型（本体 #1013）：一言診断→良い点→ボトルネック→キュー→ドリル→成功の目安→次に撮る動画→見本動画（→確認質問と補足）。
+// 新しい3欄（キュー・成功の目安・次に撮る動画）が無い過去の返答は、その節を出さない。一言診断は hitokoto があれば先頭に出す。
 // 1回プランは会話ではなく完結した回答なので、項目ごとの吹き出しに分けず1枚の回答ドキュメントとして出す（本体 #984）。
 // 海外コーチの回答3点は、和訳があれば和訳を主に・原文を直下に併記する（本体 #916）。コーチ本人の画面（viewer="coach"）は原文だけ。
 export function ReviewResponseView({ response, viewer = "requester", coach }: { response: ReviewResponse; viewer?: "requester" | "coach"; coach?: ReviewResponseCoach }) {
@@ -36,23 +38,38 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
           </p>
         </div>
       </header>
+      {response.hitokoto ? (
+        <DocSection title={L("一言診断")} tone="text-violet-300">
+          <p className="whitespace-pre-wrap text-slate-100">{response.hitokoto}</p>
+        </DocSection>
+      ) : null}
       <DocSection title={L("良い点")} tone="text-emerald-300">
         <p className="whitespace-pre-wrap text-slate-100">{good.text}</p>
         {good.original !== null ? <p lang="en" className={originalTextClass}>{good.original}</p> : null}
       </DocSection>
       {fixes.map((fix, i) => (
-        <DocSection key={i} title={L("直す点{v0}", { v0: fixes.length > 1 ? ` ${i + 1}` : "" })} tone="text-amber-300">
+        <DocSection key={i} title={L("ボトルネック{v0}", { v0: fixes.length > 1 ? ` ${i + 1}` : "" })} tone="text-amber-300">
           <p className="whitespace-pre-wrap text-slate-100">{fix.text}</p>
           {fix.original !== null ? <p lang="en" className={originalTextClass}>{fix.original}</p> : null}
         </DocSection>
       ))}
+      {response.cue ? (
+        <DocSection title={L("キュー")} tone="text-amber-300">
+          <p className="whitespace-pre-wrap text-slate-100">{response.cue}</p>
+        </DocSection>
+      ) : null}
       <DocSection title={L("おすすめのドリル")} tone="text-blue-300">
         <p className="whitespace-pre-wrap text-slate-100">{drill.text}</p>
         {drill.original !== null ? <p lang="en" className={originalTextClass}>{drill.original}</p> : null}
       </DocSection>
-      {response.hitokoto ? (
-        <DocSection title={L("ひとこと")} tone="text-violet-300">
-          <p className="whitespace-pre-wrap text-slate-100">{response.hitokoto}</p>
+      {response.success_criteria ? (
+        <DocSection title={L("成功の目安")} tone="text-emerald-300">
+          <p className="whitespace-pre-wrap text-slate-100">{response.success_criteria}</p>
+        </DocSection>
+      ) : null}
+      {response.next_video ? (
+        <DocSection title={L("次に撮る動画")} tone="text-slate-300">
+          <p className="whitespace-pre-wrap text-slate-100">{response.next_video}</p>
         </DocSection>
       ) : null}
       {response.demo_video_url ? (

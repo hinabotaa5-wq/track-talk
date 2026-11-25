@@ -30,6 +30,20 @@ function formatVideoSize(bytes: number): string {
   return `${Math.round(bytes)} B`;
 }
 
+// 申込で選手が任意で書ける選手情報（本体 #1013 補足）。並びは申込フォームと確認画面の順。
+export const reviewAthleteInfoKeys = ["pb", "goal_time", "wind_speed", "body_condition"] as const;
+export type ReviewAthleteInfoKey = (typeof reviewAthleteInfoKeys)[number];
+export type ReviewAthleteInfo = Partial<Record<ReviewAthleteInfoKey, string>>;
+
+export function reviewAthleteInfoLabel(key: ReviewAthleteInfoKey): string {
+  switch (key) {
+    case "pb": return L("PB（自己ベスト）");
+    case "goal_time": return L("目標タイム");
+    case "wind_speed": return L("風速");
+    case "body_condition": return L("その時の体のコンディション");
+  }
+}
+
 export type ReviewConfirmInput = {
   method: "card" | "paypay" | "tickets";
   priceYen: number;
@@ -45,9 +59,11 @@ export type ReviewConfirmInput = {
   nextExpiry?: Pick<TicketNextExpiry, "expires_at"> | null;
   // チケットの種別（本体 #687）。reward（無料チケット）は支払いの行と有効期限の行を分けて出す。
   ticketKind?: TicketKind | null;
+  // 選手情報（任意）。入力がある項目だけ、相談内容の下に行を足す。
+  athleteInfo?: ReviewAthleteInfo;
 };
 
-export function reviewConfirmRows({ method, priceYen, hasVideo, question, eventLabel, videoFileName, videoFileSizeBytes, coachName, nextExpiry, ticketKind }: ReviewConfirmInput): ConfirmRow[] {
+export function reviewConfirmRows({ method, priceYen, hasVideo, question, eventLabel, videoFileName, videoFileSizeBytes, coachName, nextExpiry, ticketKind, athleteInfo }: ReviewConfirmInput): ConfirmRow[] {
   const content = hasVideo
     ? (coachName ? L("スタンダード（動画1本・担当 {coachName}）", { coachName }) : L("スタンダード（動画1本）"))
     : (coachName ? L("スタンダード（悩みのみ・担当 {coachName}）", { coachName }) : L("スタンダード（悩みのみ）"));
@@ -55,6 +71,10 @@ export function reviewConfirmRows({ method, priceYen, hasVideo, question, eventL
     { label: L("内容"), value: content },
     { label: L("種目"), value: eventLabel },
     { label: L("相談内容"), value: question.trim(), multiline: true },
+    ...reviewAthleteInfoKeys.flatMap((key) => {
+      const value = athleteInfo?.[key]?.trim() ?? "";
+      return value ? [{ label: reviewAthleteInfoLabel(key), value, multiline: key === "body_condition" }] : [];
+    }),
     {
       label: L("動画"),
       value: videoFileName !== null

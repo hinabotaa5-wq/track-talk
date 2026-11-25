@@ -1393,6 +1393,10 @@ type ReviewRequest struct {
 	ReturnReason        *string    `json:"return_reason"`
 	Reminder12hAt       *time.Time `json:"reminder_12h_at"`
 	Reminder4hAt        *time.Time `json:"reminder_4h_at"`
+	Pb                  *string    `json:"pb"`
+	GoalTime            *string    `json:"goal_time"`
+	WindSpeed           *string    `json:"wind_speed"`
+	BodyCondition       *string    `json:"body_condition"`
 }
 
 type ReviewResponse struct {
@@ -1411,6 +1415,9 @@ type ReviewResponse struct {
 	HiddenAt           *time.Time `json:"hidden_at"`
 	ClarifyBody        *string    `json:"clarify_body"`
 	Hitokoto           *string    `json:"hitokoto"`
+	Cue                *string    `json:"cue"`
+	SuccessCriteria    *string    `json:"success_criteria"`
+	NextVideo          *string    `json:"next_video"`
 }
 
 type ReviewTranslation struct {
