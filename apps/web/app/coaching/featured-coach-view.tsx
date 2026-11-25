@@ -2,7 +2,7 @@
 import { L } from "@/lib/i18n";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useId, useState, type ReactNode } from "react";
 import { MotionConfig } from "motion/react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CoachAvatar } from "@/components/coach-photo";
@@ -12,6 +12,7 @@ import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachDisplayText } from "@/lib/coach-display";
 import { coachEventLabels } from "@/lib/coach-recruit";
+import { markLinkPending } from "@/lib/pending-link";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
 import { CoachSelfButton } from "../coaches/coach-self-button";
@@ -110,6 +111,17 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
 }
 
 // チケットの販売は終了した（本体 #1031）ので、「チケットを買う」は出さない。
+// 受付中の固定 CTA（本体 #1041）。タップした瞬間から下部タブと同じ「画面を開いています」の幕（ScreenLoader）を出す。
+// React 起動前のタップは data-pending-link／data-screen-loader を起動スクリプトと CSS が拾う。
+function FeaturedCtaLink({ href, children }: { href: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <Link href={href} data-pending-link="" data-screen-loader="" onNavigate={() => markLinkPending(id, href)} className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]">
+      {children}
+    </Link>
+  );
+}
+
 function FeaturedContent({ result }: { result: Loaded }) {
   if ("error" in result) return <p role="alert" className="text-sm text-red-400">{L("読み込みに失敗しました")}</p>;
   const coach = result.coach;
@@ -176,9 +188,9 @@ function FeaturedContent({ result }: { result: Loaded }) {
           {open ? null : <p className="text-center text-xs font-semibold text-red-400">{L("現在は受付を停止しています")}</p>}
           <div className="flex gap-2">
             {open ? (
-              <Link href={`/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`} className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]">
+              <FeaturedCtaLink href={`/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`}>
                 {L("動画添削を依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
-              </Link>
+              </FeaturedCtaLink>
             ) : (
               <span aria-disabled="true" className="flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400">
                 {L("動画添削を依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}

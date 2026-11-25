@@ -15,10 +15,17 @@ vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/l
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ token: auth.token, loading: false }) }));
 vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), get supportPlanListEnabled() { return flags.supportList; } }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(nav.search), usePathname: () => "/coaching" }));
+// onNavigate は DOM に渡さず、href ごとに捕捉してテストから呼べるようにする（本体 #1041 の T2）。
+const navigateHandlers = new Map<string, () => void>();
 vi.mock("next/link", () => ({
-  default: ({ children, href, ...props }: { children: ReactNode; href: string }) => createElement("a", { href, ...props }, children),
+  default: ({ children, href, onNavigate, ...props }: { children: ReactNode; href: string; onNavigate?: () => void }) => {
+    if (onNavigate) navigateHandlers.set(href, onNavigate);
+    return createElement("a", { href, ...props }, children);
+  },
 }));
 const { FeaturedCoachView, recordChips } = await import("./featured-coach-view");
+const { ScreenLoader } = await import("@/components/screen-loader");
+const { clearLinkPending } = await import("@/lib/pending-link");
 
 const coach = {
   id: "2f6d0a8e-1111-4c2b-9a7e-3c332627b25f", nickname: "テスト太郎", nickname_en: null, photo_url: "https://img.example/c.jpg", tier: "coach",
@@ -34,7 +41,7 @@ beforeEach(() => {
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
   auth.token = null; flags.supportList = false; nav.search = "";
   window.history.replaceState(null, "", "/coaching");
-  apiFetch.mockReset();
+  apiFetch.mockReset(); navigateHandlers.clear(); clearLinkPending();
   apiFetch.mockImplementation(async (path: string) => {
     if (path === "/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f") return { ...coach };
     throw new Error(`unexpected ${path}`);
@@ -208,6 +215,43 @@ it("受付停止中は、CTA を停止表示にし、依頼へ進めない", asy
   expect(container.textContent).toContain("現在は受付を停止しています");
   expect(link("動画添削を依頼する")).toBeUndefined();
   expect(container.querySelector('[aria-disabled="true"]')?.textContent).toBe("動画添削を依頼する ¥1,000");
+  // T3（本体 #1041）：停止中の span はリンクにせず、移動中表示の属性も付けない。
+  const disabled = cta()?.querySelector('[aria-disabled="true"]');
+  expect(disabled?.tagName).toBe("SPAN");
+  expect(cta()?.querySelector("a")).toBeNull();
+  expect(disabled?.hasAttribute("data-pending-link")).toBe(false);
+  expect(disabled?.hasAttribute("data-screen-loader")).toBe(false);
+  expect(cta()?.querySelector("[data-pending-link], [data-screen-loader]")).toBeNull();
+});
+
+const ctaHref = "/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card";
+
+it("受付中の固定 CTA は、href・文言・色はそのままで、移動中表示の属性を持つ（本体 #1041 T1）", async () => {
+  await render();
+  const a = cta()?.querySelector("a");
+  expect(a?.hasAttribute("data-pending-link")).toBe(true);
+  expect(a?.hasAttribute("data-screen-loader")).toBe(true);
+  expect(a?.getAttribute("href")).toBe(ctaHref);
+  expect(a?.textContent).toBe("動画添削を依頼する ¥1,000");
+  expect(a?.className).toBe("flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]");
+  expect(a?.hasAttribute("prefetch")).toBe(false);
+});
+
+it("受付中の固定 CTA をタップすると画面を開いている幕を出し、解除で消える（本体 #1041 T2）", async () => {
+  await act(async () => root.render(<><FeaturedCoachView coachID="2f6d0a8e-1111-4c2b-9a7e-3c332627b25f" /><ScreenLoader /></>));
+  await act(async () => { await Promise.resolve(); });
+  const loader = () => container.querySelector(".screen-loader");
+  expect(loader()?.className).toContain("hidden");
+  expect(container.querySelector('[role="status"]')).toBeNull();
+  const onNavigate = navigateHandlers.get(ctaHref);
+  expect(onNavigate).toBeTypeOf("function");
+  await act(async () => onNavigate?.());
+  expect(loader()?.className).toContain("flex");
+  expect(loader()?.className).not.toContain("hidden");
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("画面を開いています");
+  await act(async () => clearLinkPending());
+  expect(loader()?.className).toContain("hidden");
+  expect(container.querySelector('[role="status"]')).toBeNull();
 });
 
 it("チケットの新規販売を止めている間は「チケットを買う」を出さない", async () => {
