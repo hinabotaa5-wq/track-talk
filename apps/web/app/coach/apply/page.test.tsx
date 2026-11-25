@@ -39,6 +39,16 @@ it("名前を保存し、年数と公開説明文を外して専用の機能紹�
   expect(container.textContent).not.toContain("SNS・ホームページ・ひとこと");
 });
 
+// 本体 #1007 B10：継続プランは休眠。応募フォームに「1ヶ月プランの報酬と精算」の節を出さない。
+it("応募フォームに「1ヶ月プランの報酬と精算」の節を出さない", async () => {
+  apiFetch.mockResolvedValue({ application });
+  await act(async () => root.render(<CoachApplyPage />));
+  expect(container.querySelector("form")).not.toBeNull();
+  expect(container.querySelector("#support-plan-coach-terms")).toBeNull();
+  expect(container.textContent).not.toContain("1ヶ月プランの報酬と精算");
+  expect(container.textContent).not.toContain("1ヶ月プラン");
+});
+
 it.each([
   ["name", " ", "名前を入力してください"],
   ["events", [], "担当種目を1つ以上選んでください"],

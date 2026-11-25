@@ -12,7 +12,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import ReviewRequestPage from "./page";
 
 const routerMock = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }));
-const featureFlags = vi.hoisted(() => ({ coachList: true }));
+const featureFlags = vi.hoisted(() => ({ coachList: true, supportList: false }));
 const searchState = vi.hoisted(() => ({ paid: false }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/coaching/requests/review-1",
@@ -59,6 +59,7 @@ vi.mock("@/lib/features", async (original) => ({
   coachingMessagingEnabled: true,
   coachingConsultationEnabled: true,
   get coachingCoachListEnabled() { return featureFlags.coachList; },
+  get supportPlanListEnabled() { return featureFlags.supportList; },
 }));
 
 type RequestFixture = {
@@ -139,6 +140,7 @@ async function teardown(root: Root, container: HTMLDivElement) {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   featureFlags.coachList = true;
+  featureFlags.supportList = false;
   setActiveLocale("ja");
 }
 
@@ -154,29 +156,36 @@ async function click(element: Element) {
   });
 }
 
-// 本体 #984: 追加質問は販売終了。完了した依頼には入力欄・追加質問の導線を置かず、導線は「新しい動画で依頼する」と「継続プラン」の2つだけ。
-it("返却後は入力欄・追加質問の導線を出さず、次の依頼の導線2つだけを出す", async () => {
-  apiFetch.mockImplementation(async (path: string) => {
-    const consultations = mockConsultationsEmpty(path);
-    if (consultations !== undefined) return consultations;
-    if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
-    return baseRequest();
+// 本体 #984: 追加質問は販売終了。完了した依頼には入力欄・追加質問の導線を置かない。
+// 本体 #1007 B8: 継続プランは休眠。導線は「新しい動画で依頼する」だけで、継続プラン一覧のフラグが有効でも
+// 「継続プランを見る」「継続プランは準備中です」は出さない。
+for (const supportList of [false, true]) {
+  it(`返却後は入力欄・追加質問の導線を出さず、次の依頼の導線は「新しい動画で依頼する」だけ（継続プラン一覧フラグ=${supportList}）`, async () => {
+    featureFlags.supportList = supportList;
+    apiFetch.mockImplementation(async (path: string) => {
+      const consultations = mockConsultationsEmpty(path);
+      if (consultations !== undefined) return consultations;
+      if (path !== "/v1/coaching/requests/review-1") throw new Error(`Unexpected request: ${path}`);
+      return baseRequest();
+    });
+    const { container, root } = await renderPage();
+    try {
+      expect(container.textContent).toContain("腕振り");
+      expect(container.querySelector("textarea")).toBeNull();
+      expect(container.textContent).not.toContain("質問する（");
+      expect(container.textContent).not.toContain("追加質問");
+      const next = container.querySelector('nav[aria-label="次の依頼"]')!;
+      expect([...next.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([["新しい動画で依頼する", "/coaching/new"]]);
+      expect(next.children).toHaveLength(1);
+      expect(container.textContent).not.toContain("継続プランを見る");
+      expect(container.textContent).not.toContain("継続プランは準備中です");
+      expect(container.querySelector('a[href="/coaching?tab=support"]')).toBeNull();
+      expect(container.textContent).not.toContain("確認質問を送る（無料）");
+    } finally {
+      await teardown(root, container);
+    }
   });
-  const { container, root } = await renderPage();
-  try {
-    expect(container.textContent).toContain("腕振り");
-    expect(container.querySelector("textarea")).toBeNull();
-    expect(container.textContent).not.toContain("質問する（");
-    expect(container.textContent).not.toContain("追加質問");
-    const next = container.querySelector('nav[aria-label="次の依頼"]')!;
-    expect([...next.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([["新しい動画で依頼する", "/coaching/new"]]);
-    // 継続プランの一覧が閉じている間は、押せない「準備中」の表示に留める。
-    expect(next.textContent).toContain("継続プランは準備中です");
-    expect(container.textContent).not.toContain("確認質問を送る（無料）");
-  } finally {
-    await teardown(root, container);
-  }
-});
+}
 
 it("返却済みの依頼詳細に星セクションは出ない", async () => {
   apiFetch.mockImplementation(async (path: string) => {
@@ -608,7 +617,7 @@ it("お支払い待ちのキャンセルは専用の本文で確認し、取り�
     expect(payButtons()).toBeGreaterThan(0);
     await click(cancelButton(container)!);
     expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
-      title: "1回プランの依頼をキャンセルしますか？",
+      title: "スタンダードプランの依頼をキャンセルしますか？",
       body: "まだお支払いは済んでいません。取り消すと、この依頼ではお支払いができなくなります。",
       confirmLabel: "依頼をキャンセルする",
     }));
@@ -862,7 +871,7 @@ it("対応中は依頼内容だけで空の回答ドキュメントを出さず�
     expect([...container.querySelectorAll("h3")].some((h) => h.textContent === "良い点")).toBe(false);
     const deadline = [...container.querySelectorAll("p")].find((p) => p.textContent?.startsWith("返却期限:"))!;
     expect(deadline.previousElementSibling?.textContent).toMatch(/^送った日時 /);
-    expect(deadline.parentElement?.querySelector("h1")?.textContent).toBe("1回プラン");
+    expect(deadline.parentElement?.querySelector("h1")?.textContent).toBe("スタンダードプラン");
     expect(deadline.className).toBe(deadline.previousElementSibling?.className);
     expect(deadline.parentElement?.className).not.toContain("bg-");
     expect([...container.querySelectorAll("button")].some((b) => b.textContent === "依頼をキャンセルする")).toBe(true);
@@ -906,7 +915,7 @@ it.each(["authorized", "captured", "canceled", "refunded"])("A1–A3: %s でも�
     } });
     try {
       const heading = container.querySelector("h1")!;
-      expect(heading.textContent).toBe("1回プラン");
+      expect(heading.textContent).toBe("スタンダードプラン");
       const sent = heading.nextElementSibling!;
       expect(sent.textContent).toBe("送った日時 2026/11/19 6:00");
       expect(sent.nextElementSibling?.textContent).toBe("返却期限: 2026/11/21 6:00");

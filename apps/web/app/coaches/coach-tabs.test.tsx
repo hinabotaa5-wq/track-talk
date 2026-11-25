@@ -5,11 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
-// /coaching と /coaches で共有する一覧の切り替え。独自タブではなく共通部品 ViewSwitch を使い、
-// 今いるルートのまま tab だけを変える。見出しと説明文は出さない。
-// 大会・ケガのタブと同じく、その場の local state で即座に切り替え、URL は書き換えるだけ
-// （router.replace／router.push は使わない）。一度開いた一覧は隠して残し、
-// 行き来しても読み込み直さない。
+// /coaching と /coaches で共有する一覧の切り替え。共通部品 ViewSwitch を使い、見出しと説明文は出さない。
+// 継続プランは休眠させたので（本体 #1007）、選択肢はスタンダードプランだけで、継続プランの一覧は描画しない。
 const apiFetch = vi.fn();
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), tab: null as string | null, pathname: "/coaches" }));
 const auth = { token: "tok" as string | null };
@@ -54,132 +51,62 @@ const switchLink = (label: string) => [...container.querySelectorAll("a")].find(
 const panels = () => [...container.querySelectorAll('[role="tabpanel"] > div')] as HTMLElement[];
 const coachButton = () => [...container.querySelectorAll('a[href="/coach"]')].find((a) => a.getAttribute("aria-label") === "コーチ");
 const playerButton = () => [...container.querySelectorAll('a[href="/player"]')].find((a) => a.getAttribute("aria-label") === "選手");
-const chip = (label: string, scope: ParentNode = container) =>
-  [...scope.querySelectorAll('[role="radio"]')].find((el) => el.textContent === label) as HTMLElement | undefined;
 
-it("既定は1回プランの一覧で、見出しと説明文は出さない", async () => {
+it("既定はスタンダードプランの一覧で、見出しと説明文は出さない", async () => {
   await render();
-  // フォーム添削側だけをマウントし、継続プラン側はまだ開いていない。
   expect(panels()).toHaveLength(1);
   expect(fetchCount("/v1/coaches")).toBe(1);
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
   expect(container.querySelector("h1")).toBeNull();
-  expect(container.textContent).not.toContain("1回プラン（フォーム添削や競技に関する悩み）");
+  expect(container.textContent).not.toContain("スタンダードプラン（フォーム添削や競技に関する悩み）");
   expect(container.textContent).not.toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   expect(container.textContent).not.toContain("コーチ一覧");
-  expect(container.textContent).not.toContain("上のタブで、フォーム添削の指名と継続プランを切り替えられます。");
-  // 切り替えは共通部品 ViewSwitch（2つの選択肢・専用の layoutId）。
-  expect(switchLink("1回プラン")?.getAttribute("href")).toBe("/coaches");
-  expect(switchLink("継続プラン")?.getAttribute("href")).toBe("/coaches?tab=support");
+  expect(switchLink("スタンダードプラン")?.getAttribute("href")).toBe("/coaches");
+  expect(switchLink("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
 });
 
-it("?tab=support で直接開くと継続プラン側を出す", async () => {
-  navigation.tab = "support";
-  await render();
-  expect(panels()).toHaveLength(1);
-  expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
-  expect(fetchCount("/v1/coaches")).toBe(0);
-  expect(switchLink("継続プラン")?.getAttribute("aria-current")).toBe("page");
-  expect(container.querySelector("h1")).toBeNull();
-  expect(container.textContent).not.toContain("コーチ一覧");
-});
+// 本体 #1007 B1：継続プランは休眠。切り替えに出るのはスタンダードプランだけで、SupportPlanList は描画しない。
+for (const supportList of [true, false]) {
+  it(`切り替えの選択肢はスタンダードプランだけで、?tab=support でもスタンダードプラン側を出す（一覧フラグ=${supportList}）`, async () => {
+    flags.supportList = supportList;
+    navigation.tab = "support";
+    await render();
+    const options = [...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent);
+    expect(options).toEqual(["スタンダードプラン"]);
+    expect(switchLink("継続プラン")).toBeUndefined();
+    expect(switchLink("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
+    expect(panels()).toHaveLength(1);
+    expect(panels()[0].hidden).toBe(false);
+    expect(fetchCount("/v1/coaches")).toBe(1);
+    expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
+    expect(container.textContent).not.toContain("継続プラン");
+    expect(container.querySelector('[role="radio"]')).toBeNull();
+  });
+}
 
 it("英語でも見出しを出さず、切り替えの選択肢は英語になる", async () => {
   installEnglish(en);
   setActiveLocale("en");
   await render();
-  expect(switchLink("One-time Plan")?.getAttribute("href")).toBe("/coaches");
-  expect(switchLink("Ongoing plan")?.getAttribute("href")).toBe("/coaches?tab=support");
+  expect(switchLink("Standard Plan")?.getAttribute("href")).toBe("/coaches");
+  expect(switchLink("Ongoing plan")).toBeUndefined();
   expect(container.textContent).not.toContain("Coaches");
-  expect(container.textContent).not.toContain("One-time Plan (form feedback or concerns about competing)");
+  expect(container.textContent).not.toContain("Standard Plan (form feedback or concerns about competing)");
   expect(container.textContent).not.toContain("Attach a video if you would like form feedback. You can also ask for advice without a video.");
 });
 
 for (const pathname of ["/coaching", "/coaches"]) {
-  it(`${pathname} では切り替え後も ${pathname} に残り、別ルートへ飛ばない`, async () => {
+  it(`${pathname} では切り替えのリンク先が ${pathname} のままで、押しても画面遷移しない`, async () => {
     navigation.pathname = pathname;
     await render();
-    await act(async () => switchLink("継続プラン")!.click());
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    // router による画面遷移は使わない。URL だけを書き換えてその場で切り替える。
+    expect(switchLink("スタンダードプラン")?.getAttribute("href")).toBe(pathname);
+    await act(async () => switchLink("スタンダードプラン")!.click());
+    expect(replaceState).not.toHaveBeenCalled();
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(navigation.push).not.toHaveBeenCalled();
-    expect(replaceState).toHaveBeenCalledExactlyOnceWith(null, "", `${pathname}?tab=support`);
-    expect(panels()).toHaveLength(2);
-    expect(panels()[0].hidden).toBe(true);
-    expect(panels()[1].hidden).toBe(false);
-    await act(async () => switchLink("1回プラン")!.click());
-    expect(navigation.replace).not.toHaveBeenCalled();
-    expect(navigation.push).not.toHaveBeenCalled();
-    expect(replaceState).toHaveBeenLastCalledWith(null, "", pathname);
-    expect(panels()[0].hidden).toBe(false);
-    expect(panels()[1].hidden).toBe(true);
-  });
-
-  it(`${pathname} では行き来しても各一覧の取得は初回の1回だけで、読み込み表示が出ない`, async () => {
-    navigation.pathname = pathname;
-    await render();
     expect(fetchCount("/v1/coaches")).toBe(1);
-    await act(async () => switchLink("継続プラン")!.click());
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
-    await act(async () => switchLink("1回プラン")!.click());
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    // どちらもマウントし直していないので、再取得も読み込み表示もない。
-    expect(fetchCount("/v1/coaches")).toBe(1);
-    expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
-    expect(container.textContent).not.toContain("読み込み中");
-    expect(panels()).toHaveLength(2);
   });
 }
-
-it("同じタブのクリックは何もしない", async () => {
-  await render();
-  replaceState.mockClear();
-  await act(async () => switchLink("1回プラン")!.click());
-  expect(replaceState).not.toHaveBeenCalled();
-  expect(navigation.replace).not.toHaveBeenCalled();
-  expect(navigation.push).not.toHaveBeenCalled();
-  expect(fetchCount("/v1/coaches")).toBe(1);
-});
-
-// 本体 #991：1回プランの一覧から種目チップを外したので、チップは継続プラン一覧の側だけにある。
-it("種目チップで絞り込んだ状態が、タブを行き来しても保持される（継続プラン一覧）", async () => {
-  await render();
-  // 1回プランの一覧には種目チップを出さない。
-  expect(container.querySelector('[role="radio"]')).toBeNull();
-  await act(async () => switchLink("継続プラン")!.click());
-  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-  const target = chip("100m", panels()[1]);
-  expect(target?.getAttribute("aria-checked")).toBe("false");
-  await act(async () => { target!.click(); });
-  // 同一ノードの属性が変わる（選び直しではなくその場で切り替わる）。
-  expect(target!.getAttribute("aria-checked")).toBe("true");
-  await act(async () => switchLink("1回プラン")!.click());
-  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-  await act(async () => switchLink("継続プラン")!.click());
-  // 継続プランの一覧は破棄されていないので、選んだチップのノードも選択も残る。
-  expect(panels()[1].hidden).toBe(false);
-  expect(panels()[1].contains(target!)).toBe(true);
-  expect(target!.getAttribute("aria-checked")).toBe("true");
-  expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
-});
-
-it("継続プラン側のURLは共有できる（今いるルートのままクエリだけが付く）", async () => {
-  navigation.pathname = "/coaching";
-  await render();
-  expect(switchLink("継続プラン")?.getAttribute("href")).toBe("/coaching?tab=support");
-  expect(switchLink("1回プラン")?.getAttribute("href")).toBe("/coaching");
-});
-
-it("継続プラン一覧のフラグが閉じている間は準備中だけを出し、一覧を取得しない", async () => {
-  flags.supportList = false;
-  navigation.tab = "support";
-  await render();
-  expect(container.textContent).toContain("継続プランは準備中です");
-  expect(container.querySelector('[role="tabpanel"]')?.textContent).toBe("継続プランは準備中です");
-  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches/support-plan")).toBe(false);
-});
 
 it("狭い画面でも切り替えと円ボタン2つは同じ行に収まる", async () => {
   await render();
@@ -232,45 +159,9 @@ it("取得に失敗したらストップウォッチを消してエラーを出�
   await render();
   expect(container.querySelector(".page-loading-screen")).toBeNull();
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("読み込みに失敗しました");
-  expect(switchLink("1回プラン")).not.toBeUndefined();
+  expect(switchLink("スタンダードプラン")).not.toBeUndefined();
   expect(coachButton()?.getAttribute("href")).toBe("/coach");
   expect(fetchCount("/v1/coaches")).toBe(1);
-});
-
-// 本体 #804：継続プランを初めて開くときも、取得が終わるまで切り替えを出さない。
-it("継続プランの初回取得中は切り替えを出さず、終わったら戻す", async () => {
-  let finishSupport!: (value: { coaches: never[] }) => void;
-  apiFetch.mockImplementation(async (path: string) => {
-    if (path === "/v1/coaches") return { coaches: [] };
-    if (path === "/v1/coaches/support-plan") return new Promise<{ coaches: never[] }>((resolve) => { finishSupport = resolve; });
-    throw new Error(`unexpected ${path}`);
-  });
-  await render();
-  expect(switchLink("継続プラン")).not.toBeUndefined();
-  await act(async () => switchLink("継続プラン")!.click());
-  // 継続プラン側の取得中はストップウォッチだけで、切り替えもコーチボタンも出ない。
-  expect(container.querySelector(".page-loading-screen")).not.toBeNull();
-  expect(switchLink("1回プラン")).toBeUndefined();
-  expect(coachButton()).toBeUndefined();
-  expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
-  await act(async () => finishSupport({ coaches: [] }));
-  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-  expect(container.querySelector(".page-loading-screen")).toBeNull();
-  expect(switchLink("1回プラン")).not.toBeUndefined();
-  expect(coachButton()?.getAttribute("href")).toBe("/coach");
-  expect(fetchCount("/v1/coaches/support-plan")).toBe(1);
-});
-
-// 本体 #804：フラグが閉じている間の「継続プランは準備中です」は読み込みではない。切り替えを出したままにする。
-it("継続プラン一覧のフラグが閉じている間は準備中を出し、切り替えも隠さない", async () => {
-  flags.supportList = false;
-  navigation.tab = "support";
-  await render();
-  expect(container.querySelector(".page-loading-screen")).toBeNull();
-  expect(container.textContent).toContain("継続プランは準備中です");
-  expect(switchLink("1回プラン")).not.toBeUndefined();
-  expect(coachButton()?.getAttribute("href")).toBe("/coach");
-  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches/support-plan")).toBe(false);
 });
 
 it.each(["pending", "approved", "rejected", "suspended"])("応募あり（status=%s）でも円ボタン2つを出す（応募状態を取得しない）", async (status) => {
@@ -292,8 +183,7 @@ it("初回の取得が終わるまで切り替えとコーチボタンを出さ�
   await render();
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
   expect(container.querySelector('[role="status"]')).not.toBeNull();
-  expect(switchLink("1回プラン")).toBeUndefined();
-  expect(switchLink("継続プラン")).toBeUndefined();
+  expect(switchLink("スタンダードプラン")).toBeUndefined();
   expect(coachButton()).toBeUndefined();
   expect(playerButton()).toBeUndefined();
   expect(container.querySelector('[role="radio"]')).toBeNull();

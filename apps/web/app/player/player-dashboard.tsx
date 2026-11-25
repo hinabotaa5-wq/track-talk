@@ -4,7 +4,7 @@ import { L } from "@/lib/i18n";
 import { PageLoading } from "@/components/page-loading";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
-import { BellRing, ClipboardCheck, MessagesSquare, Ticket, Users, type LucideIcon } from "lucide-react";
+import { BellRing, ClipboardCheck, Ticket, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -16,13 +16,12 @@ import { useEffect, useState } from "react";
 // 失敗したらバッジを出さないだけ。通知タイル（通知設定）にはバッジを付けない。ドット（オレンジ点）は選手側には付けない。
 // タイル内部の見た目（アイコン・ラベル・角丸・間隔）はコーチ画面と同じ `.coach-tiles` の CSS 規則に乗せて揃える。
 // コーチ画面の縦の余り配分（CoachTiles の ResizeObserver）は持ち込まない（#940）。
+// 継続プランは休眠させたので（本体 #1007）、「継続プラン」「無料相談」のタイルは出さない。件数の取得と CountKey はそのまま残す。
 type CountKey = "player_one_time_count" | "player_personal_count" | "player_support_count" | "player_ticket_count";
 type TileCounts = Partial<Record<CountKey, number>>;
 
 const tiles: { href: string; label: string; Icon: LucideIcon; countKey?: CountKey }[] = [
-  { href: "/me/coaching/requests", label: "1回プラン", Icon: ClipboardCheck, countKey: "player_one_time_count" },
-  { href: "/me/coaching/personal", label: "継続プラン", Icon: Users, countKey: "player_personal_count" },
-  { href: "/coaching/support-consults", label: "無料相談", Icon: MessagesSquare, countKey: "player_support_count" },
+  { href: "/me/coaching/requests", label: "スタンダードプラン", Icon: ClipboardCheck, countKey: "player_one_time_count" },
   { href: "/me/coaching/tickets", label: "チケット", Icon: Ticket, countKey: "player_ticket_count" },
   { href: "/me/push", label: "通知", Icon: BellRing },
 ];

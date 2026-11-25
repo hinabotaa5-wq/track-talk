@@ -169,7 +169,7 @@ func guardianItemText(refType string) string {
 	if refType == "consultation" {
 		return "追加相談"
 	}
-	return "1回プラン"
+	return "スタンダードプラン"
 }
 
 // guardianCoachText は、メールの「担当コーチ」。コーチを選ばずに頼んだ添削は、支払いのあとに担当が決まる。

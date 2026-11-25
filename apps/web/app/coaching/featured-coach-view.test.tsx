@@ -6,7 +6,7 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 // コーチタブの特集ページ（本体 #985、#991 で並びを変更）。特集コーチ1人の詳細だけを取り、一覧・種目チップは出さない。
-// 並び：紹介バナー → 1回プラン／継続プランの切り替え＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋固定 CTA）。
+// 並び：紹介バナー → 切り替え（スタンダードプランのみ、本体 #1007）＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋固定 CTA）。
 const apiFetch = vi.fn();
 const auth = { token: null as string | null };
 const flags = { supportList: false };
@@ -90,12 +90,12 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   expect(before(about(), steps())).toBe(true);
   expect(before(steps(), faq)).toBe(true);
   expect(faq?.textContent).toContain("よくある質問");
-  // 切り替えと選手・コーチの丸ボタン。初期は1回プラン。
-  expect(switchButton("1回プラン")?.getAttribute("aria-current")).toBe("page");
-  expect(switchButton("継続プラン")?.getAttribute("href")).toBe("/coaching?tab=support");
+  // 切り替えと選手・コーチの丸ボタン。選択肢はスタンダードプランだけ（本体 #1007）。
+  expect(switchButton("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
+  expect(switchButton("継続プラン")).toBeUndefined();
   expect(container.querySelector('a[href="/player"][aria-label="選手"]')).not.toBeNull();
   expect(container.querySelector('a[href="/coach"][aria-label="コーチ"]')).not.toBeNull();
-  // 1回プラン側では継続プランの文言を出さない。
+  // 継続プランの文言を出さない。
   expect(container.textContent).not.toContain("継続プランは準備中です");
   expect(link("継続プランを見る")).toBeUndefined();
   const requestLink = link("動画添削を依頼する ¥1,000");
@@ -119,39 +119,26 @@ it("写真が未登録でも、コーチについての先頭に頭文字の丸�
   expect(Array.from(about()?.querySelectorAll('ul[aria-label="記録と対応種目"] li') ?? []).map((li) => li.textContent)).toContain("対応種目 100m・200m・400m");
 });
 
-it("継続プランを選ぶと「継続プランは準備中です」だけを出し、特集コンテンツと固定 CTA を外す。紹介バナーは出したまま。1回プランに戻すと戻る", async () => {
-  flags.supportList = true;
-  await render();
-  await act(async () => { switchButton("継続プラン")!.click(); });
-  expect(window.location.pathname + window.location.search).toBe("/coaching?tab=support");
-  expect(switchButton("継続プラン")?.getAttribute("aria-current")).toBe("page");
-  expect(container.textContent).toContain("継続プランは準備中です");
-  expect(about()).toBeNull();
-  expect(steps()).toBeNull();
-  expect(container.querySelector('section[aria-labelledby="featured-faq"]')).toBeNull();
-  expect(container.querySelector('[data-testid="featured-cta"]')).toBeNull();
-  expect(link("動画添削を依頼する")).toBeUndefined();
-  const banner = container.querySelector('a[href="/referral"]');
-  expect(banner).not.toBeNull();
-  expect(before(banner, container.querySelector('[role="group"][aria-label="コーチの一覧を切り替える"]'))).toBe(true);
-  // 切り替えはその場の状態だけで行い、取りに行かない。
-  expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f"]);
-  await act(async () => { switchButton("1回プラン")!.click(); });
-  expect(window.location.pathname + window.location.search).toBe("/coaching");
-  expect(container.textContent).not.toContain("継続プランは準備中です");
-  expect(about()).not.toBeNull();
-  expect(container.querySelector('[data-testid="featured-cta"]')).not.toBeNull();
-});
-
-it("?tab=support で開くと、最初から継続プラン（準備中）を出す", async () => {
-  nav.search = "tab=support";
-  await render();
-  expect(switchButton("継続プラン")?.getAttribute("aria-current")).toBe("page");
-  expect(container.textContent).toContain("継続プランは準備中です");
-  expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
-  expect(about()).toBeNull();
-  expect(container.querySelector('[data-testid="featured-cta"]')).toBeNull();
-});
+// 本体 #1007 B2：継続プランは休眠。?tab=support で開いてもスタンダードプラン側（特集コンテンツと固定 CTA）を出し、
+// 「継続プランは準備中です」は出さない。一覧フラグの真偽にかかわらない。
+for (const supportList of [true, false]) {
+  it(`?tab=support で開いてもスタンダードプラン側を出し、継続プランの選択肢・準備中表示を出さない（一覧フラグ=${supportList}）`, async () => {
+    flags.supportList = supportList;
+    nav.search = "tab=support";
+    await render();
+    const options = [...container.querySelectorAll('[role="group"][aria-label="コーチの一覧を切り替える"] a')].map((a) => a.textContent);
+    expect(options).toEqual(["スタンダードプラン"]);
+    expect(switchButton("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
+    expect(switchButton("スタンダードプラン")?.getAttribute("href")).toBe("/coaching");
+    expect(container.textContent).not.toContain("継続プラン");
+    expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
+    expect(about()).not.toBeNull();
+    expect(steps()).not.toBeNull();
+    expect(container.querySelector('[data-testid="featured-cta"]')).not.toBeNull();
+    expect(link("動画添削を依頼する ¥1,000")).not.toBeUndefined();
+    expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f"]);
+  });
+}
 
 it("受付停止中は、CTA を停止表示にし、依頼へ進めない", async () => {
   apiFetch.mockImplementation(async () => ({ ...coach, on_duty: false }));
@@ -181,7 +168,7 @@ it("英語表示では固定文を英語で出す", async () => {
   await render();
   expect(container.textContent).toContain("Request video feedback ¥1,000");
   expect(container.textContent).toContain("Returned within 24 hours");
-  expect(container.textContent).toContain("One-time Plan");
+  expect(container.textContent).toContain("Standard Plan");
   expect(container.textContent).toContain("FAQ");
   expect(container.textContent).not.toContain("よくある質問");
 });

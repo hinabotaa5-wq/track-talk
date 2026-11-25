@@ -6,7 +6,6 @@ import { useAuth } from "@/components/auth-provider";
 
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
-import { CoachServicePlans } from "@/components/coach-service-plans";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatYen } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
@@ -18,15 +17,15 @@ import { coachDisplayText } from "@/lib/coach-display";
 import type { PublicCoach } from "@/lib/types";
 import { CreditCard, Gift, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 
 type ReviewEntry = { key: "card" | TicketKind; Icon: LucideIcon; label: string; note?: string; href?: string; enabled: boolean };
 
-// どのプランの文脈で開いたか（本体 #694）。一覧で切り替えた先のプランの節だけを出す。
-// 一覧の切り替え（coach-tabs.tsx）と同じく、クエリ tab=support のときだけサポートプラン、
-// それ以外（指定なし・tab=video・不正値）は動画添削とする。詳細の中に切り替えは置かない。
-type PlanContext = "video" | "support";
+// どのプランの文脈で開いたか（本体 #694）。継続プランは休眠させたので（本体 #1007）、
+// クエリが tab=support でもつねにスタンダードプラン（動画添削）の文脈とし、継続プランの節（CoachServicePlans）は描画しない。
+// 詳細の中に切り替えは置かない。
+type PlanContext = "video";
 
 export default function CoachDetailPage() {
   return (
@@ -38,7 +37,7 @@ export default function CoachDetailPage() {
 
 function CoachDetailRoute() {
   const { id } = useParams<{ id: string }>();
-  const context: PlanContext = useSearchParams().get("tab") === "support" ? "support" : "video";
+  const context: PlanContext = "video";
   return <CoachDetail key={id} id={id} context={context} />;
 }
 
@@ -212,18 +211,13 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         </section>
         {showTickets ? <section className="space-y-3 text-sm" aria-labelledby="coach-tickets">
           <h2 id="coach-tickets" className="text-lg font-bold">{L("チケット")}</h2>
-          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。1回プランの申込み1件につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
+          <p className="text-slate-200">{L("チケット{q}枚で{v0}です。スタンダードプランの申込み1件につき1枚消費します。", { q: ticketPackQuantity, v0: formatYen(ticketPackPriceYen) })}</p>
           <Link
             href={ticketPurchaseHref}
             className="flex min-h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-pure-white transition hover:bg-blue-500 active:scale-[0.98]"
           >{L("購入する")}</Link>
         </section> : null}
         </> : null}
-        {/* サポート文脈：サポートプランの節だけ。動画添削とチケットの節は描画しない。 */}
-        {context === "support" ? <section className="space-y-3 text-sm" aria-labelledby="coach-plans">
-          <h2 id="coach-plans" className="text-lg font-bold">{L("継続プラン")}</h2>
-          <CoachServicePlans key={coach.id} plans={coach.plans ?? []} coachID={coach.id} consult={coach.support_consult} />
-        </section> : null}
       </>}
     </div>
   );

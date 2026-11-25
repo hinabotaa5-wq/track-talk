@@ -17,7 +17,7 @@ import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaratio
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { coachingCoachListEnabled, supportPlanListEnabled } from "@/lib/features";
+import { coachingCoachListEnabled } from "@/lib/features";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewVideosPurgedNote } from "@/lib/review";
@@ -99,18 +99,13 @@ function ResponseActions({ request, token, onChange }: { request: ReviewRequest;
   );
 }
 
-// 完了した1回プランのあとの導線は「新しい動画で依頼する」と「継続プランを見る」の2つだけ（本体 #984）。
-// 継続プランの一覧が閉じている間は開始通知の登録機能が無いので、押せない「準備中」の表示に留める。
+// 完了した1回プランのあとの導線は「新しい動画で依頼する」だけ（本体 #984）。
+// 継続プランは休眠させたので（本体 #1007）、一覧フラグの真偽にかかわらず「継続プランを見る」と「準備中」の表示は出さない。
 function CompletedNextSteps({ coachID }: { coachID: string | null }) {
   const again = coachID ? `/coaching/new?coach=${encodeURIComponent(coachID)}` : "/coaching/new";
   return (
     <nav aria-label={L("次の依頼")} className="grid gap-2">
       <Link href={again} className="block min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-pure-white transition active:scale-[0.98]">{L("新しい動画で依頼する")}</Link>
-      {supportPlanListEnabled ? (
-        <Link href="/coaching?tab=support" className="block min-h-11 w-full rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-blue-300 transition active:scale-[0.98]">{L("継続プランを見る")}</Link>
-      ) : (
-        <p aria-disabled="true" className="min-h-11 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-center text-sm text-slate-300">{L("継続プランは準備中です")}</p>
-      )}
     </nav>
   );
 }
@@ -213,7 +208,7 @@ function ReviewRequestView() {
 
   async function cancelReview() {
     if (!await confirmDialog({
-      title: L("1回プランの依頼をキャンセルしますか？"),
+      title: L("スタンダードプランの依頼をキャンセルしますか？"),
       body: request?.status === "awaiting_payment"
         ? L("まだお支払いは済んでいません。取り消すと、この依頼ではお支払いができなくなります。")
         : L("お支払いは全額返金・取消し、チケットは返還します。"),
@@ -297,7 +292,7 @@ function ReviewRequestView() {
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold">{L("1回プラン")}</h1>
+          <h1 className="text-2xl font-bold">{L("スタンダードプラン")}</h1>
           <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
           {request.status === "in_review" ? (
             <p className="text-sm text-slate-300">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>

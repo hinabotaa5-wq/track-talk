@@ -4,7 +4,7 @@ import { L } from "@/lib/i18n";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { MotionConfig } from "motion/react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { PageLoading } from "@/components/page-loading";
@@ -22,9 +22,9 @@ import { ReferralBanner } from "../coaches/referral-banner";
 // コーチタブの特集ページ（本体 #985、表示の手直しは #991）。特集モード（NEXT_PUBLIC_COACHING_FEATURED_COACH_ID）の間、/coaching の一覧の代わりに出す。
 // 名前・写真・記録・種目・紹介文・実績・SNS はプロフィールデータから出し、コードに個人の固定文言を書かない。
 // 固定の文は流れ（3ステップ）・よくある質問だけ（すべて L() でキー化）。
-// 並び（#991）：紹介バナー → 1回プラン／継続プランの切り替え＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋下部固定 CTA）。
-// 紹介バナーは切り替えの外に置き、どちらを選んでも出す。「継続プラン」側は特集コンテンツと固定 CTA を出さず「継続プランは準備中です」だけ（SupportPlanList は描かない）。
-// 切り替えの動きは通常一覧（coach-tabs.tsx）に揃える：初回だけ URL の ?tab=support を見て、以後はその場の状態で切り替え、URL は書き換えるだけ。
+// 並び（#991）：紹介バナー → 切り替え＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋下部固定 CTA）。
+// 継続プランは休眠させたので（本体 #1007）、切り替えの選択肢はスタンダードプランだけ。?tab=support で開かれてもスタンダードプラン側を出し、
+// 「継続プランは準備中です」は描画しない（通常一覧の coach-tabs.tsx と同じ）。
 // 外すもの：コーチカードの2列一覧・種目チップの絞り込み。
 
 // 記録の欄は自由記入なので、区切り（改行・読点・スラッシュ・全角スラッシュ）でチップに分ける。
@@ -33,7 +33,7 @@ export function recordChips(text: string | null): string[] {
 }
 
 type Loaded = { coach: PublicCoach | null } | { error: true };
-type Tab = "video" | "support";
+type Tab = "video";
 
 export function FeaturedCoachView({ coachID }: { coachID: string }) {
   return (
@@ -44,11 +44,9 @@ export function FeaturedCoachView({ coachID }: { coachID: string }) {
 }
 
 function FeaturedCoachTabs({ coachID }: { coachID: string }) {
-  const params = useSearchParams();
   const pathname = usePathname();
   const base = pathname === "/coaches" ? "/coaches" : "/coaching";
-  // 直接リンク・共有 URL で継続プラン側から開けるよう、初回だけ URL を見る。以後はその場の状態が正本。
-  const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "support" ? "support" : "video"));
+  const tab: Tab = "video";
   const [result, setResult] = useState<Loaded>();
   const { token } = useAuth();
   const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean }>();
@@ -80,21 +78,13 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
     return () => { cancelled = true; };
   }, [token]);
 
-  // 1回プラン側の初回読み込み中は、通常一覧と同じくストップウォッチだけにする（継続プラン側は取得しないので待たない）。
-  if (tab === "video" && !result) return <PageLoading screen label={L("読み込み中...")} />;
+  // 初回読み込み中は、通常一覧と同じくストップウォッチだけにする。
+  if (!result) return <PageLoading screen label={L("読み込み中...")} />;
 
-  const views = [
-    { id: "video", label: L("1回プラン") },
-    { id: "support", label: L("継続プラン") },
-  ] as const;
-  function select(next: Tab) {
-    if (next === tab) return;
-    setTab(next);
-    window.history.replaceState(null, "", next === "support" ? `${base}?tab=support` : base);
-  }
+  const views = [{ id: "video", label: L("スタンダードプラン") }] as const;
 
   return (
-    <div className={`mx-auto max-w-md space-y-6 ${tab === "video" ? "pb-32" : ""}`}>
+    <div className="mx-auto max-w-md space-y-6 pb-32">
       <ReferralBanner />
       <MotionConfig reducedMotion="user">
         <div className="flex items-center gap-2">
@@ -105,18 +95,14 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
               initialPillStatic
               views={views}
               current={tab}
-              onSelect={select}
-              href={(id) => (id === "support" ? `${base}?tab=support` : base)}
+              onSelect={() => {}}
+              href={() => base}
             />
           </div>
           <CoachSelfButton />
         </div>
       </MotionConfig>
-      {tab === "support" ? (
-        <p className="rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-center font-semibold text-slate-100">{L("継続プランは準備中です")}</p>
-      ) : result ? (
-        <FeaturedContent result={result} showTickets={!(ticketSales?.canPurchase === false && ticketSales.token === token)} />
-      ) : null}
+      <FeaturedContent result={result} showTickets={!(ticketSales?.canPurchase === false && ticketSales.token === token)} />
     </div>
   );
 }

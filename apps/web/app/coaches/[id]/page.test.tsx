@@ -77,7 +77,7 @@ async function render() {
 it("未ログインではフォーム添削の節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
   await render();
   expect(container.querySelector("h2#coach-video-review")?.textContent).toBe("フォーム添削や競技に関する悩み");
-  expect(container.textContent).not.toContain("1回プラン（フォーム添削や競技に関する悩み）");
+  expect(container.textContent).not.toContain("スタンダードプラン（フォーム添削や競技に関する悩み）");
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
   expect(entry("card")?.textContent).toBe("単発1,000円");
   expect(entryLink("card")).toBe(reviewHref("card"));
@@ -95,7 +95,7 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(mocks.api.mock.calls).toEqual([[`/v1/coaches/${coachID}`]]);
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("チケット");
-  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で5,000円です。1回プランの申込み1件につき1枚消費します。");
+  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で5,000円です。スタンダードプランの申込み1件につき1枚消費します。");
   expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   const purchaseClass = tickets?.querySelector("a")?.className ?? "";
   expect(purchaseClass).toContain("bg-blue-600");
@@ -307,15 +307,16 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(container.textContent).toContain("Please select");
   expect(container.textContent).not.toContain("You can also ask for advice without a video.");
   expect(container.querySelector("h2#coach-video-review")?.textContent).toBe("Form feedback or concerns about competing");
-  expect(container.textContent).not.toContain("One-time Plan (form feedback or concerns about competing)");
+  expect(container.textContent).not.toContain("Standard Plan (form feedback or concerns about competing)");
   expect(container.textContent).not.toContain("You can also pay with tickets");
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("Tickets");
-  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥5,000. One ticket is used per One-time Plan.");
+  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥5,000. One ticket is used per Standard Plan.");
   expect(tickets?.querySelector("a")?.textContent).toBe("Buy");
 });
 
-// 本体 #694：一覧で切り替えた先のプランの節だけを出す。tab=support だけがサポート文脈、それ以外はフォーム添削文脈。
+// 本体 #694 → #1007：継続プランは休眠。tab=support を含め、どのクエリでもフォーム添削（スタンダードプラン）の文脈で、
+// 継続プランの節（CoachServicePlans）は描画しない（B3）。
 const sectionIDs = () => [...container.querySelectorAll("section[aria-labelledby]")].map((s) => s.getAttribute("aria-labelledby"));
 const supportCoach: PublicCoach = {
   ...coach,
@@ -329,6 +330,7 @@ it.each([
   ["指定なし", ""],
   ["tab=video", "tab=video"],
   ["不正値", "tab=unknown"],
+  ["tab=support", "tab=support"],
 ])("フォーム添削文脈（%s）では継続プランの節を描画せず、フォーム添削とチケットの節を出す", async (_label, search) => {
   mocks.search = search;
   mocks.api.mockImplementation(async (path: string) => {
@@ -344,34 +346,6 @@ it.each([
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
   expect(container.querySelector(`section[aria-labelledby="coach-tickets"] a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   expect(container.querySelector("h1")?.textContent).toBe("テストコーチ");
-});
-
-it("サポート文脈（tab=support）では継続プランの節だけを出し、フォーム添削とチケットの節を描画しない", async () => {
-  mocks.search = "tab=support";
-  mocks.api.mockImplementation(async (path: string) => {
-    if (path === `/v1/coaches/${coachID}`) return supportCoach;
-    throw new Error(`unexpected ${path}`);
-  });
-  await render();
-  expect(sectionIDs()).toEqual(["coach-plans"]);
-  expect(container.querySelector("#coach-plans")?.textContent).toBe("継続プラン");
-  expect(container.textContent).toContain("このコーチは受付していません");
-  expect(container.textContent).toContain("従来の1ヶ月指導");
-  expect(container.querySelector('section[aria-labelledby="coach-video-review"]')).toBeNull();
-  expect(container.querySelector('section[aria-labelledby="coach-tickets"]')).toBeNull();
-  expect(container.querySelector('a[href^="/coaching/new"]')).toBeNull();
-  expect(container.querySelector('a[href^="/me/coaching/tickets"]')).toBeNull();
-  // プロフィール節は文脈によらず出す。
-  expect(container.querySelector("h1")?.textContent).toBe("テストコーチ");
-  expect(container.textContent).toContain("全国大会優勝");
-});
-
-it("サポート文脈ではフォーム添削の受付状態とチケットの要約を取りに行かない", async () => {
-  mocks.search = "tab=support";
-  withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
-  await render();
-  expect(mocks.api.mock.calls).toEqual([[`/v1/coaches/${coachID}`]]);
-  expect(sectionIDs()).toEqual(["coach-plans"]);
 });
 
 // 本体 #869：買う前に分かる情報（回答までの目安）を動画添削節へ前倒し。
@@ -393,16 +367,14 @@ it("動画添削文脈では支払い方法の説明文を表示せず、24時�
   expect(grid?.nextElementSibling).toBe(section?.lastElementChild);
 });
 
-it("サポート文脈（tab=support）では説明文と24時間の文のどちらも表示しない", async () => {
+it("tab=support で開いても動画添削の節に24時間の文を出し、継続プランの節は出さない（本体 #1007）", async () => {
   mocks.search = "tab=support";
-  mocks.api.mockImplementation(async (path: string) => {
-    if (path === `/v1/coaches/${coachID}`) return supportCoach;
-    throw new Error(`unexpected ${path}`);
-  });
+  withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
   await render();
-  expect(container.querySelector('section[aria-labelledby="coach-video-review"]')).toBeNull();
+  expect(sectionIDs()).toEqual(["coach-video-review", "coach-tickets"]);
+  expect(container.querySelector("#coach-plans")).toBeNull();
+  expect(container.querySelector('section[aria-labelledby="coach-video-review"]')?.textContent).toContain(replyNote);
   expect(container.textContent).not.toContain(paymentNote);
-  expect(container.textContent).not.toContain(replyNote);
 });
 
 it("受付停止中でも説明文は表示せず、24時間の文は表示し、単発・通常チケットの入口は無効のままにする", async () => {

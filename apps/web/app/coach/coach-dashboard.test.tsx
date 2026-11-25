@@ -125,16 +125,13 @@ async function renderFresh() {
   await act(async () => root.render(<CoachDashboard />));
 }
 
-it("ランチャーは10タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
+it("ランチャーは7タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
     "/coach/reviewing",
     "/coach/consultations",
     "/coach/contracts",
-    "/coach/support-consults",
-    "/coach/plans",
-    "/coach/commerce",
     "/coach/payouts",
     "/coach/profile",
     "/me/push",
@@ -146,6 +143,9 @@ it("ランチャーは10タイルの入口だけで（カレンダーは廃止�
   expect(container.textContent).not.toContain("対応待ちの追加相談");
   expect(container.textContent).not.toContain("受け取り口座を登録する");
   expect(container.querySelector('a[href="/me/coaching"]')).toBeNull();
+  // 本体 #1007 B5・B11：継続プランは休眠。届いた相談・継続プラン・特商法・身元のタイルは出さず、身元登録の状態も取りに行かない。
+  for (const href of ["/coach/plans", "/coach/support-consults", "/coach/commerce"]) expect(container.querySelector(`a[href="${href}"]`)).toBeNull();
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me/identity-status")).toBe(false);
   // ステータスバーは従来どおり操作できる。
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
   expect(container.querySelector("select")).toBeNull();
@@ -164,31 +164,27 @@ it("paused が true でも停止注記は出ない（評価制度は廃止）", 
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
 });
 
-it("バッジは実件数と一致し、未登録の点は条件の時だけ出す", async () => {
+it("バッジは実件数と一致し、口座未登録の点は条件の時だけ出す", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileLabels()).toContain("対応中（1件）");
   expect(tileLabels()).toContain("追加相談（1件）");
   expect(tileLabels()).toContain("契約・申込み（1件）");
-  expect(tileLabels()).toContain("特商法・身元（要確認）");
   expect(tileLabels()).toContain("報酬・口座（要確認）");
+  // 特商法・身元のタイルは出さない（本体 #1007）。
+  expect(tileLabels().some((label) => label?.startsWith("特商法・身元"))).toBe(false);
 
-  // 身元が不明（null）や取得失敗のときは点を出さない。
-  for (const status of [{ registered: null, applies: true }, { registered: false, applies: false }]) {
-    apiFetch.mockImplementation((path: string) => {
-      if (path === "/v1/coach/me") return Promise.resolve({ application: { ...application, payouts_ready: true } });
-      if (path === "/v1/coach/requests") return Promise.resolve({ offers: [], reviewing: [] });
-      if (path === "/v1/coach/consultations") return Promise.resolve({ consultations: [] });
-      if (path === "/v1/coach/contracts") return Promise.resolve({ contracts: [] });
-      if (path === "/v1/coach/me/earnings") return Promise.resolve({ unpaid_yen: 0 });
-      if (path === "/v1/coach/me/identity-status") return Promise.resolve(status);
-      return Promise.reject(new Error(`unexpected ${path}`));
-    });
-    await renderFresh();
-    expect(tileLabels()).toContain("特商法・身元");
-    expect(tileLabels()).not.toContain("特商法・身元（要確認）");
-    expect(tileLabels()).not.toContain("報酬・口座（要確認）");
-  }
+  // 口座が登録済みなら点を出さない。
+  apiFetch.mockImplementation((path: string) => {
+    if (path === "/v1/coach/me") return Promise.resolve({ application: { ...application, payouts_ready: true } });
+    if (path === "/v1/coach/requests") return Promise.resolve({ offers: [], reviewing: [] });
+    if (path === "/v1/coach/consultations") return Promise.resolve({ consultations: [] });
+    if (path === "/v1/coach/contracts") return Promise.resolve({ contracts: [] });
+    if (path === "/v1/coach/me/earnings") return Promise.resolve({ unpaid_yen: 0 });
+    return Promise.reject(new Error(`unexpected ${path}`));
+  });
+  await renderFresh();
+  expect(tileLabels()).not.toContain("報酬・口座（要確認）");
 
   // 取得失敗でも入口は壊れない。
   apiFetch.mockImplementation((path: string) => {
@@ -196,7 +192,7 @@ it("バッジは実件数と一致し、未登録の点は条件の時だけ出�
     return Promise.reject(new Error("down"));
   });
   await renderFresh();
-  expect(tileHrefs()).toHaveLength(10);
+  expect(tileHrefs()).toHaveLength(7);
 });
 
 it("未承認時はコーチ募集の文言を表示する", async () => {
@@ -240,7 +236,7 @@ it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折�
   const grid = container.querySelector("nav.grid")!;
   expect(grid.getAttribute("style") ?? "").not.toContain("--coach-tile");
   const labels = [...container.querySelectorAll("nav.grid a > span.coach-tile-label")];
-  expect(labels).toHaveLength(10);
+  expect(labels).toHaveLength(7);
   for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
 });
 
@@ -289,7 +285,7 @@ it("応答に件数のキーが無いときは行を出さず、他は従来ど�
   // 受付状態・タイル・バッジ・フッターは従来どおり。
   expect(statusSection()?.textContent).toContain("受付中");
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
-  expect(tileHrefs()).toHaveLength(10);
+  expect(tileHrefs()).toHaveLength(7);
   expect(tileLabels()).toContain("対応中（1件）");
   expect(tileLabels()).toContain("追加相談（1件）");
   expect(tileLabels()).toContain("契約・申込み（1件）");

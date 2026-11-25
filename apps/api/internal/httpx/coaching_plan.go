@@ -285,7 +285,7 @@ func (s *Server) createCoachingPlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.ServiceType != nil && *req.ServiceType == "video_review" {
-		FieldError(w, map[string]string{"service_type": "1回プランはプランとして出品できません。受付中にすると、選手が申込み時にあなたを選べます"})
+		FieldError(w, map[string]string{"service_type": "スタンダードプランはプランとして出品できません。受付中にすると、選手が申込み時にあなたを選べます"})
 		return
 	}
 	fields := req.supportFields(db.CoachingPlan{}, req.Published == nil || *req.Published)

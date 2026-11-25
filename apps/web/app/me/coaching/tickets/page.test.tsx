@@ -94,10 +94,10 @@ it("6枚5,000円の購入カードは商品名・価格・1行・ボタンだけ
   expect(card?.textContent).toContain("1回あたり約833円・有効期限6か月");
   expect(card?.textContent).not.toContain("1回ずつ払うと");
   expect(card?.querySelector("ul, li")).toBeNull();
-  for (const old of ["1枚で1回プラン1件を申し込めます", "有効期限は購入から6か月。過ぎると失効し、延長はしません", "購入した本人だけが使えます。譲渡はできません", "原則、購入者都合の払戻しはしません。"]) {
+  for (const old of ["1枚でスタンダードプラン1件を申し込めます", "有効期限は購入から6か月。過ぎると失効し、延長はしません", "購入した本人だけが使えます。譲渡はできません", "原則、購入者都合の払戻しはしません。"]) {
     expect(container.textContent).not.toContain(old);
   }
-  expect(container.textContent).not.toContain("1回プラン1件に1枚を使います。");
+  expect(container.textContent).not.toContain("スタンダードプラン1件に1枚を使います。");
   expect(card?.textContent).not.toContain("当社");
   expect(card?.querySelector("s, del")).toBeNull();
   expect(reviewButton()?.textContent).toBe("購入内容を確認する");
@@ -109,7 +109,7 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   await render();
   await act(async () => reviewButton()!.click());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
-  expect(confirm.textContent).toContain("1回プランのチケット6枚（1枚で1回プラン1件）。購入した本人だけが使えます。譲ることはできません。");
+  expect(confirm.textContent).toContain("スタンダードプランのチケット6枚（1枚でスタンダードプラン1件）。購入した本人だけが使えます。譲ることはできません。");
   expect(confirm.textContent).toContain("5,000円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
   expect(confirm.textContent).toContain("2027/05/20 10:00");
   // 最終確認にも例外4項目を番号付きで出す（本体 #572）。
@@ -118,8 +118,8 @@ it("購入の前に最終確認を出し、確定を押すまで支払いへ進�
   expect(confirm.textContent).toContain("（2）法令で認められる取消し・解除は");
   const refund = Array.from(confirm.querySelectorAll("dt")).find((label) => label.textContent === "払戻し")?.nextElementSibling;
   expect(refund?.textContent).toContain("確保したチケット1枚を戻します。これは確保の解除で、金銭の払戻しには当たりません。");
-  expect(refund?.textContent).toContain("（3）運営者またはコーチの責めに帰すべき事由で1回プランを受けられなかった場合、または運営者の都合で提供が著しく遅れた場合は、チケット1枚につき1,000円を返金します。");
-  expect(refund?.textContent).toContain("（4）運営者またはコーチの都合で有効期限内に1回プランを受けられなかったチケットは、失効後でも1枚につき1,000円を返金します。");
+  expect(refund?.textContent).toContain("（3）運営者またはコーチの責めに帰すべき事由でスタンダードプランを受けられなかった場合、または運営者の都合で提供が著しく遅れた場合は、チケット1枚につき1,000円を返金します。");
+  expect(refund?.textContent).toContain("（4）運営者またはコーチの都合で有効期限内にスタンダードプランを受けられなかったチケットは、失効後でも1枚につき1,000円を返金します。");
   expect(refund?.textContent).not.toMatch(/当社|チケットを戻すか返金/);
   expect(mocks.api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
