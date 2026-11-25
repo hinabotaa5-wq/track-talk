@@ -3,6 +3,7 @@ package httpx
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -142,7 +143,7 @@ func writeAssetReadyError(w http.ResponseWriter, err error, noun string) {
 	case errors.Is(err, cloudinary.ErrTooLarge):
 		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"はサイズの上限を超えています")
 	case errors.Is(err, cloudinary.ErrTooLong):
-		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"は30秒以内にしてください")
+		Error(w, http.StatusUnprocessableEntity, "validation_error", noun+"は"+strconv.Itoa(cloudinary.MaxCoachingSeconds)+"秒以内にしてください")
 	case errors.Is(err, cloudinary.ErrProcessing):
 		Error(w, http.StatusConflict, "processing", noun+"を処理しています。少し待ってからもう一度送ってください")
 	default:

@@ -107,7 +107,9 @@ it("「コーチを選ぶ」の見出しと選択ラジオを出さない", asyn
 it("動画欄には補足文を出さず、ファイル入力に aria-describedby を付けない（本体 #841）", async () => {
   mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
-  expect(container.textContent).toContain("動画（任意・");
+  // 申込の動画は必須で、上限は60秒（#1036）。ラベルに「任意」は付けない。
+  expect(container.textContent).toContain("動画（60秒まで）");
+  expect(container.textContent).not.toContain("動画（任意・");
   const input = container.querySelector<HTMLInputElement>('input[type="file"]');
   expect(input).not.toBeNull();
   expect(input?.hasAttribute("aria-describedby")).toBe(false);
@@ -737,7 +739,8 @@ it("通常チケットの確認は通常ロットの最速期限を出し、tick
 });
 
 
-it.each([false, true])("相談内容を必須にして申込を送る（動画あり=%s）", async (hasVideo) => {
+// 動画は必須（#1036）なので、動画を付けたうえで相談内容の必須を確かめる。
+it.each([true])("相談内容を必須にして申込を送る（動画あり=%s）", async (hasVideo) => {
   window.history.replaceState(null, "", "/coaching/new?coach=c1");
   mockReviewOpen([reviewCoach("c1")]);
   const mockRead = mocks.api.getMockImplementation()!;
@@ -747,7 +750,8 @@ it.each([false, true])("相談内容を必須にして申込を送る（動画�
     return mockRead(path, options);
   });
   await render();
-  expect(container.textContent).toContain("動画（任意・");
+  expect(container.textContent).toContain("動画（60秒まで）");
+  expect(container.textContent).not.toContain("動画（任意・");
   expect(container.textContent).not.toContain("悩みだけでも申し込めます。");
 
   if (hasVideo) {
@@ -858,7 +862,8 @@ const pendingStatus = () => confirmSection()?.querySelector('[role="status"]');
 
 // 申込みの画面を開いて、相談内容（と動画）を入れ、最終確認を開く。
 // sign は署名の取得の応答、request は /v1/coaching/requests の応答を返す。
-async function openReviewConfirm({ tickets = false, video = null as File | null, sign = async () => ({ public_id: "pre1" }) as unknown, request = async () => ({ id: "r1" }) as unknown }) {
+// 申込の動画は必須（#1036）なので、既定で動画を1本選んでから確認画面を開く。
+async function openReviewConfirm({ tickets = false, video = new File(["x"], "run.mp4", { type: "video/mp4" }) as File | null, sign = async () => ({ public_id: "pre1" }) as unknown, request = async () => ({ id: "r1" }) as unknown }) {
   window.history.replaceState(null, "", "/coaching/new?coach=c1");
   mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   mocks.api.mockImplementation(async (path: string) => {
@@ -1012,12 +1017,33 @@ it("先取りした署名でも、署名と違う public_id で上がったら�
   expect(container.textContent).toContain("アップロードに失敗しました");
 });
 
-it("B4: 動画なしの申込では署名を取りに行かない", async () => {
-  await openReviewConfirm({});
-  await pressConfirm();
-  expect(signCalls()).toBe(0);
-  expect(mocks.upload).not.toHaveBeenCalled();
-  expect(mocks.router.push).toHaveBeenCalledWith("/coaching/requests/r1");
+// W3（#1036）: 申込の動画は必須。動画を選ばないと確認画面へ進まず、署名も申込も送らない。カード・チケット・クーポンのどれでも同じ。
+it.each([
+  ["カード", "", 0, 0, "単発"],
+  ["チケット", "", 0, 2, "チケット（残り"],
+  ["クーポン", "&pay=coupon", 1, 0, "¥500クーポン"],
+] as const)("W3: 動画未選択では確認画面へ進まず「動画を選んでください」を出す（%s）", async (_label, search, coupons, tickets, chip) => {
+  await renderCoupons(search, coupons, tickets);
+  expect(pressed(chip)).toBe("true");
+  const declaration = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+  if (declaration && !declaration.checked) await act(async () => declaration.click());
+  const textarea = container.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "後半に失速します。");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => container.querySelector("form")!.requestSubmit());
+  await act(async () => {});
+  expect(confirmSection()).toBeNull();
+  expect(container.textContent).toContain("動画を選んでください");
+  expect(mocks.api.mock.calls.some(([path]) => String(path).startsWith("/v1/uploads/coaching-video"))).toBe(false);
+  expect(mocks.api.mock.calls.some(([path]) => path === "/v1/coaching/requests")).toBe(false);
+  // 動画を選べば従来どおり確認画面へ進める。
+  await pickVideo(new File(["x"], "run.mp4", { type: "video/mp4" }));
+  await act(async () => container.querySelector("form")!.requestSubmit());
+  await act(async () => {});
+  expect(confirmSection()).not.toBeNull();
+  expect(container.textContent).not.toContain("動画を選んでください");
 });
 
 it("#959: 動画送信・取り込み・保存からStripe遷移まで確認画面は待ちオーバーレイだけを出す", async () => {
@@ -1067,6 +1093,7 @@ it.each([true, false])("B4: 選手情報の任意4欄を確認画面と送信内
   mockReviewOpen([reviewCoach("c1")]);
   const mockRead = mocks.api.getMockImplementation()!;
   mocks.api.mockImplementation(async (path: string, options?: unknown) => {
+    if (path.startsWith("/v1/uploads/coaching-video")) return { public_id: "vid1" };
     if (path === "/v1/coaching/requests") return { id: "r1" };
     return mockRead(path, options);
   });
@@ -1093,6 +1120,8 @@ it.each([true, false])("B4: 選手情報の任意4欄を確認画面と送信内
     await setValue(inputs[2], "+1.2");
     await setValue(inputs[3], "前日に脚が張っていた");
   }
+  // 申込の動画は必須（#1036）。
+  await pickVideo(new File(["x"], "run.mp4", { type: "video/mp4" }));
   await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
   await act(async () => form.requestSubmit());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;

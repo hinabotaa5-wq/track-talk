@@ -120,7 +120,7 @@ func TestShrinkOriginalReplacesPublicVideoWithPlaybackDerived(t *testing.T) {
 func TestShrinkOriginalReplacesCoachingVideoFromSignedURL(t *testing.T) {
 	id := NewCoachingPublicID()
 	f := &fakeOriginals{details: map[string]string{
-		"/authenticated/" + id: `{"tags":["tt-original"],"derived":[{"transformation":"c_limit,w_1280,h_1280,q_auto,du_30/mp4","format":"mp4"}]}`,
+		"/authenticated/" + id: `{"tags":["tt-original"],"derived":[{"transformation":"c_limit,w_1280,h_1280,q_auto,du_60/mp4","format":"mp4"}]}`,
 	}}
 	c, done := newOriginalsClient(f, t)
 	defer done()

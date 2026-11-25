@@ -87,6 +87,7 @@ func TestReviewQuestionRejectsContactOnResubmit(t *testing.T) {
 	rec := doJSON(t, h, http.MethodPost, route, owner, map[string]any{
 		"tier": "coach", "event": "100m", "method": "card", "question": original,
 		"requested_coach_id": coachID, "guardian_permission": true,
+		"video_public_id": signedCoachingVideo(t, h, owner),
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatal(rec.Body.String())

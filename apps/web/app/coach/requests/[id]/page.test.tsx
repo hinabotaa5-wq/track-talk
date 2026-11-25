@@ -196,7 +196,7 @@ it("返答フォームの項目名は5つで直す点は1欄だけ", async () =>
   await renderPage();
   const form = responseForm();
   const labels = [...form.querySelectorAll("label > span.font-semibold")].map((s) => s.textContent);
-  expect(labels).toEqual(["一言診断", "良い点", "ボトルネック", "キュー", "おすすめのドリル", "成功の目安", "次に撮る動画", "見本動画（任意、30秒まで）"]);
+  expect(labels).toEqual(["一言診断", "良い点", "ボトルネック", "キュー", "おすすめのドリル", "成功の目安", "次に撮る動画", "見本動画（任意、60秒まで）"]);
   const text = container.textContent!;
   for (const stale of ["（1つ）", "（1つ目）", "（2つ目", "なくてもよい"]) {
     expect(text).not.toContain(stale);
