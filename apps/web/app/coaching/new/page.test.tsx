@@ -373,7 +373,7 @@ it("coach 指定なしの場合はコーチ一覧リンクを出し、送信時�
   expect(container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')).toBeNull();
 });
 
-it("受付中コーチ引き継ぎ時は種目チップを押しても選択が残る（種目は100mのみ）", async () => {
+it("受付中コーチ引き継ぎ時は種目チップを押しても選択が残る", async () => {
   window.history.replaceState(null, "", "/coaching/new?coach=c1");
   mockReviewOpen([reviewCoach("c9"), reviewCoach("c1")]);
   await render();
@@ -381,8 +381,97 @@ it("受付中コーチ引き継ぎ時は種目チップを押しても選択が�
   const eventChip = [...container.querySelectorAll("button")].find((b) => b.textContent === "100m")!;
   await act(async () => { eventChip.click(); });
   await act(async () => {});
+  expect(eventChip.getAttribute("aria-pressed")).toBe("true");
   expect(container.querySelector('[role="note"]')).toBeNull();
   expect(container.querySelector('a[href="/coaching"]')).toBeNull();
+});
+
+// 本体 #1035：申込で受け付ける種目は 100m／200m／400m。
+// nominees は申込種目を担当するコーチだけを返す（API の ListReviewNominees と同じ条件）。
+const sprintCoach = (id: string, events: string[]) => ({ ...reviewCoach(id), events });
+function mockReviewByEvent(coaches: ReturnType<typeof reviewCoach>[]) {
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) {
+      const event = new URLSearchParams(path.split("?")[1]).get("event") ?? "";
+      return { coaches: coaches.filter((c) => c.events.includes(event)) };
+    }
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: false };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 1000, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    if (path === "/v1/uploads/coaching-video") return { public_id: "pre1" };
+    if (path === "/v1/coaching/requests") return { id: "r1" };
+    throw new Error(`unexpected ${path}`);
+  });
+}
+const eventChips = () => [...(([...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent === "種目"))?.querySelectorAll("button") ?? [])];
+const eventChip = (label: string) => eventChips().find((b) => b.textContent === label)!;
+const apiPaths = () => mocks.api.mock.calls.map(([path]) => String(path));
+
+it("W1: 種目チップは 100m／200m／400m の3つがこの順で出て、初期選択は100m（本体 #1035）", async () => {
+  mockReviewByEvent([sprintCoach("c1", ["100m", "200m", "400m"])]);
+  await render();
+  await act(async () => {});
+  expect(eventChips().map((b) => b.textContent)).toEqual(["100m", "200m", "400m"]);
+  expect(eventChips().map((b) => b.getAttribute("aria-pressed"))).toEqual(["true", "false", "false"]);
+  expect(apiPaths()).toContain("/v1/coaching/nominees?event=100m");
+  expect(apiPaths().some((p) => p.startsWith("/v1/coaching/estimate") && p.includes("event=100m"))).toBe(true);
+});
+
+it("W2: 200m・400m のチップを押すと選択が移り、その種目で候補と返却目安を取り直す（本体 #1035）", async () => {
+  mockReviewByEvent([sprintCoach("c1", ["100m", "200m", "400m"])]);
+  await render();
+  await act(async () => {});
+  for (const label of ["200m", "400m"]) {
+    mocks.api.mockClear();
+    await act(async () => { eventChip(label).click(); });
+    await act(async () => {});
+    expect(eventChips().filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent)).toEqual([label]);
+    expect(apiPaths()).toContain(`/v1/coaching/nominees?event=${label}`);
+    expect(apiPaths().some((p) => p.startsWith("/v1/coaching/estimate") && p.includes(`event=${label}`))).toBe(true);
+  }
+});
+
+it("W3: 200m を選んで最終確認へ進むと「種目」行が200mになり、送る依頼の event も 200m（本体 #1035）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mockReviewByEvent([sprintCoach("c1", ["100m", "200m", "400m"])]);
+  await render();
+  await act(async () => {});
+  expect(eventChip("100m").getAttribute("aria-pressed")).toBe("true");
+  await act(async () => { eventChip("200m").click(); });
+  await act(async () => {});
+  expect(eventChip("200m").getAttribute("aria-pressed")).toBe("true");
+  expect(container.querySelector('[role="note"]')).toBeNull();
+  const textarea = container.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "後半に失速します。");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
+  await act(async () => container.querySelector("form")!.requestSubmit());
+  await act(async () => {});
+  const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
+  const dt = [...confirm.querySelectorAll("dt")].find((d) => d.textContent === "種目")!;
+  expect(dt.nextElementSibling?.textContent).toBe("200m");
+  await act(async () => { [...confirm.querySelectorAll("button")].find((b) => b.textContent === "確定してお支払いへ")!.click(); });
+  await act(async () => {});
+  const posted = mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests") as unknown as [string, { body: string }];
+  expect(JSON.parse(posted[1].body)).toMatchObject({ event: "200m", requested_coach_id: "c1" });
+});
+
+it("W4: ?coach= のコーチの担当が200m・400mなら、そのコーチを初期選択し、初期の種目は200m（本体 #1035）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c2");
+  mockReviewByEvent([sprintCoach("c1", ["100m"]), sprintCoach("c2", ["200m", "400m"])]);
+  await render();
+  await act(async () => {});
+  for (const label of ["100m", "200m", "400m"]) expect(apiPaths()).toContain(`/v1/coaching/nominees?event=${label}`);
+  expect(eventChips().filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent)).toEqual(["200m"]);
+  expect(container.querySelector('[role="note"]')).toBeNull();
+  expect(container.querySelector('a[href="/coaching"]')).toBeNull();
+  // 担当外の100mに切り替えると、受け付けていない注意が出る（従来の種目切替時の整合）。
+  await act(async () => { eventChip("100m").click(); });
+  await act(async () => {});
+  expect(container.querySelector('[role="note"]')?.textContent).toBe("このコーチは現在、スタンダードを受け付けていません");
 });
 
 it("24時間お知らせは新文言で枠なしに、お支払い方法の下に出て、旧文言は入力画面に出ない（本体 #841）", async () => {

@@ -1,8 +1,8 @@
 import { L } from "@/lib/i18n";
 import type { ClarifyReason, CoachEvent, HelpfulAnswer, ReviewFocus, ReviewInfoReason, ReviewPayMethod, ReviewRequest, ReviewStatus } from "./types";
 
-// 添削を受け付ける種目。最初は100mだけにし、コーチが増えたら足す（API の reviewEvents と合わせる）。
-export const reviewEvents: CoachEvent[] = ["100m"];
+// 添削を受け付ける種目。いまは100m・200m・400m（API の reviewEvents と同じ種目・同じ並びにする）。
+export const reviewEvents: CoachEvent[] = ["100m", "200m", "400m"];
 
 // 以前の依頼で選ばれた項目の表示名。
 const reviewFocusLabels: Record<ReviewFocus, string> = {

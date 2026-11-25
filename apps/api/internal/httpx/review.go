@@ -33,8 +33,8 @@ const (
 // 招待コードに使う文字。読み違えやすい 0/O と 1/I は外す。
 const demoCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-// 添削を受け付ける種目。最初は100mだけにし、コーチが増えたら足す。
-var reviewEvents = []string{"100m"}
+// 添削を受け付ける種目。いまは100m・200m・400m（Web の reviewEvents と同じ種目・同じ並びにする）。
+var reviewEvents = []string{"100m", "200m", "400m"}
 
 func validReviewEvent(event string) bool {
 	return oneOf(event, reviewEvents)
@@ -320,7 +320,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		fields["tier"] = "枠を選んでください"
 	}
 	if !validReviewEvent(req.Event) {
-		fields["event"] = "いまは100mだけ受け付けています"
+		fields["event"] = "いまは100m・200m・400mだけ受け付けています"
 	}
 	focus := []string{}
 	question := ""
