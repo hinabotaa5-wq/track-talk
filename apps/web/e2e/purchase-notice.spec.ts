@@ -22,7 +22,7 @@ for (const age of ["unregistered", "adult", "minor"]) {
    await route.fulfill({json:body});
   });
   await page.goto("/coaching/new");
-  await expect(page.getByRole("heading",{name:"スタンダードプラン（フォーム添削や競技に関する悩み）"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"スタンダード（フォーム添削や競技に関する悩み）"})).toBeVisible();
   const checkbox = page.getByRole("checkbox",{name:"未成年の方は保護者に許可を取ってください"});
   await expect(checkbox).toBeVisible();
   await expect(checkbox).not.toBeChecked();

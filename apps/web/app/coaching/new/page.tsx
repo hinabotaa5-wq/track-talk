@@ -169,7 +169,7 @@ export default function NewReviewRequestPage() {
       appliedCoachRef.current = requested;
       const accepting = lists.filter(({ coaches: list }) => (list ?? []).some((c) => c.id === requested));
       if (accepting.length === 0) {
-        setCoachNotice(L("このコーチは現在、スタンダードプランを受け付けていません"));
+        setCoachNotice(L("このコーチは現在、スタンダードを受け付けていません"));
         return;
       }
       const record = accepting.flatMap(({ coaches: list }) => list ?? []).find((c) => c.id === requested);
@@ -188,7 +188,7 @@ export default function NewReviewRequestPage() {
   // 種目切替時の整合：指定コーチが今の種目で受付中にいない（切替後など）ときも、
   // 送信を止めて枠なしの注意で分かるようにする（state を増やさず描画時に判定する）。
   const coachInactiveForEvent = !!coachID && !coachesLoading && !coachesError && !coaches.some((c) => c.id === coachID);
-  const visibleCoachNotice = coachNotice || (coachInactiveForEvent ? L("このコーチは現在、スタンダードプランを受け付けていません") : "");
+  const visibleCoachNotice = coachNotice || (coachInactiveForEvent ? L("このコーチは現在、スタンダードを受け付けていません") : "");
 
   async function loadMe() {
     try {
@@ -355,12 +355,12 @@ export default function NewReviewRequestPage() {
         {!estimate || estimate.payments ? null : (
           <p className="inline-flex rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-300">{L("デモ版")}</p>
         )}
-        <h1 className="text-2xl font-bold">{L("スタンダードプラン（フォーム添削や競技に関する悩み）")}</h1>
+        <h1 className="text-2xl font-bold">{L("スタンダード（フォーム添削や競技に関する悩み）")}</h1>
       </div>
 
       {!reviewOpen ? (
         <DemoCodeForm
-          intro={L("スタンダードプランは準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。")}
+          intro={L("スタンダードは準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。")}
           token={token}
           onJoined={() => void loadMe()}
         />
@@ -482,7 +482,7 @@ export default function NewReviewRequestPage() {
                     </div>
                   ) : null}
                   <TicketBalance summary={ticketSummary} />
-                  <p className="text-xs text-slate-300">{L("スタンダードプラン1件はチケット1枚です。")}</p>
+                  <p className="text-xs text-slate-300">{L("スタンダード1件はチケット1枚です。")}</p>
                   <Link href="/me/coaching/tickets?return_to=%2Fcoaching%2Fnew" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-blue-400/50 hover:bg-white/15 active:scale-[0.98]">
                     {ticketSummary.can_purchase ? L("チケットを購入・確認する") : L("コーチングチケット")}<ArrowRight className="size-4 text-blue-300" aria-hidden />
                   </Link>

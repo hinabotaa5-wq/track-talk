@@ -91,7 +91,7 @@ func TestReviewAuthorizationCancellationCompletionNotice(t *testing.T) {
 	}); rec.Code != http.StatusOK {
 		t.Fatalf("settings %d %s", rec.Code, rec.Body.String())
 	}
-	title, url := "スタンダードプランの仮押さえの取り消しが完了しました", "/coaching/requests/"+id
+	title, url := "スタンダードの仮押さえの取り消しが完了しました", "/coaching/requests/"+id
 	tickRefundNoticeTest(t, h)
 	assertRefundNotice(t, h, payer, title, url, pushes, 0)
 
@@ -132,7 +132,7 @@ func TestCapturedRefundCompletionNotice(t *testing.T) {
 			legacyReviewAmount(t, id)
 			execSQLArgs(t, "UPDATE review_payments SET status='captured',captured_at=now() WHERE request_id=$1", id)
 			subscribeRefundNoticeTest(t, h, payer, endpoint)
-			title, url := "スタンダードプランの返金が完了しました", "/coaching/requests/"+id
+			title, url := "スタンダードの返金が完了しました", "/coaching/requests/"+id
 			remoteID := "re_dashboard_notice"
 			event := func(status string, amount int) {
 				t.Helper()
@@ -276,7 +276,7 @@ func TestPendingReviewPayPayRefundCompletionNotice(t *testing.T) {
 	id := paidReview(t, h, payer, "paypay", intent)
 	legacyReviewAmount(t, id)
 	subscribeRefundNoticeTest(t, h, payer, endpoint)
-	title, url := "スタンダードプランの返金が完了しました", "/coaching/requests/"+id
+	title, url := "スタンダードの返金が完了しました", "/coaching/requests/"+id
 	f.mu.Lock()
 	f.ticketRefundStatus = "pending"
 	f.mu.Unlock()

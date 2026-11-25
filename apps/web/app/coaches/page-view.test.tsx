@@ -48,7 +48,7 @@ for (const locale of ["ja", "en"] as const) {
         expect(text).not.toContain("上のタブで、動画添削の指名とサポートプランを切り替えられます。");
         expect(text).not.toContain("Use the tabs above");
         expect(container.querySelector("h1")).toBeNull();
-        // 継続プランは休眠（本体 #1007）。?tab=support でもスタンダードプランの一覧を出し、継続プランの一覧は描画しない。
+        // 継続プランは休眠（本体 #1007）。?tab=support でもスタンダードの一覧を出し、継続プランの一覧は描画しない。
         expect(text).toContain("coach-list");
         expect(text).not.toContain("support-plan-list");
         for (const word of ["海外コーチ", "指導を受けたい", "Coaches overseas", "overseas coach", "coming soon"]) {

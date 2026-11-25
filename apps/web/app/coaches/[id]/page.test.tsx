@@ -77,7 +77,7 @@ async function render() {
 it("未ログインではフォーム添削の節と3つの入口を有効なまま出し、受付状態を取りに行かない", async () => {
   await render();
   expect(container.querySelector("h2#coach-video-review")?.textContent).toBe("フォーム添削や競技に関する悩み");
-  expect(container.textContent).not.toContain("スタンダードプラン（フォーム添削や競技に関する悩み）");
+  expect(container.textContent).not.toContain("スタンダード（フォーム添削や競技に関する悩み）");
   expect(container.querySelectorAll('section[aria-labelledby="coach-video-review"] [data-entry]')).toHaveLength(3);
   expect(entry("card")?.textContent).toBe("単発1,000円");
   expect(entryLink("card")).toBe(reviewHref("card"));
@@ -95,7 +95,7 @@ it("未ログインではフォーム添削の節と3つの入口を有効なま
   expect(mocks.api.mock.calls).toEqual([[`/v1/coaches/${coachID}`]]);
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("チケット");
-  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で5,000円です。スタンダードプランの申込み1件につき1枚消費します。");
+  expect(tickets?.querySelector("p")?.textContent).toBe("チケット6枚で5,000円です。スタンダードの申込み1件につき1枚消費します。");
   expect(tickets?.querySelector(`a[href="${ticketPurchaseHref}"]`)?.textContent).toBe("購入する");
   const purchaseClass = tickets?.querySelector("a")?.className ?? "";
   expect(purchaseClass).toContain("bg-blue-600");
@@ -307,15 +307,15 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   expect(container.textContent).toContain("Please select");
   expect(container.textContent).not.toContain("You can also ask for advice without a video.");
   expect(container.querySelector("h2#coach-video-review")?.textContent).toBe("Form feedback or concerns about competing");
-  expect(container.textContent).not.toContain("Standard Plan (form feedback or concerns about competing)");
+  expect(container.textContent).not.toContain("Standard (form feedback or concerns about competing)");
   expect(container.textContent).not.toContain("You can also pay with tickets");
   const tickets = container.querySelector('section[aria-labelledby="coach-tickets"]');
   expect(tickets?.querySelector("h2")?.textContent).toBe("Tickets");
-  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥5,000. One ticket is used per Standard Plan.");
+  expect(tickets?.querySelector("p")?.textContent).toBe("6 tickets for ¥5,000. One ticket is used per Standard request.");
   expect(tickets?.querySelector("a")?.textContent).toBe("Buy");
 });
 
-// 本体 #694 → #1007：継続プランは休眠。tab=support を含め、どのクエリでもフォーム添削（スタンダードプラン）の文脈で、
+// 本体 #694 → #1007：継続プランは休眠。tab=support を含め、どのクエリでもフォーム添削（スタンダード）の文脈で、
 // 継続プランの節（CoachServicePlans）は描画しない（B3）。
 const sectionIDs = () => [...container.querySelectorAll("section[aria-labelledby]")].map((s) => s.getAttribute("aria-labelledby"));
 const supportCoach: PublicCoach = {

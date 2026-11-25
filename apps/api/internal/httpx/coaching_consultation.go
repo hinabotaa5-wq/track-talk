@@ -256,7 +256,7 @@ func reviewConsultationLimit(ctx context.Context, q *db.Queries, reviewID uuid.U
 func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room consultationRoom) (int32, int16, bool, error) {
 	if room.review != nil && !s.cfg.ReviewConsultationSales {
 		// 1回プランの追加質問は販売を終了した（本体 #984）。相談の対象が添削（review）のときだけ止め、継続プランの追加相談（contract）は従来どおり。
-		return 0, 0, false, &ticketRuleError{"consultation_sales_ended", "スタンダードプランの追加質問は販売を終了しました"}
+		return 0, 0, false, &ticketRuleError{"consultation_sales_ended", "スタンダードの追加質問は販売を終了しました"}
 	}
 	if room.review != nil {
 		if err := reviewConsultationLimit(ctx, q, room.id); err != nil {
@@ -757,7 +757,7 @@ func (s *Server) actConsultation(w http.ResponseWriter, r *http.Request) {
 	clarifying := action == "clarify" || action == "clarification"
 	// 動画添削のあとの追加質問は質問1回・回答1回の一方通行なので、回答への確認・補足はない。
 	if clarifying && c.ReviewRequestID != nil {
-		Error(w, http.StatusConflict, "clarify_unavailable", "スタンダードプランの追加質問には、回答への確認・補足はありません")
+		Error(w, http.StatusConflict, "clarify_unavailable", "スタンダードの追加質問には、回答への確認・補足はありません")
 		return
 	}
 	// 回答・確認・補足は送信にあたるので、ゲートが閉じている間は止める。受諾・辞退・取り消しは止めない。

@@ -24,7 +24,7 @@ function Harness({ initialPillStatic = false }: { initialPillStatic?: boolean })
       label="切り替え"
       layoutId="test-pill"
       views={[
-        { id: "video", label: "スタンダードプラン" },
+        { id: "video", label: "スタンダード" },
         { id: "support", label: "継続プラン" },
       ] as const}
       current={current}
@@ -62,10 +62,10 @@ it("initialPillStatic では最初のピルはアニメーションなしで置�
   // 最初の表示では motion のピルではなく、最終位置に置いただけの span である。
   expect(pill()).not.toBeNull();
   expect(pill()?.hasAttribute("data-motion-pill")).toBe(false);
-  expect(pill()?.parentElement?.textContent).toContain("スタンダードプラン");
+  expect(pill()?.parentElement?.textContent).toContain("スタンダード");
   await act(async () => frameCallback?.(0));
   expect(pill()?.getAttribute("data-motion-pill")).toBe("test-pill");
-  expect(pill()?.parentElement?.textContent).toContain("スタンダードプラン");
+  expect(pill()?.parentElement?.textContent).toContain("スタンダード");
 });
 
 it("initialPillStatic のピルはフレーム後、切り替えで相手側へ移る", async () => {

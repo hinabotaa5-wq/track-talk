@@ -124,9 +124,9 @@ it("フォーム上部に価格ボックス（動画添削（動画1本））を
 it("デモの招待コード画面には販売者の表記とリンクを出さない", async () => {
   mocks.me = { demo: false, review_open: false, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   await render();
-  expect(container.querySelector("h1")?.textContent).toBe("スタンダードプラン（フォーム添削や競技に関する悩み）");
+  expect(container.querySelector("h1")?.textContent).toBe("スタンダード（フォーム添削や競技に関する悩み）");
   expect(container.textContent).not.toContain("コーチを選んで、動画を送ります");
-  expect(container.textContent).toContain("スタンダードプランは準備中です");
+  expect(container.textContent).toContain("スタンダードは準備中です");
   expect(container.querySelector('input[aria-label="招待コード"]')).not.toBeNull();
   expect(container.querySelector('button[type="submit"]')?.textContent).toBe("デモに参加する");
   expect(container.textContent).not.toContain("販売者:");
@@ -195,7 +195,7 @@ it("支払いのある環境では、招待コードなしで申込みの画面�
   await render();
   expect(container.querySelector("form")).not.toBeNull();
   expect(container.querySelector('input[aria-label="招待コード"]')).toBeNull();
-  expect(container.textContent).not.toContain("スタンダードプランは準備中です");
+  expect(container.textContent).not.toContain("スタンダードは準備中です");
 });
 
 it("チケットがなく販売中なら、お支払い方法に単発とチケット（6枚）の二択を出す（通常価格や打ち消し線は使わない）", async () => {
@@ -266,7 +266,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(container.textContent).not.toContain(contactMessage);
   await act(async () => { submit.form!.requestSubmit(); });
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]');
-  expect(confirm?.textContent).toContain("スタンダードプラン（動画1本・担当 テストコーチ）");
+  expect(confirm?.textContent).toContain("スタンダード（動画1本・担当 テストコーチ）");
   expect(confirm?.textContent).toContain("500円（税込）");
   const confirmDts = [...confirm!.querySelectorAll("dt")];
   const rowValue = (label: string) => confirmDts.find((d) => d.textContent === label)!.nextElementSibling as HTMLElement;
@@ -317,7 +317,7 @@ it("?coach= で受付中のコーチを初期選択する（本体 #643）", asy
   mockReviewOpen([reviewCoach("c9"), reviewCoach("c1")]);
   await render();
   await act(async () => {});
-  expect(container.textContent).not.toContain("このコーチは現在、スタンダードプランを受け付けていません");
+  expect(container.textContent).not.toContain("このコーチは現在、スタンダードを受け付けていません");
   expect(container.querySelector('a[href="/coaching"]')).toBeNull();
   expect(container.textContent).toContain("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケットは返還します。");
   expect(container.textContent).not.toContain("受付中のコーチには決済の確認後に依頼が届きます。");
@@ -340,7 +340,7 @@ it("?coach= のコーチが受付中でない場合は枠なしの明示を出�
   await render();
   await act(async () => {});
   const note = container.querySelector('[role="note"]');
-  expect(note?.textContent).toBe("このコーチは現在、スタンダードプランを受け付けていません");
+  expect(note?.textContent).toBe("このコーチは現在、スタンダードを受け付けていません");
   expect(note?.className).not.toMatch(/border|bg-/);
   expect(container.querySelector('a[href="/coaching"]')).not.toBeNull();
   expect(container.querySelector("form")).not.toBeNull();
@@ -568,7 +568,7 @@ it("チケット版の確認は4項目で、有効期限はお支払い行の中
     "お支払い",
     "キャンセル・チケットの戻り",
   ]);
-  expect(confirm.textContent).toContain("スタンダードプラン（動画1本・担当 コーチc1）");
+  expect(confirm.textContent).toContain("スタンダード（動画1本・担当 コーチc1）");
   expect(confirm.textContent).toContain("申し込みが確定してから24時間以内に回答が来ます（再提出時は再提出から24時間以内）");
   expect(confirm.textContent).toContain("有効期限");
   expect(confirm.textContent).toContain("2027");
@@ -666,7 +666,7 @@ it("入口の指定がなければチケットを選び、内訳は両方あれ�
   const free = button("無料チケット（残り 1 枚・いちばん早い有効期限 ")!;
   expect(free.getAttribute("aria-pressed")).toBe("true");
   expect(free.textContent).toContain("2027");
-  expect(container.textContent).toContain("スタンダードプラン1件はチケット1枚です。");
+  expect(container.textContent).toContain("スタンダード1件はチケット1枚です。");
   // 単発に切り替えると内訳は出ない。
   await act(async () => { button("単発")!.click(); });
   expect(button("通常チケット")).toBeUndefined();
@@ -769,7 +769,7 @@ it.each([false, true])("相談内容を必須にして申込を送る（動画�
   });
   await act(async () => form.requestSubmit());
   const confirm = container.querySelector('section[aria-labelledby="purchase-confirm-heading"]')!;
-  expect(confirm.textContent).toContain(hasVideo ? "スタンダードプラン（動画1本・担当 コーチc1）" : "スタンダードプラン（悩みのみ・担当 コーチc1）");
+  expect(confirm.textContent).toContain(hasVideo ? "スタンダード（動画1本・担当 コーチc1）" : "スタンダード（悩みのみ・担当 コーチc1）");
   const videoDd = [...confirm.querySelectorAll("dt")].find((d) => d.textContent === "動画")!.nextElementSibling!;
   expect(videoDd.textContent).toBe(hasVideo ? "run.mp4（1 B）" : "なし");
   await act(async () => confirm.querySelector("button")!.click());

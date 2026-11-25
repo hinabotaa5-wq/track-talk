@@ -275,7 +275,7 @@ it.each([true, false])("コーチングセクションは coachingEnabled=%s で
     expect(container.querySelector(`a[href="${href}"]`)).toBeNull();
   }
   expect(container.textContent).not.toContain("コーチングチケット");
-  expect(container.textContent).not.toContain("依頼したスタンダードプラン");
+  expect(container.textContent).not.toContain("依頼したスタンダード");
   expect(container.textContent).not.toContain("申し込んだ継続プラン");
   // 他の要素は従来どおり残る。
   expect(container.querySelector('a[href="/me/posts"]')).not.toBeNull();

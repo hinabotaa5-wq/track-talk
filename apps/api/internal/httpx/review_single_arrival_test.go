@@ -17,7 +17,7 @@ func arrivalBellCounts(t *testing.T, h http.Handler, coachToken string, coach uu
 		[]any{requestID, coach}, &offer)
 	items := coachingNotifications(t, h, coachToken)
 	for _, n := range items {
-		if n.Title == "スタンダードプランの依頼が届きました" {
+		if n.Title == "スタンダードの依頼が届きました" {
 			workOrder++
 			if !strings.HasSuffix(n.URL, "#work-order") {
 				t.Fatalf("arrival bell URL %q does not end with #work-order", n.URL)
@@ -70,7 +70,7 @@ func TestReviewSingleArrivalCard(t *testing.T) {
 	if n := arrivalPushCount(t, coach, id); n != 1 {
 		t.Fatalf("arrival push rows = %d, want 1", n)
 	}
-	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードプランの依頼が届きました")
+	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードの依頼が届きました")
 }
 
 // TestReviewSingleArrivalTicket は本体 #745 の項目4：チケット利用の申込でも項目1と同じく
@@ -101,7 +101,7 @@ func TestReviewSingleArrivalTicket(t *testing.T) {
 	if n := arrivalPushCount(t, coach, id); n != 1 {
 		t.Fatalf("arrival push rows = %d, want 1", n)
 	}
-	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードプランの依頼が届きました")
+	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードの依頼が届きました")
 }
 
 // TestReviewSingleArrivalRequeue は本体 #745 の項目5：待機キューからの再割当（offerReview 経由）でも
@@ -170,7 +170,7 @@ func TestReviewSingleArrivalNotificationsOff(t *testing.T) {
 	if n := arrivalPushCount(t, coach, id); n != 0 {
 		t.Fatalf("arrival push rows when off = %d, want 0", n)
 	}
-	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードプランの依頼が届きました")
+	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードの依頼が届きました")
 }
 
 // TestReviewSingleArrivalTicketNotificationsOff はフォローアップの項目2：通知オフ＋
@@ -204,7 +204,7 @@ func TestReviewSingleArrivalTicketNotificationsOff(t *testing.T) {
 	if n := arrivalPushCount(t, coach, id); n != 0 {
 		t.Fatalf("arrival push rows when off = %d, want 0", n)
 	}
-	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードプランの依頼が届きました")
+	assertWorkOrderDelivered(t, h, coachToken, "review_request_id", id, "/coach/requests/"+id+"#work-order", "スタンダードの依頼が届きました")
 }
 
 // TestReviewSingleArrivalRequeueNotificationsOff はフォローアップの項目3：通知オフ＋

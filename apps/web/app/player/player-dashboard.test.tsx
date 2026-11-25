@@ -57,10 +57,10 @@ const labels = () => tiles().map((a) => a.querySelector(".coach-tile-label")?.te
 const hrefs = ["/me/coaching/requests", "/me/coaching/tickets", "/me/push"];
 const badgeClass = "absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white";
 
-it("ログイン済みでは見出し『選手』と3つのタイル（スタンダードプラン・チケット・通知）が順番どおりに出る（本体 #1007 B4）", async () => {
+it("ログイン済みでは見出し『選手』と3つのタイル（スタンダード・チケット・通知）が順番どおりに出る（本体 #1007 B4）", async () => {
   await render();
   expect(container.querySelector("h1")?.textContent).toBe("選手");
-  expect(tiles().map((a) => a.textContent)).toEqual(["スタンダードプラン", "チケット", "通知"]);
+  expect(tiles().map((a) => a.textContent)).toEqual(["スタンダード", "チケット", "通知"]);
   expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
   // 継続プランは休眠。継続プラン・無料相談のタイルは出さない。
   expect(container.querySelector('a[href="/me/coaching/personal"]')).toBeNull();
@@ -117,7 +117,7 @@ it("件数があるタイルにだけ、その数字の赤バッジが出る（�
     expect(tile.querySelectorAll("span").length).toBeLessThanOrEqual(2);
   }
   // 順序・行き先・ラベルは従来どおり。
-  expect(labels()).toEqual(["スタンダードプラン", "チケット", "通知"]);
+  expect(labels()).toEqual(["スタンダード", "チケット", "通知"]);
   expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
 });
 
@@ -143,7 +143,7 @@ it("取得に失敗してもバッジを出さないだけで、タイルは従�
   await render();
   expect(badges()).toEqual([null, null, null]);
   expect(tiles().map((a) => a.getAttribute("href"))).toEqual(hrefs);
-  expect(labels()).toEqual(["スタンダードプラン", "チケット", "通知"]);
+  expect(labels()).toEqual(["スタンダード", "チケット", "通知"]);
   expect(navigation.replace).not.toHaveBeenCalled();
 });
 
@@ -180,7 +180,7 @@ it("token が無いときは取得せず、バッジも出さない", async () =
 it("件数があるタイルの aria-label は「{ラベル}（{件数}件）」、0件タイルはラベルのみ", async () => {
   apiFetch.mockResolvedValue(counts({ one: 2, ticket: 3 }));
   await render();
-  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["スタンダードプラン（2件）", "チケット（3件）", null]);
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["スタンダード（2件）", "チケット（3件）", null]);
 });
 
 it("英語では aria-label が \"{label} ({count})\" になる", async () => {
@@ -188,7 +188,7 @@ it("英語では aria-label が \"{label} ({count})\" になる", async () => {
   setActiveLocale("en");
   apiFetch.mockResolvedValue(counts({ one: 2, ticket: 3 }));
   await render();
-  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["Standard Plan (2)", "Tickets (3)", null]);
+  expect(tiles().map((a) => a.getAttribute("aria-label"))).toEqual(["Standard (2)", "Tickets (3)", null]);
 });
 
 it("未ログインでは /login?next=/player へ寄せ、タイルを出さない", async () => {
@@ -213,7 +213,7 @@ it("英語ではタイル名が既存キーの訳になる", async () => {
   setActiveLocale("en");
   await render();
   expect(container.querySelector("h1")?.textContent).toBe("Athlete");
-  expect(tiles().map((a) => a.textContent)).toEqual(["Standard Plan", "Tickets", "Notifications"]);
+  expect(tiles().map((a) => a.textContent)).toEqual(["Standard", "Tickets", "Notifications"]);
 });
 
 // ---- 本体 #1009：表示中の利用者の分だけを出す ----

@@ -617,7 +617,7 @@ it("お支払い待ちのキャンセルは専用の本文で確認し、取り�
     expect(payButtons()).toBeGreaterThan(0);
     await click(cancelButton(container)!);
     expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
-      title: "スタンダードプランの依頼をキャンセルしますか？",
+      title: "スタンダードの依頼をキャンセルしますか？",
       body: "まだお支払いは済んでいません。取り消すと、この依頼ではお支払いができなくなります。",
       confirmLabel: "依頼をキャンセルする",
     }));
@@ -871,7 +871,7 @@ it("対応中は依頼内容だけで空の回答ドキュメントを出さず�
     expect([...container.querySelectorAll("h3")].some((h) => h.textContent === "良い点")).toBe(false);
     const deadline = [...container.querySelectorAll("p")].find((p) => p.textContent?.startsWith("返却期限:"))!;
     expect(deadline.previousElementSibling?.textContent).toMatch(/^送った日時 /);
-    expect(deadline.parentElement?.querySelector("h1")?.textContent).toBe("スタンダードプラン");
+    expect(deadline.parentElement?.querySelector("h1")?.textContent).toBe("スタンダード");
     expect(deadline.className).toBe(deadline.previousElementSibling?.className);
     expect(deadline.parentElement?.className).not.toContain("bg-");
     expect([...container.querySelectorAll("button")].some((b) => b.textContent === "依頼をキャンセルする")).toBe(true);
@@ -915,7 +915,7 @@ it.each(["authorized", "captured", "canceled", "refunded"])("A1–A3: %s でも�
     } });
     try {
       const heading = container.querySelector("h1")!;
-      expect(heading.textContent).toBe("スタンダードプラン");
+      expect(heading.textContent).toBe("スタンダード");
       const sent = heading.nextElementSibling!;
       expect(sent.textContent).toBe("送った日時 2026/11/19 6:00");
       expect(sent.nextElementSibling?.textContent).toBe("返却期限: 2026/11/21 6:00");

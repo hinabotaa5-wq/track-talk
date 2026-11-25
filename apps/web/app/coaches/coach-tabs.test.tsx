@@ -6,7 +6,7 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 // /coaching と /coaches で共有する一覧の切り替え。共通部品 ViewSwitch を使い、見出しと説明文は出さない。
-// 継続プランは休眠させたので（本体 #1007）、選択肢はスタンダードプランだけで、継続プランの一覧は描画しない。
+// 継続プランは休眠させたので（本体 #1007）、選択肢はスタンダードだけで、継続プランの一覧は描画しない。
 const apiFetch = vi.fn();
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), tab: null as string | null, pathname: "/coaches" }));
 const auth = { token: "tok" as string | null };
@@ -52,29 +52,29 @@ const panels = () => [...container.querySelectorAll('[role="tabpanel"] > div')] 
 const coachButton = () => [...container.querySelectorAll('a[href="/coach"]')].find((a) => a.getAttribute("aria-label") === "コーチ");
 const playerButton = () => [...container.querySelectorAll('a[href="/player"]')].find((a) => a.getAttribute("aria-label") === "選手");
 
-it("既定はスタンダードプランの一覧で、見出しと説明文は出さない", async () => {
+it("既定はスタンダードの一覧で、見出しと説明文は出さない", async () => {
   await render();
   expect(panels()).toHaveLength(1);
   expect(fetchCount("/v1/coaches")).toBe(1);
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
   expect(container.querySelector("h1")).toBeNull();
-  expect(container.textContent).not.toContain("スタンダードプラン（フォーム添削や競技に関する悩み）");
+  expect(container.textContent).not.toContain("スタンダード（フォーム添削や競技に関する悩み）");
   expect(container.textContent).not.toContain("フォームを見てほしい場合は動画を添えてください。悩みだけでも申し込めます。");
   expect(container.textContent).not.toContain("コーチ一覧");
-  expect(switchLink("スタンダードプラン")?.getAttribute("href")).toBe("/coaches");
-  expect(switchLink("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
+  expect(switchLink("スタンダード")?.getAttribute("href")).toBe("/coaches");
+  expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
 });
 
-// 本体 #1007 B1：継続プランは休眠。切り替えに出るのはスタンダードプランだけで、SupportPlanList は描画しない。
+// 本体 #1007 B1：継続プランは休眠。切り替えに出るのはスタンダードだけで、SupportPlanList は描画しない。
 for (const supportList of [true, false]) {
-  it(`切り替えの選択肢はスタンダードプランだけで、?tab=support でもスタンダードプラン側を出す（一覧フラグ=${supportList}）`, async () => {
+  it(`切り替えの選択肢はスタンダードだけで、?tab=support でもスタンダード側を出す（一覧フラグ=${supportList}）`, async () => {
     flags.supportList = supportList;
     navigation.tab = "support";
     await render();
     const options = [...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent);
-    expect(options).toEqual(["スタンダードプラン"]);
+    expect(options).toEqual(["スタンダード"]);
     expect(switchLink("継続プラン")).toBeUndefined();
-    expect(switchLink("スタンダードプラン")?.getAttribute("aria-current")).toBe("page");
+    expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
     expect(panels()).toHaveLength(1);
     expect(panels()[0].hidden).toBe(false);
     expect(fetchCount("/v1/coaches")).toBe(1);
@@ -88,10 +88,10 @@ it("英語でも見出しを出さず、切り替えの選択肢は英語にな�
   installEnglish(en);
   setActiveLocale("en");
   await render();
-  expect(switchLink("Standard Plan")?.getAttribute("href")).toBe("/coaches");
+  expect(switchLink("Standard")?.getAttribute("href")).toBe("/coaches");
   expect(switchLink("Ongoing plan")).toBeUndefined();
   expect(container.textContent).not.toContain("Coaches");
-  expect(container.textContent).not.toContain("Standard Plan (form feedback or concerns about competing)");
+  expect(container.textContent).not.toContain("Standard (form feedback or concerns about competing)");
   expect(container.textContent).not.toContain("Attach a video if you would like form feedback. You can also ask for advice without a video.");
 });
 
@@ -99,8 +99,8 @@ for (const pathname of ["/coaching", "/coaches"]) {
   it(`${pathname} では切り替えのリンク先が ${pathname} のままで、押しても画面遷移しない`, async () => {
     navigation.pathname = pathname;
     await render();
-    expect(switchLink("スタンダードプラン")?.getAttribute("href")).toBe(pathname);
-    await act(async () => switchLink("スタンダードプラン")!.click());
+    expect(switchLink("スタンダード")?.getAttribute("href")).toBe(pathname);
+    await act(async () => switchLink("スタンダード")!.click());
     expect(replaceState).not.toHaveBeenCalled();
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(navigation.push).not.toHaveBeenCalled();
@@ -159,7 +159,7 @@ it("取得に失敗したらストップウォッチを消してエラーを出�
   await render();
   expect(container.querySelector(".page-loading-screen")).toBeNull();
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("読み込みに失敗しました");
-  expect(switchLink("スタンダードプラン")).not.toBeUndefined();
+  expect(switchLink("スタンダード")).not.toBeUndefined();
   expect(coachButton()?.getAttribute("href")).toBe("/coach");
   expect(fetchCount("/v1/coaches")).toBe(1);
 });
@@ -183,7 +183,7 @@ it("初回の取得が終わるまで切り替えとコーチボタンを出さ�
   await render();
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
   expect(container.querySelector('[role="status"]')).not.toBeNull();
-  expect(switchLink("スタンダードプラン")).toBeUndefined();
+  expect(switchLink("スタンダード")).toBeUndefined();
   expect(coachButton()).toBeUndefined();
   expect(playerButton()).toBeUndefined();
   expect(container.querySelector('[role="radio"]')).toBeNull();

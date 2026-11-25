@@ -46,27 +46,27 @@ const render = async () => {
 const stopwatches = () => [...container.querySelectorAll('[role="status"]')];
 
 // §5.1：初回読み込み中（1回プラン）はストップウォッチだけになる。
-it("初回読み込み中（スタンダードプラン）はストップウォッチだけで、バナー・タブ・ボタン・チップは出ない", async () => {
+it("初回読み込み中（スタンダード）はストップウォッチだけで、バナー・タブ・ボタン・チップは出ない", async () => {
   await render();
   expect(stopwatches()).toHaveLength(1);
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
   expect(container.textContent).not.toContain("2人に紹介すると、1回(1000円)無料！");
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
-  expect(container.textContent).not.toContain("スタンダードプランの都度払いやチケットの購入で、紹介IDが発行されます。");
-  expect(container.textContent).not.toContain("スタンダードプラン");
+  expect(container.textContent).not.toContain("スタンダードの都度払いやチケットの購入で、紹介IDが発行されます。");
+  expect(container.textContent).not.toContain("スタンダード");
   expect(container.textContent).not.toContain("継続プラン");
   expect(container.textContent).not.toContain("コーチ");
   expect(container.querySelector('[role="radio"]')).toBeNull();
 });
 
-// §5.2 → 本体 #1007：継続プランは休眠。?tab=support でもスタンダードプランの一覧を読み込み、継続プランの一覧は取得しない。
-it("?tab=support でも初回読み込み中はスタンダードプランの一覧を待つストップウォッチだけで、継続プランの一覧は取得しない", async () => {
+// §5.2 → 本体 #1007：継続プランは休眠。?tab=support でもスタンダードの一覧を読み込み、継続プランの一覧は取得しない。
+it("?tab=support でも初回読み込み中はスタンダードの一覧を待つストップウォッチだけで、継続プランの一覧は取得しない", async () => {
   navigation.tab = "support";
   await render();
   expect(stopwatches()).toHaveLength(1);
   expect(container.querySelector(".page-loading-screen")).not.toBeNull();
   expect(container.textContent).not.toContain("2人に紹介すると、1回(1000円)無料！");
-  expect(container.textContent).not.toContain("スタンダードプラン");
+  expect(container.textContent).not.toContain("スタンダード");
   expect(container.textContent).not.toContain("継続プラン");
   expect(container.querySelector('[role="radio"]')).toBeNull();
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches")).toBe(true);
@@ -74,7 +74,7 @@ it("?tab=support でも初回読み込み中はスタンダードプランの一
   await act(async () => finishCoaches({ coaches: [] }));
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   expect(container.querySelector(".page-loading-screen")).toBeNull();
-  expect(container.textContent).toContain("スタンダードプラン");
+  expect(container.textContent).toContain("スタンダード");
   expect(container.textContent).not.toContain("継続プラン");
 });
 
@@ -86,7 +86,7 @@ it("英語でも初回読み込み中はストップウォッチだけで、バ�
   expect(stopwatches()).toHaveLength(1);
   expect(container.textContent).not.toContain("Refer 2 people, get 1 free (¥500)!");
   expect(container.textContent).not.toContain("Refer two friends and get a free review!");
-  expect(container.textContent).not.toContain("Standard Plan");
+  expect(container.textContent).not.toContain("Standard");
   expect(container.textContent).not.toContain("Ongoing plan");
 });
 
@@ -99,7 +99,7 @@ it("読み込み完了後はバナー・タブ切り替え・一覧が出て、�
   expect(container.textContent).toContain("2人に紹介すると、1回(1000円)無料！");
   expect(container.textContent).not.toContain("友達2人に紹介すると、1回無料！");
   expect(container.textContent).not.toContain("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると");
-  expect(container.textContent).toContain("スタンダードプラン");
+  expect(container.textContent).toContain("スタンダード");
   // 継続プランは休眠（本体 #1007）。切り替えに継続プランの選択肢は出さない。
   expect(container.textContent).not.toContain("継続プラン");
   expect(container.querySelector('[role="group"][aria-label="コーチの一覧を切り替える"]')).not.toBeNull();

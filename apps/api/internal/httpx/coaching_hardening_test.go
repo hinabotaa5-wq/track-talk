@@ -452,7 +452,7 @@ func TestPaidReviewOfferNotifiesCoachThroughTick(t *testing.T) {
 	var dedup, title, body string
 	queryRowArgs(t, `SELECT dedup_key, title, body FROM push_outbox WHERE profile_id = $1 AND dedup_key LIKE 'review_assigned:%'`, []any{coach}, &dedup, &title, &body)
 	// 到着の知らせは表題1行だけで、本文は空（本体 #609）。
-	if title != "スタンダードプランの依頼が届きました" || body != "" {
+	if title != "スタンダードの依頼が届きました" || body != "" {
 		t.Fatalf("offer push text %q %q", title, body)
 	}
 	if status, _ := outboxStatus(t, dedup); status != "pending" {

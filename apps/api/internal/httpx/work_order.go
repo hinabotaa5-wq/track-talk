@@ -24,7 +24,8 @@ import (
 // 4: お知らせ(ベル)の文面を「依頼が届いた」の1行だけにし、9項目の全文は依頼の画面にだけ出す形にした(本体 #609)。
 // 5: 極短文面(本体 #625)。委託者・受託者は役割表示のみで個人名を出さない。3条の9要素は8行にまとめる(支払期日と支払方法は「支払」1行)。
 // 7: 表示名を「1回プラン」から「スタンダードプラン」に改めた(本体 #1007)。
-const workOrderTermsVersion = 7
+// 8: 表示名から「プラン」を外し「スタンダード」とした(本体 #1018)。
+const workOrderTermsVersion = 8
 
 type workOrderItem struct {
 	Label string `json:"label"`
@@ -83,7 +84,7 @@ func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return workOrderTerms{}, err
 	}
-	work := fmt.Sprintf("スタンダードプラン（%s）。競技に関する悩みに文章で回答", rr.Event)
+	work := fmt.Sprintf("スタンダード（%s）。競技に関する悩みに文章で回答", rr.Event)
 	if rr.VideoPublicID != nil {
 		work = fmt.Sprintf("動画1本の添削（%s）。相談に答えて文章で返却", rr.Event)
 	}
@@ -97,7 +98,7 @@ func consultationWorkOrderTerms(c db.CoachingConsultation, consignedAt time.Time
 	if c.AnswerBy != nil {
 		deliverBy = *c.AnswerBy
 	}
-	work := "スタンダードプランの追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える"
+	work := "スタンダードの追加質問。利用者の質問1件に、文章（実践動画は任意）で1回答える"
 	return buildWorkOrderTerms(work, int32(int64(c.PriceYen)*int64(c.SharePercent)/100), deliverBy, consignedAt)
 }
 
@@ -126,7 +127,7 @@ func saveWorkOrder(ctx context.Context, q *db.Queries, kind string, review, cons
 // お知らせは「何が届いたか」の1行だけにして本文は空にし、9項目の全文は開く先の依頼の画面
 // (コーチ本人だけが見られる)にだけ出す(本体 #609)。
 func workOrderNotice(kind string, roomID uuid.UUID) (title, body, url string) {
-	title = "スタンダードプランの依頼が届きました"
+	title = "スタンダードの依頼が届きました"
 	if kind == "consultation" {
 		title = "追加質問が届きました"
 	}
