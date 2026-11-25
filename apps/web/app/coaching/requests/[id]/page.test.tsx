@@ -223,7 +223,7 @@ it("未評価の返却済み依頼でも依頼の一覧へ遷移できる", asyn
   }
 });
 
-it("未評価の返却済み依頼でもコーチのプロフィールへ遷移できる", async () => {
+it("A1: 未評価の返却済み依頼でもコーチのプロフィールへのリンクは当面出さない（本体 #1020）", async () => {
   apiFetch.mockImplementation(async (path: string) => {
     const consultations = mockConsultationsEmpty(path);
     if (consultations !== undefined) return consultations;
@@ -232,32 +232,26 @@ it("未評価の返却済み依頼でもコーチのプロフィールへ遷移�
   });
   const { container, root } = await renderPage();
   try {
-    const profile = container.querySelector('a[href="/coaches/coach-1"]');
-    expect(profile).not.toBeNull();
-    expect(container.querySelectorAll('a[href^="/coaches/"]')).toHaveLength(1);
-    expect(profile!.textContent).toBe("このコーチのプロフィールを見る");
-    const header = container.querySelector("h1")!.parentElement!.parentElement!;
-    expect(header.lastElementChild).toBe(profile);
+    expect(container.querySelectorAll('a[href^="/coaches/"]')).toHaveLength(0);
+    expect(container.textContent).not.toContain("このコーチのプロフィールを見る");
+    const heading = container.querySelector("h1")!;
+    expect(heading.textContent).toBe("スタンダード");
+    const header = heading.parentElement!.parentElement!;
     expect(header.classList).toContain("items-start");
     expect(header.classList).toContain("justify-between");
+    expect(header.children).toHaveLength(1);
     expect(header.firstElementChild!.textContent).toContain("送った日時");
-    for (const cls of ["inline-flex", "min-h-9", "items-center", "rounded-full", "border", "border-white/25", "bg-white/10", "text-sm", "text-blue-300", "transition", "active:scale-[0.98]"]) {
-      expect(profile!.classList).toContain(cls);
-    }
-    expect(profile!.classList).not.toContain("underline");
     const question = [...container.querySelectorAll("p")].find((p) => p.textContent === "スタートの姿勢について")!;
     const response = [...container.querySelectorAll("h3")].find((h) => h.textContent === "良い点")!;
-    for (const element of [container.querySelector("video")!, question, response]) {
-      expect(profile!.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    }
+    expect(container.querySelector("video")).not.toBeNull();
+    expect(response).toBeDefined();
     // 依頼内容のすぐ後に、1枚の回答ドキュメントが続く（本体 #984）。
     expect(question.closest("section[aria-label]")!.nextElementSibling).toBe(response.closest("article"));
-    const outside = container.textContent!.replace(response.closest("article")!.textContent!, "").replace(profile!.textContent!, "");
+    const outside = container.textContent!.replace(response.closest("article")!.textContent!, "");
     for (const text of ["テストコーチ", "100m", "10秒台", "実績"]) {
       expect(outside).not.toContain(text);
     }
-    await click(profile!);
-    expect(routerMock.push).toHaveBeenCalledWith("/coaches/coach-1");
+    expect(routerMock.push).not.toHaveBeenCalledWith("/coaches/coach-1");
   } finally {
     await teardown(root, container);
   }
@@ -949,7 +943,8 @@ it.each(["returned", "expired", "awaiting_payment"])("A5・A6・A8: %s の既存
     expect([...container.querySelectorAll("p")].some((p) => p.textContent === "返却済み")).toBe(false);
     if (status === "returned") {
       expect(container.textContent).toContain("腕振り");
-      expect(container.querySelector('a[href="/coaches/coach-1"]')?.textContent).toBe("このコーチのプロフィールを見る");
+      expect(container.querySelector('a[href^="/coaches/"]')).toBeNull();
+      expect(container.textContent).not.toContain("このコーチのプロフィールを見る");
     }
     if (status === "expired") expect(container.querySelector('a[href="/coaching/new"]')?.textContent).toBe("別のコーチを選んで申し込む");
     if (status === "awaiting_payment") {
@@ -1002,25 +997,31 @@ it("返答前は詳細リンクを出さず、選んだコーチの中央表示�
   } finally { await teardown(root, container); }
 });
 
-it("運営非表示の返答でも詳細リンクを維持しIDをエンコードする", async () => {
+it("A3: 運営非表示の返答でも詳細リンクは出さず、非表示の案内は従来どおり出す", async () => {
   apiFetch.mockImplementation(async (path: string) => mockConsultationsEmpty(path) ?? baseRequest({
     response: { hidden: true }, coach: { id: "coach/1" },
   }));
   const { container, root } = await renderPage();
   try {
-    expect(container.querySelector('a[href="/coaches/coach%2F1"]')).not.toBeNull();
+    expect(container.querySelector('a[href^="/coaches/"]')).toBeNull();
+    expect(container.textContent).not.toContain("このコーチのプロフィールを見る");
     expect(container.textContent).toContain("この返答は運営が非表示にしました。");
   } finally { await teardown(root, container); }
 });
 
-it("英語表示では右上リンクに既存の英訳を使う", async () => {
+it("A4: 英語表示でも右上リンクは出さず、見出しと返答は英語で出す", async () => {
   installEnglish(en);
   setActiveLocale("en");
   apiFetch.mockImplementation(async (path: string) => mockConsultationsEmpty(path) ?? baseRequest({ coach: { id: "coach-1" } }));
   const { container, root } = await renderPage();
   try {
-    const profile = container.querySelector('a[href="/coaches/coach-1"]')!;
-    expect(profile.textContent).toBe("View this coach's profile");
-    expect(container.querySelector("h1")!.parentElement!.parentElement!.lastElementChild).toBe(profile);
+    expect(container.querySelector('a[href^="/coaches/"]')).toBeNull();
+    expect(container.textContent).not.toContain(en["このコーチのプロフィールを見る"]);
+    expect(container.textContent).not.toContain("View this coach's profile");
+    const heading = container.querySelector("h1")!;
+    expect(heading.textContent).toBe(en["スタンダード"]);
+    expect(heading.nextElementSibling?.textContent).toMatch(/^Sent /);
+    expect(heading.parentElement!.parentElement!.children).toHaveLength(1);
+    expect([...container.querySelectorAll("h3")].some((h) => h.textContent === en["良い点"])).toBe(true);
   } finally { await teardown(root, container); }
 });

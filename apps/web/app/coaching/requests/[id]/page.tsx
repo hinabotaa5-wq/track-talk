@@ -17,7 +17,6 @@ import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaratio
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { coachingCoachListEnabled } from "@/lib/features";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { useMinorDeclaration } from "@/lib/minor-purchase";
 import { availableReviewPayMethods, helpfulLabels, reviewQuestionText, reviewVideosPurgedNote } from "@/lib/review";
@@ -298,11 +297,6 @@ function ReviewRequestView() {
             <p className="text-sm text-slate-300">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
           ) : null}
         </div>
-        {request.coach?.id && coachingCoachListEnabled ? (
-          <Link href={`/coaches/${encodeURIComponent(request.coach.id)}`} className="inline-flex min-h-9 items-center rounded-full border border-white/25 bg-white/10 px-4 text-sm font-medium text-blue-300 transition active:scale-[0.98]">
-            {L("このコーチのプロフィールを見る")}
-          </Link>
-        ) : null}
       </div>
 
       {canCancel ? <Button type="button" variant="secondary" disabled={canceling} onClick={() => void cancelReview()}>{L("依頼をキャンセルする")}</Button> : null}
