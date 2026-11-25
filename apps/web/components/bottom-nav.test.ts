@@ -8,6 +8,12 @@ describe("mainTabHref", () => {
     expect(activeMainTab("/me/sense")).toBe("memo");
     expect(activeMainTab("/injury/hamstring-strain")).toBe("injury");
   });
+  it("紹介の説明ページ（/referral）はコーチタブに所属する（#1028）", () => {
+    expect(activeMainTab("/referral")).toBe("coaching");
+  });
+  it("URLだけで所属を判断できない詳細や対象外のパスは、従来どおり所属なし（#1028）", () => {
+    for (const path of ["/posts/post-1", "/referral/x", "/referrals", "/login", "/me/profile", "/admin"]) expect(activeMainTab(path), path).toBe("");
+  });
   it("下のメニューは コーチ→メモ→大会→ケガ の順（フィードは当面閉じる #1008）", () => {
     expect(mainTabs.map((tab) => tab.label)).toEqual(["コーチ", "メモ", "大会", "ケガ"]);
     expect(mainTabs.map((tab) => tab.id)).toEqual(["coaching", "memo", "competitions", "injury"]);

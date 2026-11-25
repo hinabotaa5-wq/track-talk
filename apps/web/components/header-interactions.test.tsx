@@ -243,6 +243,20 @@ describe("ヘッダーの開閉", () => {
     expect(container.textContent).toBe("injury");
   });
 
+  it.each(["/memo", "/competitions", "/injury?tab=data"])("最後に開いたタブが %s でも、紹介ページ（/referral）ではコーチタブを選択状態にする（#1028）", async (last) => {
+    localStorage.setItem("tracktalk:last-tab", last);
+    function Selection() { return <span>{useCurrentMainTab("/referral")}</span>; }
+    await act(async () => root.render(<Selection />));
+    expect(container.textContent).toBe("coaching");
+  });
+
+  it("最後に開いたタブの保存値が無くても、紹介ページ（/referral）ではコーチタブを選択状態にする（#1028）", async () => {
+    expect(localStorage.getItem("tracktalk:last-tab")).toBeNull();
+    function Selection() { return <span>{useCurrentMainTab("/referral")}</span>; }
+    await act(async () => root.render(<Selection />));
+    expect(container.textContent).toBe("coaching");
+  });
+
   it("未読と既読を表示し、すべて既読で状態と件数が変わる", async () => {
     // 既読化のあとは正本を取り直すので、サーバー側も既読化を反映する。
     let readAll = false;
