@@ -21,7 +21,7 @@ test("login then publish a text post", async ({ page }) => {
   await page.getByPlaceholder("ニックネーム").fill("あされん");
   await page.getByLabel("種目").selectOption("100m");
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page).toHaveURL("/", { timeout: 20_000 });
+  await expect(page).toHaveURL("/coaching", { timeout: 20_000 });
 
   await page.goto("/posts/new");
   await expect(page.getByRole("heading", { name: "文章・写真" })).toBeVisible({ timeout: 20_000 });
@@ -29,5 +29,10 @@ test("login then publish a text post", async ({ page }) => {
   const body = `朝練の話 ${Date.now()}\n今日のスタートを共有します`;
   await page.getByLabel("詳細").fill(body);
   await page.getByRole("button", { name: "投稿する" }).click();
-  await expect(page.getByRole("link", { name: new RegExp(body.split("\n")[0]) })).toBeVisible({ timeout: 20_000 });
+  // フィードを当面閉じたため、投稿後は /?sort=new からリダイレクトで /coaching?sort=new に着地する（#1008）。
+  // フィード復帰時に投稿の見え方確認（投稿本文のリンクが見えること）へ戻す。
+  await expect.poll(() => {
+    const url = new URL(page.url());
+    return `${url.pathname}?${url.searchParams.toString()}`;
+  }, { timeout: 20_000 }).toBe("/coaching?sort=new");
 });
