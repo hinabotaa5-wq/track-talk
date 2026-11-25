@@ -6,7 +6,8 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 // /coaching と /coaches で共有する一覧の切り替え。共通部品 ViewSwitch を使い、見出しと説明文は出さない。
-// 継続プランは休眠させたので（本体 #1007）、選択肢はスタンダードだけで、継続プランの一覧は描画しない。
+// 切り替えはスタンダード／プレミアムの2択（本体 #1026）。プレミアム側は「プレミアムは準備中です」だけで、取得もしない。
+// 継続プランは休眠させたので（本体 #1007）、継続プランの選択肢と一覧は描画しない。
 const apiFetch = vi.fn();
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), tab: null as string | null, pathname: "/coaches" }));
 const auth = { token: "tok" as string | null };
@@ -52,8 +53,15 @@ const panels = () => [...container.querySelectorAll('[role="tabpanel"] > div')] 
 const coachButton = () => [...container.querySelectorAll('a[href="/coach"]')].find((a) => a.getAttribute("aria-label") === "コーチ");
 const playerButton = () => [...container.querySelectorAll('a[href="/player"]')].find((a) => a.getAttribute("aria-label") === "選手");
 
-it("既定はスタンダードの一覧で、見出しと説明文は出さない", async () => {
+const options = () => [...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent);
+const premiumText = "プレミアムは準備中です";
+
+// T1
+it("既定はスタンダードの一覧で、切り替えはスタンダード／プレミアムの2択。見出しと説明文は出さない", async () => {
   await render();
+  expect(options()).toEqual(["スタンダード", "プレミアム"]);
+  expect(switchLink("プレミアム")?.getAttribute("aria-current")).toBeNull();
+  expect(container.textContent).not.toContain(premiumText);
   expect(panels()).toHaveLength(1);
   expect(fetchCount("/v1/coaches")).toBe(1);
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
@@ -65,14 +73,68 @@ it("既定はスタンダードの一覧で、見出しと説明文は出さな�
   expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
 });
 
-// 本体 #1007 B1：継続プランは休眠。切り替えに出るのはスタンダードだけで、SupportPlanList は描画しない。
+// T2
+it("「プレミアム」を押すとその場で準備中の一文だけに切り替わり、URL を書き換えるだけで取得はしない", async () => {
+  await render();
+  await act(async () => switchLink("プレミアム")!.click());
+  expect(replaceState).toHaveBeenCalledTimes(1);
+  expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaches?tab=premium");
+  expect(navigation.replace).not.toHaveBeenCalled();
+  expect(navigation.push).not.toHaveBeenCalled();
+  expect(switchLink("プレミアム")?.getAttribute("aria-current")).toBe("page");
+  expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBeNull();
+  const visible = panels().filter((panel) => !panel.hidden);
+  expect(visible).toHaveLength(1);
+  expect(visible[0].textContent).toBe(premiumText);
+  // プレミアム側にリンク・ボタン・価格・案内は出さない（切り替えと円ボタンは tabpanel の外）。
+  expect(visible[0].querySelectorAll("a, button")).toHaveLength(0);
+  expect(visible[0].textContent).not.toMatch(/[¥$円]/);
+  expect(fetchCount("/v1/coaches")).toBe(1);
+  expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
+  expect(apiFetch.mock.calls.filter(([path]) => path !== "/v1/me/coaching/action-counts")).toHaveLength(1);
+});
+
+// T3
+it("プレミアムからスタンダードに戻すと URL が base に戻り、コーチ一覧は取り直さない", async () => {
+  await render();
+  await act(async () => switchLink("プレミアム")!.click());
+  await act(async () => switchLink("スタンダード")!.click());
+  expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaches");
+  expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
+  const visible = panels().filter((panel) => !panel.hidden);
+  expect(visible).toHaveLength(1);
+  expect(visible[0].textContent).not.toContain(premiumText);
+  expect(container.querySelector(".page-loading-screen")).toBeNull();
+  expect(fetchCount("/v1/coaches")).toBe(1);
+});
+
+// T4
+it("?tab=premium で開くとストップウォッチを挟まずプレミアム側から出し、スタンダードに切り替えて初めて一覧を取得する", async () => {
+  navigation.tab = "premium";
+  await render();
+  expect(container.querySelector(".page-loading-screen")).toBeNull();
+  expect(options()).toEqual(["スタンダード", "プレミアム"]);
+  expect(switchLink("プレミアム")?.getAttribute("aria-current")).toBe("page");
+  expect(panels()).toHaveLength(1);
+  expect(panels()[0].textContent).toBe(premiumText);
+  expect(coachButton()?.getAttribute("href")).toBe("/coach");
+  expect(fetchCount("/v1/coaches")).toBe(0);
+  await act(async () => switchLink("スタンダード")!.click());
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(fetchCount("/v1/coaches")).toBe(1);
+  expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaches");
+  expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
+  expect(panels()).toHaveLength(2);
+  expect(panels().filter((panel) => !panel.hidden)[0].textContent).not.toContain(premiumText);
+});
+
+// T5（本体 #1007 B1 を書き換え）：継続プランは休眠。?tab=support でもスタンダード側を出し、SupportPlanList は描画しない。
 for (const supportList of [true, false]) {
-  it(`切り替えの選択肢はスタンダードだけで、?tab=support でもスタンダード側を出す（一覧フラグ=${supportList}）`, async () => {
+  it(`?tab=support で開いてもスタンダード側を出し、継続プランの選択肢・文言は出さない（一覧フラグ=${supportList}）`, async () => {
     flags.supportList = supportList;
     navigation.tab = "support";
     await render();
-    const options = [...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent);
-    expect(options).toEqual(["スタンダード"]);
+    expect(options()).toEqual(["スタンダード", "プレミアム"]);
     expect(switchLink("継続プラン")).toBeUndefined();
     expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
     expect(panels()).toHaveLength(1);
@@ -84,24 +146,33 @@ for (const supportList of [true, false]) {
   });
 }
 
-it("英語でも見出しを出さず、切り替えの選択肢は英語になる", async () => {
+// T7
+it("英語でも見出しを出さず、切り替えの選択肢は Standard／Premium、プレミアム側の文も英語になる", async () => {
   installEnglish(en);
   setActiveLocale("en");
   await render();
+  expect(options()).toEqual(["Standard", "Premium"]);
   expect(switchLink("Standard")?.getAttribute("href")).toBe("/coaches");
+  expect(switchLink("Premium")?.getAttribute("href")).toBe("/coaches?tab=premium");
+  await act(async () => switchLink("Premium")!.click());
+  expect(panels().filter((panel) => !panel.hidden)[0].textContent).toBe("Premium is in preparation");
   expect(switchLink("Ongoing plan")).toBeUndefined();
   expect(container.textContent).not.toContain("Coaches");
   expect(container.textContent).not.toContain("Standard (form feedback or concerns about competing)");
   expect(container.textContent).not.toContain("Attach a video if you would like form feedback. You can also ask for advice without a video.");
 });
 
+// T6
 for (const pathname of ["/coaching", "/coaches"]) {
   it(`${pathname} では切り替えのリンク先が ${pathname} のままで、押しても画面遷移しない`, async () => {
     navigation.pathname = pathname;
     await render();
     expect(switchLink("スタンダード")?.getAttribute("href")).toBe(pathname);
+    expect(switchLink("プレミアム")?.getAttribute("href")).toBe(`${pathname}?tab=premium`);
     await act(async () => switchLink("スタンダード")!.click());
     expect(replaceState).not.toHaveBeenCalled();
+    await act(async () => switchLink("プレミアム")!.click());
+    expect(replaceState).toHaveBeenLastCalledWith(null, "", `${pathname}?tab=premium`);
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(navigation.push).not.toHaveBeenCalled();
     expect(fetchCount("/v1/coaches")).toBe(1);

@@ -93,6 +93,8 @@ export const en: Readonly<Record<string, string>> = {
   "「フォームを見てほしい」「大会に向けて何をすればいい？」。そんな選手の悩みに、競技や指導で培った経験を生かして応える機能です。動画や文章でのアドバイスを通じて、自分が対応できる形で活動できます。": "\"Can you look at my form?\" \"What should I do before my meet?\" This feature lets you answer athletes' questions with what you've learned from competing and coaching. Through video and written advice, you can work in the way that suits you.",
   "関わり方": "How you help",
   "スタンダード": "Standard",
+  "プレミアム": "Premium",
+  "プレミアムは準備中です": "Premium is in preparation",
   "利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容を送り、必要に応じて動画を添えます。運営がコーチを割り振ることはありません。料金はどのコーチでも同じ1回1,000円で、コーチの報酬はその70％（700円）です。利用者がチケットで申し込んだスタンダードも、報酬は同じ700円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。": "Athletes choose an available coach for their event and submit the event and their concern, with an optional video. The team does not assign coaches. The price is ¥1,000 per request, and the coach earns 70% (¥700), including ticket requests. The list order changes daily and does not show request totals or ratings.",
   "コーチは届いた依頼を確認し、対応できるものを引き受けます。動画を見て、良い点・直す点・おすすめのドリルを返し、選手が次の練習で試せる具体的な一歩を伝えます。": "Coaches review incoming requests and accept the ones they can handle. After watching the video, they send back a strong point, things to fix, and a recommended drill, giving the athlete a concrete step to try at their next practice.",
   "継続プラン：あなたに相談したい人を支える": "Ongoing plan: support people who want your advice",

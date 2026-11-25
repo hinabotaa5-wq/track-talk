@@ -1,31 +1,55 @@
 "use client";
 import { L } from "@/lib/i18n";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, MotionConfig } from "motion/react";
 import { ViewSwitch } from "@/components/view-switch";
 import { CoachList } from "./coach-list";
 import { CoachSelfButton } from "./coach-self-button";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
-// コーチ一覧の上部の切り替え。スタンダードの指名用のコーチ一覧だけを出す。
+// コーチ一覧の上部の切り替え。「スタンダード」と「プレミアム」の2択（本体 #1026）。
+// スタンダードは指名用のコーチ一覧。プレミアムは商品が未実装なので「プレミアムは準備中です」の一文だけを出し、
+// 価格・説明・申込みの導線は出さず、API も呼ばない。
 // 継続プランは商品として休眠させたので（本体 #1007）、継続プランの選択肢と対応コーチの一覧（SupportPlanList）は描画しない。
-// ?tab=support の直接リンク・共有 URL で開かれても、つねにスタンダード側を出す。
+// ?tab=support の直接リンク・共有 URL で開かれても、スタンダード側を出す。
 // SupportPlanList の部品とフラグ（NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED）は休眠として残す。
-type Tab = "video";
+// /coaching と /coaches のどちらの一覧でも同じ部品を使い、切り替えは今いるルートのまま tab だけを変える。
+// 大会・ケガのタブと同じく、その場の状態で即座に切り替え、URL は書き換えるだけにする。
+// router.replace だとサーバーまで取りに行って「読み込み中」が挟まるので使わない。
+type Tab = "video" | "premium";
 
 export function CoachTabs({ onLoadingChange }: { onLoadingChange?: (loading: boolean) => void }) {
+  const params = useSearchParams();
   const pathname = usePathname();
   const base = pathname === "/coaching" ? "/coaching" : "/coaches";
-  const tab: Tab = "video";
+  // 直接リンク・共有 URL でプレミアム側から開けるよう、初回だけ URL を見る。以後はその場の状態が正本。
+  const initial: Tab = params.get("tab") === "premium" ? "premium" : "video";
+  const [tab, setTab] = useState<Tab>(initial);
+  // 一度開いたパネルは消さずに隠しておき、行き来しても読み込み直さない（大会・ケガと同じ）。
+  const [opened, setOpened] = useState<Set<Tab>>(() => new Set([initial]));
   // 初回読み込み中はページ中身をストップウォッチだけにする（本体 #804）。
-  // 一覧は初回の取得1回だけを行い、終わったら（成功・失敗のどちらも）知らせる。
-  const [settled, setSettled] = useState(false);
-  const loading = !settled;
+  // スタンダードの一覧は初回の取得1回だけを行い、終わったら（成功・失敗のどちらも）知らせる。行き来での再取得はない。
+  const [settled, setSettled] = useState<Set<Tab>>(() => new Set());
+  const markSettled = useCallback((done: Tab) => {
+    setSettled((prev) => (prev.has(done) ? prev : new Set(prev).add(done)));
+  }, []);
+  // プレミアム側は取得せず準備中の一文だけなので、読み込みではない。
+  const loading = tab === "video" && !settled.has("video");
   useEffect(() => {
     onLoadingChange?.(loading);
   }, [loading, onLoadingChange]);
-  const views = [{ id: "video", label: L("スタンダード") }] as const;
+  const views = [
+    { id: "video", label: L("スタンダード") },
+    { id: "premium", label: L("プレミアム") },
+  ] as const;
+  const hrefOf = (id: Tab) => (id === "premium" ? `${base}?tab=premium` : base);
+  function select(next: Tab) {
+    if (next === tab) return;
+    setOpened((prev) => (prev.has(next) ? prev : new Set(prev).add(next)));
+    setTab(next);
+    window.history.replaceState(null, "", hrefOf(next));
+  }
   return (
     <div className="space-y-4">
       <MotionConfig reducedMotion="user">
@@ -38,22 +62,31 @@ export function CoachTabs({ onLoadingChange }: { onLoadingChange?: (loading: boo
                 initialPillStatic
                 views={views}
                 current={tab}
-                onSelect={() => {}}
-                href={() => base}
+                onSelect={select}
+                href={hrefOf}
               />
             </div>
             <CoachSelfButton />
           </div>
         )}
         <div role="tabpanel">
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          >
-            <CoachList onSettled={() => setSettled(true)} />
-          </motion.div>
+          {views.map((item) =>
+            opened.has(item.id) || item.id === tab ? (
+              <motion.div
+                key={item.id}
+                hidden={item.id !== tab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={item.id === tab ? { opacity: 1, y: 0 } : { opacity: 0, y: 8 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
+                {item.id === "premium" ? (
+                  <p className="py-8 text-center text-sm text-slate-200">{L("プレミアムは準備中です")}</p>
+                ) : (
+                  <CoachList onSettled={() => markSettled("video")} />
+                )}
+              </motion.div>
+            ) : null,
+          )}
         </div>
       </MotionConfig>
     </div>
