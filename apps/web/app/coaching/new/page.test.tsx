@@ -449,6 +449,8 @@ it("W3: 200m を選んで最終確認へ進むと「種目」行が200mになり
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "後半に失速します。");
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   });
+  // 申込の動画は必須（#1036）なので、動画を1本選んでから確認画面へ進む。
+  await pickVideo(new File(["x"], "run.mp4", { type: "video/mp4" }));
   await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
   await act(async () => container.querySelector("form")!.requestSubmit());
   await act(async () => {});
@@ -458,7 +460,7 @@ it("W3: 200m を選んで最終確認へ進むと「種目」行が200mになり
   await act(async () => { [...confirm.querySelectorAll("button")].find((b) => b.textContent === "確定してお支払いへ")!.click(); });
   await act(async () => {});
   const posted = mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests") as unknown as [string, { body: string }];
-  expect(JSON.parse(posted[1].body)).toMatchObject({ event: "200m", requested_coach_id: "c1" });
+  expect(JSON.parse(posted[1].body)).toMatchObject({ event: "200m", requested_coach_id: "c1", video_public_id: "pre1" });
 });
 
 it("W4: ?coach= のコーチの担当が200m・400mなら、そのコーチを初期選択し、初期の種目は200m（本体 #1035）", async () => {
