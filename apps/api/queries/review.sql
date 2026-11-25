@@ -145,6 +145,19 @@ WHERE coach_id = sqlc.arg(coach_id)::uuid
   AND status IN ('in_review', 'needs_info')
 ORDER BY due_at;
 
+-- name: ListCoachCompleted :many
+-- コーチの履歴（本体 #1014）。返却済み（returned）と補足回答待ち（clarifying）を、返却の新しい順に最大100件。
+-- 一覧に見本動画を出すため、返答の見本動画と非表示の時刻を同じクエリで取る（要素ごとに取り直さない）。
+SELECT sqlc.embed(r),
+       rs.demo_video_public_id AS response_demo_video_public_id,
+       rs.hidden_at AS response_hidden_at
+FROM review_requests r
+LEFT JOIN review_responses rs ON rs.request_id = r.id
+WHERE r.coach_id = sqlc.arg(coach_id)::uuid
+  AND r.status IN ('returned', 'clarifying')
+ORDER BY r.returned_at DESC NULLS LAST, r.id DESC
+LIMIT 100;
+
 -- name: LockReviewRequester :exec
 -- 同じ人の依頼の作成を1つずつにする。「同意待ちの18歳未満は1本目まで」の確認と作成のあいだに、別の作成を割り込ませない。
 SELECT pg_advisory_xact_lock(hashtext('review_requester:' || sqlc.arg(requester_id)::uuid::text));

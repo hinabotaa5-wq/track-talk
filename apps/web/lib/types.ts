@@ -763,6 +763,8 @@ export type ReviewRequest = {
   status: ReviewStatus;
   due_at: string;
   created_at: string;
+  // 返却した時刻（本体 #1014）。返却前の状態では null。
+  returned_at?: string | null;
   // スレッドの終わりから7日を過ぎて、動画ファイル（依頼の動画とコーチの見本動画）を消した後は null。
   video_url: string | null;
   thumbnail_url: string | null;
@@ -840,6 +842,8 @@ export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_ur
   video_url?: string;
   thumbnail_url?: string;
   work_order?: WorkOrder;
+  // 履歴（completed）の要素にだけ付く、自分の返答の見本動画（本体 #1014）。無い・隠された・削除済みは null。
+  demo_video_url?: string | null;
 };
 
 export type ReviewOffer = {
@@ -852,6 +856,8 @@ export type ReviewOffer = {
 export type CoachRequests = {
   offers: ReviewOffer[];
   reviewing: CoachReviewRequest[];
+  // 返却済み・補足回答待ちの履歴（本体 #1014）。返却の新しい順に最大100件。履歴の画面だけが読むので任意にしておく。
+  completed?: CoachReviewRequest[];
 };
 
 export type ReviewEstimate = {

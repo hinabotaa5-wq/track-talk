@@ -125,7 +125,7 @@ async function renderFresh() {
   await act(async () => root.render(<CoachDashboard />));
 }
 
-it("ランチャーは7タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
+it("ランチャーは8タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
@@ -136,6 +136,7 @@ it("ランチャーは7タイルの入口だけで（カレンダーは廃止）
     "/coach/profile",
     "/me/push",
     "/coach/feedback",
+    "/coach/history",
   ]);
   // 中身は個別画面に切り出したので、ランチャーには出さない。
   expect(container.textContent).not.toContain("引き受ける");
@@ -192,7 +193,7 @@ it("バッジは実件数と一致し、口座未登録の点は条件の時だ�
     return Promise.reject(new Error("down"));
   });
   await renderFresh();
-  expect(tileHrefs()).toHaveLength(7);
+  expect(tileHrefs()).toHaveLength(8);
 });
 
 it("未承認時はコーチ募集の文言を表示する", async () => {
@@ -236,7 +237,7 @@ it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折�
   const grid = container.querySelector("nav.grid")!;
   expect(grid.getAttribute("style") ?? "").not.toContain("--coach-tile");
   const labels = [...container.querySelectorAll("nav.grid a > span.coach-tile-label")];
-  expect(labels).toHaveLength(7);
+  expect(labels).toHaveLength(8);
   for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
 });
 
@@ -249,9 +250,41 @@ it("「選手からの感想」タイルがあり、/coach/feedback へ遷移す
   expect(tile!.getAttribute("aria-label")).toBe("選手からの感想");
   expect(tile!.querySelector("span.coach-tile-label")?.textContent).toBe("選手からの感想");
   expect(tile!.querySelector("span.rounded-full")).toBeNull();
-  expect(tileLinks().at(-1)).toBe(tile);
+  // 本体 #1014 で「履歴」を最後尾に足したので、感想はその1つ前。
+  expect(tileLinks().at(-2)).toBe(tile);
   // 感想は取得しない（ホームの表示から届いた時期を推測させない）。
   expect(apiFetch.mock.calls.map((c) => c[0])).not.toContain("/v1/coach/feedback");
+});
+
+// 返却済みの添削の履歴（本体 #1014 B1）。最後尾に1つ足し、件数バッジは付けない。既存タイルの並びとバッジは変えない。
+it("「履歴」タイルが最後尾にあり、/coach/history へ遷移し、バッジは付かない（#1014 B1）", async () => {
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  const tile = tileLinks().at(-1)!;
+  expect(tile.getAttribute("href")).toBe("/coach/history");
+  expect(tile.getAttribute("aria-label")).toBe("履歴");
+  expect(tile.querySelector("span.coach-tile-label")?.textContent).toBe("履歴");
+  expect(tile.querySelector("span.rounded-full")).toBeNull();
+  // 既存のバッジ・点は従来どおり。
+  expect(tileLabels().slice(0, 7)).toEqual([
+    "対応中（1件）",
+    "追加相談（1件）",
+    "契約・申込み（1件）",
+    "報酬・口座（要確認）",
+    "プロフィール",
+    "通知設定",
+    "選手からの感想",
+  ]);
+  expect(container.querySelectorAll("nav.grid a span.rounded-full")).toHaveLength(4);
+});
+
+it("英語では History と出す（#1014）", async () => {
+  flags.locale = "en";
+  installEnglish(en);
+  setActiveLocale("en");
+  mockAll();
+  await act(async () => root.render(<CoachDashboard />));
+  expect(tileLinks().at(-1)?.getAttribute("aria-label")).toBe("History");
 });
 
 function statusSection() {
@@ -285,7 +318,7 @@ it("応答に件数のキーが無いときは行を出さず、他は従来ど�
   // 受付状態・タイル・バッジ・フッターは従来どおり。
   expect(statusSection()?.textContent).toContain("受付中");
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
-  expect(tileHrefs()).toHaveLength(7);
+  expect(tileHrefs()).toHaveLength(8);
   expect(tileLabels()).toContain("対応中（1件）");
   expect(tileLabels()).toContain("追加相談（1件）");
   expect(tileLabels()).toContain("契約・申込み（1件）");
@@ -338,6 +371,7 @@ it("件数を含む応答では、件数の行と「選手からの感想」タ�
   const tile = tileLinks().find((a) => a.getAttribute("href") === "/coach/feedback");
   expect(tile?.getAttribute("aria-label")).toBe("選手からの感想");
   expect(tile?.querySelector("span.rounded-full")).toBeNull();
-  expect(tileLinks().at(-1)).toBe(tile);
+  // 最後尾は「履歴」（本体 #1014）、感想はその1つ前。
+  expect(tileLinks().at(-2)).toBe(tile);
   expect(tileLabels()).toContain("対応中（1件）");
 });

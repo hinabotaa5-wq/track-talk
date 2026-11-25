@@ -22,6 +22,7 @@ import { useActionLock } from "@/lib/use-action-lock";
 import {
   BellRing,
   FileText,
+  History,
   Inbox,
   MessageSquareText,
   MessagesSquare,
@@ -283,6 +284,8 @@ export function CoachDashboard() {
         <Tile locale={locale} href="/me/push" label={t(locale, "coach.tile.push")} Icon={BellRing} />
         {/* 選手からの匿名の感想（本体 #911）。件数バッジは付けない（届いた時期から特定されないように）。 */}
         <Tile locale={locale} href="/coach/feedback" label={L("選手からの感想")} Icon={MessageSquareText} />
+        {/* 返却済みの添削を見返す履歴（本体 #1014）。件数は状態カードに出ているので、バッジは付けない。 */}
+        <Tile locale={locale} href="/coach/history" label={t(locale, "coach.tile.history")} Icon={History} />
       </CoachTiles>
 
       <footer className="space-y-1 border-t border-white/15 pt-3">

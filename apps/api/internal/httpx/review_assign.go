@@ -438,6 +438,7 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"started_at":         rr.StartedAt,
 		"due_at":             rr.DueAt,
 		"created_at":         rr.CreatedAt,
+		"returned_at":        rr.ReturnedAt, // 返却した時刻（本体 #1014）。返却前の状態では null。
 		"requested_coach_id": rr.RequestedCoachID,
 		"coach_reward_yen":   rr.BasePriceYen * reviewSharePercent / 100,
 		"info_request":       infoRequestJSON(rr),
@@ -469,5 +470,26 @@ func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 	for _, rr := range reviewing {
 		reviewOut = append(reviewOut, s.coachRequestJSON(rr, coachSeesVideo(rr)))
 	}
-	JSON(w, http.StatusOK, map[string]any{"offers": []any{}, "reviewing": reviewOut})
+	// 履歴（本体 #1014）：返却済み・補足回答待ちを、返却の新しい順に最大100件。
+	completed, err := s.q.ListCoachCompleted(r.Context(), p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	completedOut := make([]map[string]any, 0, len(completed))
+	for _, row := range completed {
+		out := s.coachRequestJSON(row.ReviewRequest, coachSeesVideo(row.ReviewRequest))
+		out["demo_video_url"] = s.completedDemoVideoURL(row)
+		completedOut = append(completedOut, out)
+	}
+	JSON(w, http.StatusOK, map[string]any{"offers": []any{}, "reviewing": reviewOut, "completed": completedOut})
+}
+
+// completedDemoVideoURL は、履歴の要素に付ける見本動画の再生 URL。詳細の作法（reviewResponseJSON・withResponse）に揃え、
+// 見本動画が無い・運営が返答を隠した・動画ファイルを消した後は null にする。
+func (s *Server) completedDemoVideoURL(row db.ListCoachCompletedRow) any {
+	if row.ResponseDemoVideoPublicID == nil || row.ResponseHiddenAt != nil || row.ReviewRequest.VideosPurgedAt != nil {
+		return nil
+	}
+	return s.cloud.CoachingPlaybackURL(*row.ResponseDemoVideoPublicID)
 }
