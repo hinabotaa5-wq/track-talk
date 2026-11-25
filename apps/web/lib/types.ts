@@ -842,8 +842,6 @@ export type CoachReviewRequest = Omit<ReviewRequest, "video_url" | "thumbnail_ur
   video_url?: string;
   thumbnail_url?: string;
   work_order?: WorkOrder;
-  // 履歴（completed）の要素にだけ付く、自分の返答の見本動画（本体 #1014）。無い・隠された・削除済みは null。
-  demo_video_url?: string | null;
 };
 
 export type ReviewOffer = {

@@ -147,15 +147,10 @@ ORDER BY due_at;
 
 -- name: ListCoachCompleted :many
 -- コーチの履歴（本体 #1014）。返却済み（returned）と補足回答待ち（clarifying）を、返却の新しい順に最大100件。
--- 一覧に見本動画を出すため、返答の見本動画と非表示の時刻を同じクエリで取る（要素ごとに取り直さない）。
-SELECT sqlc.embed(r),
-       rs.demo_video_public_id AS response_demo_video_public_id,
-       rs.hidden_at AS response_hidden_at
-FROM review_requests r
-LEFT JOIN review_responses rs ON rs.request_id = r.id
-WHERE r.coach_id = sqlc.arg(coach_id)::uuid
-  AND r.status IN ('returned', 'clarifying')
-ORDER BY r.returned_at DESC NULLS LAST, r.id DESC
+SELECT * FROM review_requests
+WHERE coach_id = sqlc.arg(coach_id)::uuid
+  AND status IN ('returned', 'clarifying')
+ORDER BY returned_at DESC NULLS LAST, id DESC
 LIMIT 100;
 
 -- name: LockReviewRequester :exec

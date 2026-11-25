@@ -519,75 +519,62 @@ func (q *Queries) GetReviewRequest(ctx context.Context, id uuid.UUID) (ReviewReq
 }
 
 const listCoachCompleted = `-- name: ListCoachCompleted :many
-SELECT r.id, r.requester_id, r.tier, r.event, r.focus, r.video_public_id, r.status, r.due_at, r.coach_id, r.created_at, r.updated_at, r.returned_at, r.question, r.requested_coach_id, r.requested_coach_name, r.base_price_yen, r.use_tickets, r.info_request, r.info_reason, r.info_requested_at, r.info_from_status, r.resubmit_by, r.original_question, r.video_replaced, r.resubmitted_at, r.withdrawn_at, r.withdrawn_by, r.withdrawn_from_status, r.withdraw_reason, r.videos_purged_at, r.retention_hold_at, r.assigned_at, r.started_at, r.timed_out_at, r.canceled_at, r.return_reason, r.reminder_12h_at, r.reminder_4h_at,
-       rs.demo_video_public_id AS response_demo_video_public_id,
-       rs.hidden_at AS response_hidden_at
-FROM review_requests r
-LEFT JOIN review_responses rs ON rs.request_id = r.id
-WHERE r.coach_id = $1::uuid
-  AND r.status IN ('returned', 'clarifying')
-ORDER BY r.returned_at DESC NULLS LAST, r.id DESC
+SELECT id, requester_id, tier, event, focus, video_public_id, status, due_at, coach_id, created_at, updated_at, returned_at, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, info_request, info_reason, info_requested_at, info_from_status, resubmit_by, original_question, video_replaced, resubmitted_at, withdrawn_at, withdrawn_by, withdrawn_from_status, withdraw_reason, videos_purged_at, retention_hold_at, assigned_at, started_at, timed_out_at, canceled_at, return_reason, reminder_12h_at, reminder_4h_at FROM review_requests
+WHERE coach_id = $1::uuid
+  AND status IN ('returned', 'clarifying')
+ORDER BY returned_at DESC NULLS LAST, id DESC
 LIMIT 100
 `
 
-type ListCoachCompletedRow struct {
-	ReviewRequest             ReviewRequest `json:"review_request"`
-	ResponseDemoVideoPublicID *string       `json:"response_demo_video_public_id"`
-	ResponseHiddenAt          *time.Time    `json:"response_hidden_at"`
-}
-
 // コーチの履歴（本体 #1014）。返却済み（returned）と補足回答待ち（clarifying）を、返却の新しい順に最大100件。
-// 一覧に見本動画を出すため、返答の見本動画と非表示の時刻を同じクエリで取る（要素ごとに取り直さない）。
-func (q *Queries) ListCoachCompleted(ctx context.Context, coachID uuid.UUID) ([]ListCoachCompletedRow, error) {
+func (q *Queries) ListCoachCompleted(ctx context.Context, coachID uuid.UUID) ([]ReviewRequest, error) {
 	rows, err := q.db.Query(ctx, listCoachCompleted, coachID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListCoachCompletedRow
+	var items []ReviewRequest
 	for rows.Next() {
-		var i ListCoachCompletedRow
+		var i ReviewRequest
 		if err := rows.Scan(
-			&i.ReviewRequest.ID,
-			&i.ReviewRequest.RequesterID,
-			&i.ReviewRequest.Tier,
-			&i.ReviewRequest.Event,
-			&i.ReviewRequest.Focus,
-			&i.ReviewRequest.VideoPublicID,
-			&i.ReviewRequest.Status,
-			&i.ReviewRequest.DueAt,
-			&i.ReviewRequest.CoachID,
-			&i.ReviewRequest.CreatedAt,
-			&i.ReviewRequest.UpdatedAt,
-			&i.ReviewRequest.ReturnedAt,
-			&i.ReviewRequest.Question,
-			&i.ReviewRequest.RequestedCoachID,
-			&i.ReviewRequest.RequestedCoachName,
-			&i.ReviewRequest.BasePriceYen,
-			&i.ReviewRequest.UseTickets,
-			&i.ReviewRequest.InfoRequest,
-			&i.ReviewRequest.InfoReason,
-			&i.ReviewRequest.InfoRequestedAt,
-			&i.ReviewRequest.InfoFromStatus,
-			&i.ReviewRequest.ResubmitBy,
-			&i.ReviewRequest.OriginalQuestion,
-			&i.ReviewRequest.VideoReplaced,
-			&i.ReviewRequest.ResubmittedAt,
-			&i.ReviewRequest.WithdrawnAt,
-			&i.ReviewRequest.WithdrawnBy,
-			&i.ReviewRequest.WithdrawnFromStatus,
-			&i.ReviewRequest.WithdrawReason,
-			&i.ReviewRequest.VideosPurgedAt,
-			&i.ReviewRequest.RetentionHoldAt,
-			&i.ReviewRequest.AssignedAt,
-			&i.ReviewRequest.StartedAt,
-			&i.ReviewRequest.TimedOutAt,
-			&i.ReviewRequest.CanceledAt,
-			&i.ReviewRequest.ReturnReason,
-			&i.ReviewRequest.Reminder12hAt,
-			&i.ReviewRequest.Reminder4hAt,
-			&i.ResponseDemoVideoPublicID,
-			&i.ResponseHiddenAt,
+			&i.ID,
+			&i.RequesterID,
+			&i.Tier,
+			&i.Event,
+			&i.Focus,
+			&i.VideoPublicID,
+			&i.Status,
+			&i.DueAt,
+			&i.CoachID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ReturnedAt,
+			&i.Question,
+			&i.RequestedCoachID,
+			&i.RequestedCoachName,
+			&i.BasePriceYen,
+			&i.UseTickets,
+			&i.InfoRequest,
+			&i.InfoReason,
+			&i.InfoRequestedAt,
+			&i.InfoFromStatus,
+			&i.ResubmitBy,
+			&i.OriginalQuestion,
+			&i.VideoReplaced,
+			&i.ResubmittedAt,
+			&i.WithdrawnAt,
+			&i.WithdrawnBy,
+			&i.WithdrawnFromStatus,
+			&i.WithdrawReason,
+			&i.VideosPurgedAt,
+			&i.RetentionHoldAt,
+			&i.AssignedAt,
+			&i.StartedAt,
+			&i.TimedOutAt,
+			&i.CanceledAt,
+			&i.ReturnReason,
+			&i.Reminder12hAt,
+			&i.Reminder4hAt,
 		); err != nil {
 			return nil, err
 		}

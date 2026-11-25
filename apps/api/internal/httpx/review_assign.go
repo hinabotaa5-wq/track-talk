@@ -476,20 +476,10 @@ func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 一覧では動画を出さない（動画と自分の返答は詳細を開いたときに見る。運営者決定 2026-11-25）。
 	completedOut := make([]map[string]any, 0, len(completed))
-	for _, row := range completed {
-		out := s.coachRequestJSON(row.ReviewRequest, coachSeesVideo(row.ReviewRequest))
-		out["demo_video_url"] = s.completedDemoVideoURL(row)
-		completedOut = append(completedOut, out)
+	for _, rr := range completed {
+		completedOut = append(completedOut, s.coachRequestJSON(rr, false))
 	}
 	JSON(w, http.StatusOK, map[string]any{"offers": []any{}, "reviewing": reviewOut, "completed": completedOut})
-}
-
-// completedDemoVideoURL は、履歴の要素に付ける見本動画の再生 URL。詳細の作法（reviewResponseJSON・withResponse）に揃え、
-// 見本動画が無い・運営が返答を隠した・動画ファイルを消した後は null にする。
-func (s *Server) completedDemoVideoURL(row db.ListCoachCompletedRow) any {
-	if row.ResponseDemoVideoPublicID == nil || row.ResponseHiddenAt != nil || row.ReviewRequest.VideosPurgedAt != nil {
-		return nil
-	}
-	return s.cloud.CoachingPlaybackURL(*row.ResponseDemoVideoPublicID)
 }
