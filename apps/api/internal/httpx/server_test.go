@@ -81,9 +81,6 @@ func setupConfig(t *testing.T, mutate func(*config.Config)) http.Handler {
 		ReviewConsultationSales: true,
 		// コーチ一覧も、一覧の中身を確かめるテストが多いので開けておく。閉じたときの動きは coach_list_flag_test.go で確かめる。
 		CoachingCoachList: true,
-		// 本番はチケットの新規販売を止めている（空が既定）。購入済みチケットの消費・返金を確かめる
-		// テストが多いので開けておき、止めたときの動きは coaching_ticket_sales_test.go で確かめる。
-		CoachingTicketSales: true,
 		// 本番は動画添削のおまかせ(割り当て)を止めている（空が既定）。打診・辞退・期限切れの仕組みは残しているので、
 		// それを確かめるテストのために開けておき、止めたときの動きは review_coach_choice_test.go で確かめる。
 		ReviewRandomAssign: true,

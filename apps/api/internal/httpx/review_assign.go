@@ -219,6 +219,8 @@ type coachingTickResult struct {
 	ConsultationRefunds    int `json:"consultation_refunds"`
 	ConsultationsPurged    int `json:"consultations_purged"`
 	TicketsReleased        int `json:"tickets_released"`
+	CouponsReleased        int `json:"coupons_released"`
+	CouponsExpired         int `json:"coupons_expired"`
 	TicketRefundsProcessed int `json:"ticket_refunds_processed"`
 	// 決済完了から6か月を過ぎて失効させたチケットの枚数（本体 #569）。
 	TicketsExpired int `json:"tickets_expired"`
@@ -287,6 +289,12 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.TicketsReleased, err = s.releaseExpiredTickets(ctx); err != nil {
+		return out, err
+	}
+	if out.CouponsReleased, err = s.releaseEndedCoupons(ctx); err != nil {
+		return out, err
+	}
+	if out.CouponsExpired, err = s.expireCoupons(ctx); err != nil {
 		return out, err
 	}
 	if out.TicketRefundsProcessed, err = s.settleTicketRefunds(ctx); err != nil {

@@ -24,8 +24,6 @@ func TestReviewOpenWithoutInviteCodeWhenPaymentsConfigured(t *testing.T) {
 		t.Fatalf("coaching me %s", rec.Body.String())
 	}
 	execSQLArgs(t, `UPDATE profiles SET birth_month=$2 WHERE id=$1`, id, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
-	// チケットも招待コードなしで買える（販売の開閉は COACHING_TICKET_SALES_ENABLED のまま）。
-	startTicketPurchase(t, h, tu, "six", uuid.NewString(), "/coaching/new")
 	body := reviewBodyFor(t, h, tu)
 	body["method"] = "card"
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests", tu, body); rec.Code != http.StatusCreated || !strings.Contains(rec.Body.String(), "checkout_url") {

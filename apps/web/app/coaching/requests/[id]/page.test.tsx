@@ -890,7 +890,7 @@ it("Stripeからの支払い同期後も状態・支払い文は出さず、紹�
     expectRemovedSummary(container);
     expect(cancelButton(container)).toBeDefined();
     expect(container.textContent).toContain("あなたの紹介ID ABC123");
-    expect(container.textContent).toContain("無料チケットをプレゼントしました");
+    expect(container.textContent).toContain("¥500クーポンをプレゼントしました");
     expect(container.querySelector("section h2")?.classList).toContain("text-sm");
     for (const text of ["購入すると、紹介IDが発行されます。", "付与日", "有効期限", "このIDは終了しました。"]) expect(container.textContent).not.toContain(text);
   } finally { searchState.paid = false; await teardown(root, container); }

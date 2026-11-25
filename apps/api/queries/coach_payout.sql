@@ -23,9 +23,10 @@ RETURNING *;
 
 -- name: InsertReviewEarnings :many
 -- 返却して代金が確定した添削の、コーチの取り分を記録する。チケットで払った添削は RecordTicketReviewEarnings で記録する。
-INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen, confirmed_at)
-SELECT gen_random_uuid(), r.coach_id, 'review', r.id, pay.amount_yen, sqlc.arg(share_percent)::smallint,
-       pay.amount_yen * sqlc.arg(share_percent)::int / 100, r.returned_at
+-- クーポンを使った添削は、割引前の価格（選手の支払額＋運営負担のクーポン額）で計算し、運営負担分を platform_subsidy_yen に残す（本体 #1031）。
+INSERT INTO coach_earnings (id, coach_id, source, review_request_id, gross_yen, share_percent, amount_yen, confirmed_at, platform_subsidy_yen)
+SELECT gen_random_uuid(), r.coach_id, 'review', r.id, pay.amount_yen + r.coupon_discount_yen, sqlc.arg(share_percent)::smallint,
+       (pay.amount_yen + r.coupon_discount_yen) * sqlc.arg(share_percent)::int / 100, r.returned_at, r.coupon_discount_yen
 FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL

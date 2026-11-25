@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { MotionConfig } from "motion/react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { PageLoading } from "@/components/page-loading";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
@@ -13,7 +12,6 @@ import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachDisplayText } from "@/lib/coach-display";
 import { coachEventLabels } from "@/lib/coach-recruit";
-import { coachTicketPurchaseHref, type TicketSummary } from "@/lib/coaching-tickets";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
 import { CoachSelfButton } from "../coaches/coach-self-button";
@@ -53,8 +51,6 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
   // 直接リンク・共有 URL でプレミアム側から開けるよう、初回だけ URL を見る。以後はその場の状態が正本。
   const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "premium" ? "premium" : "video"));
   const [result, setResult] = useState<Loaded>();
-  const { token } = useAuth();
-  const [ticketSales, setTicketSales] = useState<{ token: string; canPurchase: boolean }>();
 
   useEffect(() => {
     let cancelled = false;
@@ -69,19 +65,6 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
     return () => { cancelled = true; };
   }, [coachID]);
 
-  useEffect(() => {
-    // チケットの新規販売を止めている間は「チケットを買う」を出さない（コーチ詳細と同じ判定）。
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
-      .then((data) => {
-        if (!cancelled) setTicketSales({ token, canPurchase: data.can_purchase });
-      })
-      .catch(() => {
-        if (!cancelled) setTicketSales(undefined);
-      });
-    return () => { cancelled = true; };
-  }, [token]);
 
   // 初回読み込み中は、通常一覧と同じくストップウォッチだけにする。
   if (!result) return <PageLoading screen label={L("読み込み中...")} />;
@@ -120,13 +103,14 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
       {tab === "premium" ? (
         <p className="py-8 text-center text-sm text-slate-200">{L("プレミアムは準備中です")}</p>
       ) : (
-        <FeaturedContent result={result} showTickets={!(ticketSales?.canPurchase === false && ticketSales.token === token)} />
+        <FeaturedContent result={result} />
       )}
     </div>
   );
 }
 
-function FeaturedContent({ result, showTickets }: { result: Loaded; showTickets: boolean }) {
+// チケットの販売は終了した（本体 #1031）ので、「チケットを買う」は出さない。
+function FeaturedContent({ result }: { result: Loaded }) {
   if ("error" in result) return <p role="alert" className="text-sm text-red-400">{L("読み込みに失敗しました")}</p>;
   const coach = result.coach;
   if (!coach) return <p className="text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p>;
@@ -200,11 +184,6 @@ function FeaturedContent({ result, showTickets }: { result: Loaded; showTickets:
                 {L("動画添削を依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
               </span>
             )}
-            {showTickets ? (
-              <Link href={coachTicketPurchaseHref(coach.id)} className="flex min-h-11 items-center justify-center rounded-md border border-blue-400/60 px-3 text-sm font-semibold text-blue-300">
-                {L("チケットを買う")}
-              </Link>
-            ) : null}
           </div>
         </div>
       </div>

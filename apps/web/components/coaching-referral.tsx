@@ -78,8 +78,11 @@ export function ReferralInput({ code, onChange, warning, disabled, token }: {
 // 共有ボタンで送る、紹介の流れの公開ページ（本体 #996）。
 const REFERRAL_SHARE_URL = "https://track-talk.netlify.app/referral";
 
-const referralHeadline = () => L("友達2人に紹介すると、1回分(1,000円)無料！");
-const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に無料チケットがプレゼントされます。");
+// 紹介の訴求文面（本体 #1031）。特典は ¥500 クーポン。
+const referralHeadline = () => L("2人に紹介すると500円分無料！");
+const referralBody = () => L("購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に¥500クーポンがプレゼントされます。");
+// クーポンの条件。API の referralRewardTerms と同じ。
+const couponTerms = () => L("¥500クーポン：付与日から6か月有効／付与された本人だけが使えます／現金への払戻しはできません／1回の申込に1枚まで");
 
 export function LoadedReferralCard({ token, variant = "full" }: { token: string | null; variant?: "full" | "compact" }) {
   const { referral } = useMyReferral(token);
@@ -89,7 +92,9 @@ export function LoadedReferralCard({ token, variant = "full" }: { token: string 
 
 function ReferralCard({ referral, variant = "full" }: { referral: Referral; variant?: "full" | "compact" }) {
   const [copyStatus, setCopyStatus] = useState("");
-  const { code, active, friend_count, granted_at, expires_at } = referral;
+  const { code, active, friend_count, granted_at, expires_at, reward_kind } = referral;
+  // 発行済みの特典チケット（本体 #1031 より前の付与）は、発行時の条件のまま表示する。
+  const legacyTicket = reward_kind === "ticket";
   const compact = variant === "compact";
   return <section className={compact ? "app-card space-y-1 rounded-xl p-3" : "app-card space-y-2 rounded-xl p-4"}>
     <h2 className={compact ? "text-sm font-semibold" : "font-semibold"}>{referralHeadline()}</h2>
@@ -124,12 +129,12 @@ function ReferralCard({ referral, variant = "full" }: { referral: Referral; vari
       }}>{L("共有")}</Button> : null}
     </div>
     {copyStatus ? <p role="status" className="text-xs">{copyStatus}</p> : null}
-    {granted_at ? <p className="text-sm font-semibold">{L("無料チケットをプレゼントしました")}</p>
-      : active ? <p className="text-sm font-semibold">{friend_count === 1 ? L("あと1人で無料チケット") : L("あと2人で無料チケット")}</p> : null}
+    {granted_at ? <p className="text-sm font-semibold">{legacyTicket ? L("紹介特典をプレゼントしました") : L("¥500クーポンをプレゼントしました")}</p>
+      : active ? <p className="text-sm font-semibold">{friend_count === 1 ? L("あと1人で¥500クーポン") : L("あと2人で¥500クーポン")}</p> : null}
     {!compact && granted_at && expires_at ? <div className="space-y-1 text-xs">
       <p>{L("付与日 {v0}", { v0: formatDateTime(granted_at) })}</p>
       <p>{L("有効期限 {v0}", { v0: formatDateTime(expires_at) })}</p>
-      <p>{L("特典チケット：付与日から6か月有効／付与された本人だけが使えます／払戻しはできません")}</p>
+      <p>{legacyTicket ? L("特典チケット：付与日から6か月有効／付与された本人だけが使えます／払戻しはできません") : couponTerms()}</p>
     </div> : null}
     {compact || active ? null : <p className="text-sm">{L("このIDは終了しました。紹介IDを使わずに購入すると、新しい紹介IDが発行されます。")}</p>}
   </section>;

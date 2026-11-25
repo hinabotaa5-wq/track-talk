@@ -12,8 +12,6 @@ import (
 	"golang.org/x/text/width"
 )
 
-const referralRewardTerms = "特典チケット：付与日から6か月有効／付与された本人だけが使えます／払戻しはできません"
-
 func normalizeReferralCode(code string) string {
 	return strings.ToUpper(strings.TrimSpace(width.Narrow.String(code)))
 }
@@ -48,7 +46,7 @@ func recordCoachingReferral(ctx context.Context, q *db.Queries, buyer, ticketID,
 	if wanted, err := notificationWanted(ctx, q, id, notifyCoaching, true); err != nil || !wanted {
 		return err
 	}
-	title, body, url := "紹介特典：無料チケットを1枚プレゼントしました", referralRewardTerms, "/me/coaching/tickets"
+	title, body, url := "紹介特典：¥500クーポンをプレゼントしました", referralRewardTerms, "/me/coaching/tickets"
 	role := "player"
 	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
 		ID: uuid.New(), RecipientID: id, Title: &title, Body: &body, Url: &url, CoachingRole: &role,
@@ -69,7 +67,18 @@ func (s *Server) myCoachingReferral(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	JSON(w, http.StatusOK, map[string]any{"referral": progress})
+	// 特典の種類（本体 #1031）：coupon＝¥500 クーポン、ticket＝発行済みの特典チケット。まだ付与していなければ null。
+	var kind, expires any
+	switch {
+	case progress.CouponExpiresAt != nil:
+		kind, expires = "coupon", progress.CouponExpiresAt
+	case progress.TicketExpiresAt != nil:
+		kind, expires = "ticket", progress.TicketExpiresAt
+	}
+	JSON(w, http.StatusOK, map[string]any{"referral": map[string]any{
+		"code": progress.Code, "active": progress.Active, "friend_count": progress.FriendCount,
+		"granted_at": progress.GrantedAt, "expires_at": expires, "reward_kind": kind,
+	}})
 }
 
 func (s *Server) checkCoachingReferral(w http.ResponseWriter, r *http.Request) {

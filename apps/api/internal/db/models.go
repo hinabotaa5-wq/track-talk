@@ -77,18 +77,19 @@ type CoachCommerceSetting struct {
 }
 
 type CoachEarning struct {
-	ID              uuid.UUID  `json:"id"`
-	CoachID         *uuid.UUID `json:"coach_id"`
-	Source          string     `json:"source"`
-	ReviewRequestID *uuid.UUID `json:"review_request_id"`
-	ContractID      *uuid.UUID `json:"contract_id"`
-	GrossYen        int32      `json:"gross_yen"`
-	SharePercent    int16      `json:"share_percent"`
-	AmountYen       int32      `json:"amount_yen"`
-	PayoutID        *uuid.UUID `json:"payout_id"`
-	CreatedAt       time.Time  `json:"created_at"`
-	ConsultationID  *uuid.UUID `json:"consultation_id"`
-	ConfirmedAt     time.Time  `json:"confirmed_at"`
+	ID                 uuid.UUID  `json:"id"`
+	CoachID            *uuid.UUID `json:"coach_id"`
+	Source             string     `json:"source"`
+	ReviewRequestID    *uuid.UUID `json:"review_request_id"`
+	ContractID         *uuid.UUID `json:"contract_id"`
+	GrossYen           int32      `json:"gross_yen"`
+	SharePercent       int16      `json:"share_percent"`
+	AmountYen          int32      `json:"amount_yen"`
+	PayoutID           *uuid.UUID `json:"payout_id"`
+	CreatedAt          time.Time  `json:"created_at"`
+	ConsultationID     *uuid.UUID `json:"consultation_id"`
+	ConfirmedAt        time.Time  `json:"confirmed_at"`
+	PlatformSubsidyYen int32      `json:"platform_subsidy_yen"`
 }
 
 type CoachIdentityAccessLog struct {
@@ -445,6 +446,20 @@ type CoachingContractRating struct {
 	RatedAt    time.Time `json:"rated_at"`
 }
 
+type CoachingCoupon struct {
+	ID         uuid.UUID  `json:"id"`
+	OwnerID    *uuid.UUID `json:"owner_id"`
+	Source     string     `json:"source"`
+	AmountYen  int32      `json:"amount_yen"`
+	Status     string     `json:"status"`
+	RequestID  *uuid.UUID `json:"request_id"`
+	GrantedAt  time.Time  `json:"granted_at"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	ReservedAt *time.Time `json:"reserved_at"`
+	UsedAt     *time.Time `json:"used_at"`
+	EndedAt    *time.Time `json:"ended_at"`
+}
+
 type CoachingDemoCode struct {
 	Code      string     `json:"code"`
 	CreatedAt time.Time  `json:"created_at"`
@@ -569,7 +584,7 @@ type CoachingReferralCount struct {
 }
 
 type CoachingReferralReward struct {
-	LotID              uuid.UUID  `json:"lot_id"`
+	LotID              *uuid.UUID `json:"lot_id"`
 	ReferrerID         *uuid.UUID `json:"referrer_id"`
 	FirstCountID       *uuid.UUID `json:"first_count_id"`
 	SecondCountID      *uuid.UUID `json:"second_count_id"`
@@ -577,6 +592,7 @@ type CoachingReferralReward struct {
 	CanceledAt         *time.Time `json:"canceled_at"`
 	QualifyingRefundAt *time.Time `json:"qualifying_refund_at"`
 	ReferralCode       *string    `json:"referral_code"`
+	CouponID           *uuid.UUID `json:"coupon_id"`
 }
 
 type CoachingTicketAllocation struct {
@@ -1397,6 +1413,7 @@ type ReviewRequest struct {
 	GoalTime            *string    `json:"goal_time"`
 	WindSpeed           *string    `json:"wind_speed"`
 	BodyCondition       *string    `json:"body_condition"`
+	CouponDiscountYen   int32      `json:"coupon_discount_yen"`
 }
 
 type ReviewResponse struct {

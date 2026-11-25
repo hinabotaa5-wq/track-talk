@@ -88,7 +88,7 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   const banner = container.querySelector('a[href="/referral"]');
   const group = container.querySelector('[role="group"][aria-label="コーチの一覧を切り替える"]');
   const faq = container.querySelector('section[aria-labelledby="featured-faq"]');
-  expect(banner?.textContent).toContain("1回(1000円)無料！");
+  expect(banner?.textContent).toContain("2人に紹介すると500円分無料！");
   expect(before(banner, group)).toBe(true);
   expect(before(group, about())).toBe(true);
   expect(before(about(), steps())).toBe(true);
@@ -109,9 +109,9 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   expect(requestLink?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
   expect(requestLink?.className).toContain("bg-[#EF442D]");
   expect(requestLink?.className).not.toContain("bg-blue-600");
-  const ticketLink = link("チケットを買う");
-  expect(ticketLink?.getAttribute("href")).toBe("/me/coaching/tickets?return_to=%2Fcoaches%2F2f6d0a8e-1111-4c2b-9a7e-3c332627b25f");
-  expect(ticketLink?.className).toContain("border-blue-400/60");
+  // チケットの販売は終了した（本体 #1031）。購入の入口は出さない。
+  expect(link("チケットを買う")).toBeUndefined();
+  expect(container.querySelector('a[href^="/me/coaching/tickets"]')).toBeNull();
   // 一覧の部品（種目チップの絞り込み）は出さない。
   expect(container.querySelector('[role="radiogroup"]')).toBeNull();
 });

@@ -2,6 +2,7 @@ package httpx_test
 
 import (
 	"encoding/json"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,20 +34,43 @@ func ticketSummary(t *testing.T, h http.Handler, tok string) ticketSummaryView {
 	}
 	return out
 }
+
+// startTicketPurchase は、販売終了（本体 #1031）の前に支払い画面まで進んでいた購入を DB に作る。購入の API は
+// 常に 409 を返すため、発行済みチケットの残高・利用・返金を確かめるテストはここで前提を作り、payTicketPurchase で
+// 本番と同じ Webhook（completeTicketCheckout）を通して支払いを済ませる。
 func startTicketPurchase(t *testing.T, h http.Handler, tok, product, key, path string) string {
 	t.Helper()
-	// 18歳未満のときに要る購入のたびの宣言も付ける（18歳以上には効かない）。
-	r := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", tok, map[string]any{"product_id": product, "request_key": key, "return_path": path, "guardian_permission": true})
-	if r.Code != 200 {
-		t.Fatalf("checkout %d %s", r.Code, r.Body.String())
-	}
-	var out struct {
-		ID string `json:"purchase_id"`
-	}
-	if err := json.Unmarshal(r.Body.Bytes(), &out); err != nil {
+	return seedTicketPurchase(t, tok, product, key, path, "")
+}
+
+// seedTicketPurchase は startTicketPurchase に紹介IDを足したもの。紹介IDは販売終了前の購入 API と同じ条件
+// （他人の・終了していない・その紹介者に有効カウント済みでない）のときだけ購入に記録する。
+func seedTicketPurchase(t *testing.T, tok, product, key, path, referral string) string {
+	t.Helper()
+	claims := jwt.MapClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(tok, claims); err != nil {
 		t.Fatal(err)
 	}
-	return out.ID
+	owner, err := uuid.Parse(claims["sub"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
+		path = "/me/coaching/tickets"
+	}
+	id := uuid.NewString()
+	execSQLArgs(t, `INSERT INTO coaching_ticket_purchases (id, owner_id, request_key, product_id, quantity, amount_yen, session_expires_at, return_path, referral_code, checkout_session_id, checkout_url)
+		SELECT $1::uuid, $2::uuid, $3::uuid, p.id, p.quantity, p.amount_yen, now() + interval '1 hour', $4::text,
+			(SELECT c.code FROM coaching_referral_codes c WHERE c.code = upper(btrim($5::text)) AND c.owner_id <> $2::uuid AND c.closed_at IS NULL
+				AND NOT EXISTS (SELECT FROM coaching_referral_counts a WHERE a.referrer_id = c.owner_id AND a.buyer_id = $2::uuid AND a.canceled_at IS NULL)),
+			'cs_seed_' || $1::text, 'https://checkout.test/' || $1::text
+		FROM coaching_ticket_products p WHERE p.id = $6::text AND p.active`, id, owner, key, path, referral, product)
+	var n int
+	queryRowArgs(t, `SELECT count(*) FROM coaching_ticket_purchases WHERE id = $1`, []any{id}, &n)
+	if n != 1 {
+		t.Fatalf("seed ticket purchase %s: product unavailable", product)
+	}
+	return id
 }
 func payTicketPurchase(t *testing.T, h http.Handler, id string, amount int) {
 	t.Helper()
@@ -98,16 +122,11 @@ func assertTicketAccounting(t *testing.T, h http.Handler, admin string) {
 }
 
 func TestTicketPurchaseOnlyCreditsVerifiedWebhookOnce(t *testing.T) {
-	h, f := setupStripe(t)
+	h, _ := setupStripe(t)
 	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
 	key := uuid.NewString()
+	// 販売終了（本体 #1031）の前に支払い画面まで進んでいた購入の、支払いの確定だけを確かめる。
 	id := startTicketPurchase(t, h, tu, "six", key, "https://evil.test")
-	if got := startTicketPurchase(t, h, tu, "six", key, "https://evil.test"); got != id {
-		t.Fatalf("duplicate purchase %s %s", id, got)
-	}
-	if len(f.sessions) != 1 {
-		t.Fatalf("duplicate checkout %d", len(f.sessions))
-	}
 	if got := ticketSummary(t, h, tu).Balance.Available; got != 0 {
 		t.Fatalf("credited before payment: %d", got)
 	}
@@ -138,39 +157,6 @@ func TestTicketPurchaseOnlyCreditsVerifiedWebhookOnce(t *testing.T) {
 		t.Fatal("other user balance")
 	}
 	assertTicketAccounting(t, h, adminToken(t, h))
-}
-
-// 本体 #691：コーチ詳細から来た購入は、その戻り先を購入記録に残し、確定後の照会でも返す。
-func TestTicketPurchaseKeepsCoachDetailReturnPath(t *testing.T) {
-	h, f := setupStripe(t)
-	_, tu := demoUser(t, h, time.Date(1995, 4, 1, 0, 0, 0, 0, time.UTC))
-	coachPath := "/coaches/" + uuid.NewString()
-	id := startTicketPurchase(t, h, tu, "six", uuid.NewString(), coachPath)
-	var path string
-	queryRowArgs(t, `SELECT return_path FROM coaching_ticket_purchases WHERE id=$1`, []any{id}, &path)
-	if path != coachPath {
-		t.Fatalf("return path %q", path)
-	}
-	// 購入画面を閉じた場合も戻り先を引き継ぐ（取消し時の挙動そのものは従来どおり購入画面に戻る）。
-	if len(f.sessions) != 1 || !strings.Contains(f.sessions[0].Get("cancel_url"), "return_to="+strings.ReplaceAll(coachPath, "/", "%2F")) {
-		t.Fatalf("checkout sessions %v", f.sessions)
-	}
-	payTicketPurchase(t, h, id, 5000)
-	r := doJSON(t, h, http.MethodGet, "/v1/coaching/tickets/purchases/"+id, tu, nil)
-	var out struct {
-		Status     string `json:"status"`
-		ReturnPath string `json:"return_path"`
-	}
-	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &out) != nil || out.Status == "pending" || out.ReturnPath != coachPath {
-		t.Fatalf("purchase %d %s", r.Code, r.Body.String())
-	}
-	for _, bad := range []string{coachPath + "/x", "/coaches/not-a-uuid", "https://evil.test" + coachPath} {
-		bid := startTicketPurchase(t, h, tu, "six", uuid.NewString(), bad)
-		queryRowArgs(t, `SELECT return_path FROM coaching_ticket_purchases WHERE id=$1`, []any{bid}, &path)
-		if path != "/me/coaching/tickets" {
-			t.Fatalf("unsafe return %q -> %q", bad, path)
-		}
-	}
 }
 
 func TestTicketsReservedConsumedAndReleasedWithFixedEarnings(t *testing.T) {
@@ -316,42 +302,6 @@ func TestTicketUnusedRefundAndCrashRecovery(t *testing.T) {
 
 // 18歳未満は保護者の同意なしにチケットを買えるが、単発と同じく購入のたびに宣言のチェックが要る（本体 #569）。
 // 宣言は購入ごとに記録し、月の上限では止めない。買ったチケットは宣言なしで使える。
-func TestTicketMinorPurchaseRequiresDeclaration(t *testing.T) {
-	fakeCoachingCloudinary(t)
-	h, f := setupStripe(t)
-	minor, tu := demoUser(t, h, time.Date(time.Now().Year()-14, 1, 1, 0, 0, 0, 0, time.UTC))
-	body := map[string]any{"product_id": "six", "request_key": uuid.NewString(), "return_path": "/coaching/new"}
-	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", tu, body); rec.Code != 422 || !strings.Contains(rec.Body.String(), "guardian_permission_required") {
-		t.Fatalf("missing declaration %d %s", rec.Code, rec.Body.String())
-	}
-	if sessionCount(f) != 0 {
-		t.Fatal("checkout created without declaration")
-	}
-	body["guardian_permission"] = true
-	for i := 0; i < 2; i++ {
-		body["request_key"] = uuid.NewString()
-		rec := doJSON(t, h, http.MethodPost, "/v1/coaching/tickets/checkout", tu, body)
-		if rec.Code != 200 {
-			t.Fatalf("declared checkout %d %s", rec.Code, rec.Body.String())
-		}
-		var out struct {
-			ID string `json:"purchase_id"`
-		}
-		_ = json.Unmarshal(rec.Body.Bytes(), &out)
-		payTicketPurchase(t, h, out.ID, 5000)
-	}
-	var declarations, amount int
-	queryRowArgs(t, `SELECT count(*),COALESCE(max(amount_yen),0) FROM minor_purchase_declarations WHERE minor_id=$1 AND ref_type='ticket_purchase'`, []any{minor}, &declarations, &amount)
-	if declarations != 2 || amount != 5000 {
-		t.Fatalf("declarations %d amount %d", declarations, amount)
-	}
-	if got := ticketSummary(t, h, tu).Balance.Available; got != 12 {
-		t.Fatalf("balance %d", got)
-	}
-	ticketReview(t, h, tu)
-	assertTicketAccounting(t, h, adminToken(t, h))
-}
-
 func TestTicketRefundExcludesReservedAndCanRefundAfterRelease(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h, f := setupStripe(t)
@@ -419,10 +369,10 @@ func TestPostExpiryTicketRefundForOperatorFault(t *testing.T) {
 	// 文面の版を購入ごとに残す（本体 #572 項目10）。
 	var wording *string
 	queryRowArgs(t, `SELECT wording_version FROM coaching_ticket_purchases WHERE id=$1`, []any{purchase}, &wording)
-	if wording == nil || *wording != "v6" {
+	if wording == nil || *wording != "v7" {
 		t.Fatalf("wording version %+v", wording)
 	}
-	if rec := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", tu, nil); !strings.Contains(rec.Body.String(), `"terms_version":"v6"`) {
+	if rec := doJSON(t, h, http.MethodGet, "/v1/me/coaching/tickets", tu, nil); !strings.Contains(rec.Body.String(), `"terms_version":"v7"`) {
 		t.Fatalf("terms version %s", rec.Body.String())
 	}
 	// 期限を過ぎたら、失効の tick を待たずに従来の返金では断る（既存の挙動を維持）。

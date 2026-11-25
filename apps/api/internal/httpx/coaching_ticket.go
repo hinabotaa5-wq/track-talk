@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -30,11 +29,13 @@ const ticketValidityMonths = 6
 
 // ticketWordingVersion は、チケットの購入画面・最終確認・規約に表示している文面の版（本体 #572 v3、プラン改名で v4、スタンダードプランへの改名で v5（本体 #1007））。
 // v6: 表示名から「プラン」を外し「スタンダード」とした（本体 #1018）。
+// v7: チケットの販売を終了し、購入の文面を販売終了と「発行済みのチケットは有効期限まで利用できる」旨に改めた（本体 #1031）。
 // 購入の確定時に購入ごとに残し、文面の版と購入を突き合わせられるようにする（証拠化）。
-const ticketWordingVersion = "v6"
+const ticketWordingVersion = "v7"
 
-// チケットの新規販売を止めている間の文言（COACHING_TICKET_SALES_ENABLED）。
-const ticketSalesClosedMessage = "チケットの新規販売は終了しました。スタンダード・追加質問は申込み時にカードでお支払いください"
+// チケットの販売は終了した（本体 #1031、全商品）。環境変数などで再開する経路は持たない。
+// 発行済みのチケット（購入分・紹介特典の無料チケット）は、有効期限まで残高の表示と申込みでの利用ができる。
+const ticketSalesClosedMessage = "チケットの販売は終了しました。発行済みのチケットは有効期限まで利用できます。スタンダード・追加質問は申込み時にカードでお支払いください"
 
 type ticketRuleError struct{ code, message string }
 
@@ -123,11 +124,6 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	products, err := s.q.ListTicketProducts(r.Context())
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
 	balance, err := s.q.TicketBalance(r.Context(), &p.ID)
 	if err != nil {
 		MapDBError(w, err)
@@ -156,22 +152,19 @@ func (s *Server) myTickets(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
-	reason := ""
+	coupons, err := s.q.CouponBalance(r.Context(), &p.ID)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	ledgerOut := publicTicketLedger(ledger)
-	if !s.stripe.Configured() {
-		reason = "チケットの販売は準備中です"
-	}
-	if !s.cfg.CoachingTicketSales {
-		// 販売を止めている間は商品も出さない。動画添削は申込み時の都度払いだけにした。
-		products = []db.CoachingTicketProduct{}
-		reason = ticketSalesClosedMessage
-	}
-	// 残高があれば販売休止中も利用できる。支払い済みチケットをデモ用にはしない。
+	// 販売は終了した（本体 #1031）。商品は出さず、残高（発行済みのチケット）とクーポンの保有状況だけを返す。
+	// 支払い済みチケットをデモ用にはしない。
 	w, read := s.coachingReadOnSuccess(w, r, p.ID, "player", nil, "/me/coaching/tickets")
 	defer read()
-	JSON(w, 200, map[string]any{"products": products, "balance": balance, "next_expiry": nextExpiry, "balance_by_kind": byKind, "purchases": purchases, "ledger": ledgerOut,
-		"can_purchase": s.stripe.Configured() && s.cfg.CoachingTicketSales, "sales_open": s.cfg.CoachingTicketSales,
-		"purchase_block_reason": reason, "unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
+	JSON(w, 200, map[string]any{"products": []db.CoachingTicketProduct{}, "balance": balance, "next_expiry": nextExpiry, "balance_by_kind": byKind, "purchases": purchases, "ledger": ledgerOut,
+		"coupons": couponJSON(coupons), "can_purchase": false, "sales_open": false, "purchase_block_reason": ticketSalesClosedMessage,
+		"unit_yen": reviewPriceYen, "single_price_yen": reviewPriceYen,
 		"review_units": reviewTicketUnits, "validity_months": ticketValidityMonths, "terms_version": ticketWordingVersion})
 }
 
@@ -254,102 +247,13 @@ func writeTicketEligibilityReason(err error, reason *string) bool {
 	return true
 }
 
+// checkoutTickets は、チケットの購入を断る。販売は全商品とも終了し（本体 #1031）、環境変数などの値によらず
+// 常に 409 ticket_sales_closed を返す。発行済みのチケットの残高・利用・返金はこのハンドラーを通らない。
 func (s *Server) checkoutTickets(w http.ResponseWriter, r *http.Request) {
-	p, ok := s.requireProfile(w, r)
-	if !ok {
+	if _, ok := s.requireProfile(w, r); !ok {
 		return
 	}
-	if !s.cfg.CoachingTicketSales {
-		Error(w, 409, "ticket_sales_closed", ticketSalesClosedMessage)
-		return
-	}
-	if !s.stripe.Configured() {
-		Error(w, 409, "tickets_unavailable", "チケットの販売は準備中です")
-		return
-	}
-	var req struct {
-		ProductID    string    `json:"product_id"`
-		RequestKey   uuid.UUID `json:"request_key"`
-		ReturnPath   string    `json:"return_path"`
-		ReferralCode string    `json:"referral_code"`
-		minorDeclarationReq
-	}
-	if err := DecodeJSON(r, &req); err != nil || req.RequestKey == uuid.Nil {
-		FieldError(w, map[string]string{"product_id": "商品を選び直してください"})
-		return
-	}
-	var purchase db.CoachingTicketPurchase
-	err := s.tx(r.Context(), func(q *db.Queries) error {
-		if err := q.LockReviewRequester(r.Context(), p.ID); err != nil {
-			return err
-		}
-		// 単発と同じく、全員が購入のたびに注意事項のチェックを行う。
-		if err := requirePurchaseNotice(true, req.GuardianPermission); err != nil {
-			return err
-		}
-		old, err := q.GetTicketPurchaseByKey(r.Context(), db.GetTicketPurchaseByKeyParams{OwnerID: &p.ID, RequestKey: req.RequestKey})
-		if err == nil {
-			if old.ProductID != req.ProductID || old.ReturnPath != ticketReturnPath(req.ReturnPath) {
-				return &ticketRuleError{"purchase_conflict", "同じ購入操作の商品を変更できません。画面を更新してください"}
-			}
-			purchase = old
-			if old.Status == "pending" {
-				return recordPurchaseNotice(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: old.ID, amount: old.AmountYen}, req.minorDeclarationReq)
-			}
-			return nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		product, err := q.GetTicketProduct(r.Context(), req.ProductID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return &ticketRuleError{"product_unavailable", "この商品は現在購入できません"}
-		}
-		if err != nil {
-			return err
-		}
-		code, err := usableReferralCode(r.Context(), q, p.ID, req.ReferralCode)
-		if err != nil {
-			return err
-		}
-		purchase, err = q.CreateTicketPurchase(r.Context(), db.CreateTicketPurchaseParams{ID: uuid.New(), OwnerID: &p.ID, RequestKey: req.RequestKey, ProductID: product.ID,
-			Quantity: product.Quantity, AmountYen: product.AmountYen, ReferralCode: code, SessionExpiresAt: time.Now().Add(time.Hour), ReturnPath: ticketReturnPath(req.ReturnPath)})
-		if err != nil {
-			return err
-		}
-		return recordPurchaseNotice(r.Context(), q, p, minorPurchase{refType: "ticket_purchase", refID: purchase.ID, amount: purchase.AmountYen}, req.minorDeclarationReq)
-	})
-	if err != nil {
-		writeCheckoutError(w, err)
-		return
-	}
-	if purchase.Status != "pending" {
-		JSON(w, 200, map[string]any{"purchase_id": purchase.ID, "paid": true, "return_path": purchase.ReturnPath})
-		return
-	}
-	if !purchase.SessionExpiresAt.After(time.Now().Add(checkoutMinLife)) {
-		Error(w, 409, "ticket_checkout_expired", "購入画面の有効期限が近づいています。新しい購入操作で開き直してください")
-		return
-	}
-	if purchase.CheckoutUrl != nil {
-		JSON(w, 200, map[string]any{"purchase_id": purchase.ID, "checkout_url": *purchase.CheckoutUrl})
-		return
-	}
-	// 先に購入記録を確定。同じ操作を再送しても同じ購入・決済画面になり、通知が先着しても受け取れる。
-	page := s.cfg.WebBaseURL + "/me/coaching/tickets"
-	sess, err := s.stripe.CreateCheckoutSession(r.Context(), stripe.CheckoutParams{Name: fmt.Sprintf("スタンダードのチケット%d枚", purchase.Quantity), AmountYen: int(purchase.AmountYen),
-		SuccessURL: page + "?purchase=" + purchase.ID.String(), CancelURL: page + "?cancelled=1&return_to=" + url.QueryEscape(purchase.ReturnPath), Reference: purchase.ID.String(),
-		Metadata: map[string]string{"kind": "tickets", "purchase_id": purchase.ID.String()}, ExpiresAt: purchase.SessionExpiresAt,
-		PaymentMethodTypes: []string{"card"}, IdempotencyKey: "ticket-checkout-" + purchase.ID.String()})
-	if err != nil {
-		writeCheckoutError(w, fmt.Errorf("%w: %w", errStripe, err))
-		return
-	}
-	if err := s.q.SaveTicketCheckout(r.Context(), db.SaveTicketCheckoutParams{ID: purchase.ID, CheckoutSessionID: &sess.ID, CheckoutUrl: &sess.URL}); err != nil {
-		MapDBError(w, err)
-		return
-	}
-	JSON(w, 200, map[string]any{"purchase_id": purchase.ID, "checkout_url": sess.URL})
+	Error(w, http.StatusConflict, "ticket_sales_closed", ticketSalesClosedMessage)
 }
 
 func moveTickets(ctx context.Context, q *db.Queries, lot uuid.UUID, key, kind string, a, r, c, f int32) error {
@@ -539,10 +443,15 @@ func (s *Server) reserveReviewTickets(ctx context.Context, q *db.Queries, p db.P
 // 依頼行がない・読めない・印がない場合（選手キャンセル・再提出期限切れ・未割当の期限切れ・
 // 相談の予約・依頼が消えている場合を含む）は false を返し、出し直さない（fail-closed）。
 func coachCausedReviewEnd(ctx context.Context, q *db.Queries, reservation db.CoachingTicketReservation) (bool, error) {
-	if reservation.RequestID == nil {
+	return coachCausedEnd(ctx, q, reservation.RequestID)
+}
+
+// coachCausedEnd は coachCausedReviewEnd の依頼IDだけを取る形（クーポンの戻しでも使う。本体 #1031）。
+func coachCausedEnd(ctx context.Context, q *db.Queries, requestID *uuid.UUID) (bool, error) {
+	if requestID == nil {
 		return false, nil
 	}
-	rr, err := q.GetReviewRequest(ctx, *reservation.RequestID)
+	rr, err := q.GetReviewRequest(ctx, *requestID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -575,7 +484,7 @@ func reissueExpiredRewardLot(ctx context.Context, q *db.Queries, lot db.Coaching
 		return nil
 	}
 	title := "紹介特典：期限切れの無料チケットを出し直しました"
-	body := "運営者・コーチの都合で終わったスタンダードで使った分を出し直しました。新しい特典チケット：" + referralRewardTerms
+	body := "運営者・コーチの都合で終わったスタンダードで使った分を出し直しました。新しい" + legacyRewardTicketTerms
 	url, role := "/me/coaching/tickets", "player"
 	return q.InsertMessageNotification(ctx, db.InsertMessageNotificationParams{
 		ID: uuid.New(), RecipientID: *lot.OwnerID, Title: &title, Body: &body, Url: &url, CoachingRole: &role,

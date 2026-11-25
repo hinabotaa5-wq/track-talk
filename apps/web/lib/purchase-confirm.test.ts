@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reviewConfirmRows, ticketPackConfirmRows } from "./purchase-confirm";
+import { reviewConfirmRows } from "./purchase-confirm";
 import { installEnglish, setActiveLocale } from "./i18n";
 import { en } from "./i18n-en";
 
@@ -38,20 +38,9 @@ describe("purchase-confirm", () => {
     ]);
   });
 
-  it("英語辞書で 1 review の表記が消え、One ticket covers one Standard request. 相当になっている", () => {
+  it("英語のカード払いの確認文が運営者決定の短縮文の訳と一致する", () => {
     installEnglish(en);
     setActiveLocale("en");
-    const rows = ticketPackConfirmRows({
-      quantity: 6,
-      amountYen: 5000,
-      validityMonths: 6,
-    });
-    const contentRow = rows.find((r) => r.label === "Message" || r.label === "内容");
-    expect(contentRow).toBeDefined();
-    expect(contentRow?.value).toContain("6 Standard tickets (One ticket covers one Standard request.)");
-    expect(contentRow?.value).toContain("Only the purchaser can use them.");
-    expect(contentRow?.value).not.toContain("1 review");
-
     const cardRows = reviewConfirmRows({
       method: "card",
       priceYen: 500,
@@ -101,9 +90,6 @@ describe("purchase-confirm", () => {
     expect(normalCancel).toContain("有効期限を過ぎた分は失効します");
     expect(normalCancel).not.toContain("出し直します");
 
-    const packRefund = ticketPackConfirmRows({ quantity: 6, amountYen: 5000, validityMonths: 6 })
-      .find((row) => row.label === "払戻し")?.value;
-    expect(packRefund).toContain("有効期限を過ぎていても1枚を出し直します");
   });
 
   it("shows the free-ticket reissue exception in English too (本体 #797)", () => {
@@ -121,50 +107,35 @@ describe("purchase-confirm", () => {
         ticketKind: "reward",
       }).find((r) => r.label === "Cancellation and ticket returns")?.value;
       expect(rewardCancel).toContain("a new ticket is issued even after expiry");
-
-      const packRefund = ticketPackConfirmRows({ quantity: 6, amountYen: 5000, validityMonths: 6 })
-        .find((row) => row.label === "Refunds")?.value;
-      expect(packRefund).toContain("a new ticket is issued even after expiry");
     } finally {
       setActiveLocale("ja");
     }
   });
 
-  it("distinguishes a returned reservation from a monetary refund in English", () => {
-    installEnglish(en);
-    setActiveLocale("en");
-    try {
-      const refund = ticketPackConfirmRows({ quantity: 6, amountYen: 5000, validityMonths: 6 })
-        .find((row) => row.label === "Refunds")?.value;
-      expect(refund).toContain("the one reserved ticket is returned");
-      expect(refund).toContain("you receive a refund of ¥1,000 per ticket even after expiry");
-      expect(refund).not.toContain("returned or refunded");
-      expect(refund).not.toContain("(Terms, Article 6)");
-      expect(refund).toContain("divided by 6, multiplied by the number of unused tickets");
-    } finally {
-      setActiveLocale("ja");
-    }
-  });
-
-  it("チケット購入の確認は4行（内容・総額・有効期限・払戻し）で、確認画面だけで完結する（本体 #844）", () => {
+  // 本体 #1031：クーポンを使うときは、価格・クーポン（−¥500）・お支払い額の内訳を見せる。
+  it("クーポン適用の確認は、価格・クーポン・お支払い額の内訳を出す", () => {
     setActiveLocale("ja");
-    const rows = ticketPackConfirmRows({ quantity: 6, amountYen: 5000, validityMonths: 6, now: new Date("2026-11-20T10:00:00+09:00") });
-    expect(rows.map((r) => r.label)).toEqual(["内容", "総額", "有効期限", "払戻し"]);
-    expect(rows[0].value).toBe("スタンダードのチケット6枚（1枚でスタンダード1件）。購入した本人だけが使えます。譲ることはできません。");
-    expect(rows[1].value).toBe("5,000円（税込）。6枚分をまとめてカードで先に支払います。支払いが済むと購入が確定し、すぐ使えます。");
-    expect(rows[2].value).toContain("2027/05/20 10:00");
-    expect(rows[2].value).toContain("申し込んだ依頼が終了して戻るチケットも、有効期限を過ぎていれば失効します。");
-    const refund = rows[3].value;
-    expect(refund).toContain("購入者の都合による払戻しは原則として行いません");
-    expect(refund).toContain("確保したチケット1枚を戻します。これは確保の解除で、金銭の払戻しには当たりません");
-    expect(refund).not.toContain("有効期限を過ぎてから戻るチケットは失効します");
-    expect(refund).toContain("有効期限を過ぎていても1枚を出し直します");
-    expect(refund).toContain("（1）サービス終了時は、終了の時点で未使用のチケット（有効期限にかかわらず）について、購入金額を6で割った額に未使用の枚数を掛けた額（1円未満は四捨五入）を払い戻します。");
-    expect(refund).toContain("（3）");
-    expect(refund).toContain("チケット1枚につき1,000円");
-    expect(refund).toContain("失効後でも1枚につき1,000円");
-    expect(refund).not.toContain("利用規約第6条");
-    expect(refund).not.toMatch(/当社|チケットを戻すか返金/);
+    const base = { hasVideo: true, question: "相談", eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 1 };
+    const rows = reviewConfirmRows({ ...base, method: "card", priceYen: 1000, couponYen: 500 });
+    const value = (label: string) => rows.find((r) => r.label === label)?.value;
+    expect(value("価格")).toBe("1,000円（税込）");
+    expect(value("クーポン")).toBe("−500円（¥500クーポン1枚）");
+    expect(value("お支払い額")).toBe("500円（税込）");
+    expect(value("総額")).toBeUndefined();
+    expect(value("お支払い方法")).toBeDefined();
+    expect(value("クーポンの戻り")).toContain("クーポンが戻ります");
+    // ¥2,000 の申込みなら ¥1,500（プレミアム相当の価格でも同じ計算）。
+    const premium = reviewConfirmRows({ ...base, method: "card", priceYen: 2000, couponYen: 500 });
+    expect(premium.find((r) => r.label === "お支払い額")?.value).toBe("1,500円（税込）");
+    // 価格が ¥500 なら支払いは0円で、支払い方法・カードの行は出さない。
+    const free = reviewConfirmRows({ ...base, method: "card", priceYen: 500, couponYen: 500 });
+    expect(free.find((r) => r.label === "お支払い額")?.value).toBe("0円（税込）");
+    expect(free.find((r) => r.label === "お支払い方法")).toBeUndefined();
+    expect(free.find((r) => r.label === "キャンセル・クーポンの戻り")).toBeDefined();
+    // クーポンなしは従来どおり総額。
+    const plain = reviewConfirmRows({ ...base, method: "card", priceYen: 1000 });
+    expect(plain.find((r) => r.label === "総額")?.value).toBe("1,000円（税込）");
+    expect(plain.find((r) => r.label === "クーポン")).toBeUndefined();
   });
 });
 

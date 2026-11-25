@@ -20,10 +20,10 @@ SELECT c.code, p.id AS owner_id, p.nickname, c.issued_at, c.closed_at,
     r.granted_at, r.canceled_at, r.qualifying_refund_at
 FROM coaching_referral_codes c
 JOIN profiles p ON p.id = c.owner_id
-LEFT JOIN coaching_referral_rewards r ON r.lot_id = (
-    SELECT x.lot_id FROM coaching_referral_rewards x WHERE x.referral_code = c.code
-    ORDER BY x.canceled_at IS NULL DESC, x.granted_at DESC LIMIT 1)
-WHERE ($1::text = '' AND r.lot_id IS NOT NULL) OR c.code = $1::text
+LEFT JOIN LATERAL (
+    SELECT x.granted_at, x.canceled_at, x.qualifying_refund_at FROM coaching_referral_rewards x WHERE x.referral_code = c.code
+    ORDER BY x.canceled_at IS NULL DESC, x.granted_at DESC LIMIT 1) r ON true
+WHERE ($1::text = '' AND r.granted_at IS NOT NULL) OR c.code = $1::text
 ORDER BY r.granted_at DESC NULLS LAST, c.code
 LIMIT 200
 `
@@ -35,7 +35,7 @@ type AdminCoachingReferralOverviewRow struct {
 	IssuedAt           time.Time  `json:"issued_at"`
 	ClosedAt           *time.Time `json:"closed_at"`
 	Buyers             []string   `json:"buyers"`
-	GrantedAt          *time.Time `json:"granted_at"`
+	GrantedAt          time.Time  `json:"granted_at"`
 	CanceledAt         *time.Time `json:"canceled_at"`
 	QualifyingRefundAt *time.Time `json:"qualifying_refund_at"`
 }
@@ -81,7 +81,7 @@ func (q *Queries) CancelDisputedCoachingReferral(ctx context.Context, dollar_1 s
 
 const cancelReleasedReferralReward = `-- name: CancelReleasedReferralReward :exec
 UPDATE coaching_referral_rewards SET canceled_at = now()
-WHERE lot_id = $1 AND qualifying_refund_at IS NOT NULL AND canceled_at IS NULL
+WHERE lot_id = $1::uuid AND qualifying_refund_at IS NOT NULL AND canceled_at IS NULL
   AND EXISTS (SELECT FROM coaching_ticket_lots l WHERE l.id = coaching_referral_rewards.lot_id AND l.reserved = 0 AND l.consumed = 0)
 `
 
@@ -112,10 +112,11 @@ const getCoachingReferralProgress = `-- name: GetCoachingReferralProgress :one
 SELECT c.code, (c.closed_at IS NULL)::boolean AS active,
     (SELECT count(*)::int FROM coaching_referral_counts a
      WHERE a.referral_code = c.code AND a.canceled_at IS NULL) AS friend_count,
-    r.granted_at, l.expires_at
+    r.granted_at, l.expires_at AS ticket_expires_at, cp.expires_at AS coupon_expires_at
 FROM coaching_referral_codes c
 LEFT JOIN coaching_referral_rewards r ON r.referral_code = c.code AND r.canceled_at IS NULL
 LEFT JOIN coaching_ticket_lots l ON l.id = r.lot_id
+LEFT JOIN coaching_coupons cp ON cp.id = r.coupon_id
 WHERE c.owner_id = $1
   AND (c.closed_at IS NULL OR c.closed_at > now() - interval '7 days')
 ORDER BY c.closed_at IS NULL DESC, c.issued_at DESC
@@ -123,11 +124,12 @@ LIMIT 1
 `
 
 type GetCoachingReferralProgressRow struct {
-	Code        string     `json:"code"`
-	Active      bool       `json:"active"`
-	FriendCount int32      `json:"friend_count"`
-	GrantedAt   *time.Time `json:"granted_at"`
-	ExpiresAt   *time.Time `json:"expires_at"`
+	Code            string     `json:"code"`
+	Active          bool       `json:"active"`
+	FriendCount     int32      `json:"friend_count"`
+	GrantedAt       *time.Time `json:"granted_at"`
+	TicketExpiresAt *time.Time `json:"ticket_expires_at"`
+	CouponExpiresAt *time.Time `json:"coupon_expires_at"`
 }
 
 // 有効な周があればそれを、なければ終了から7日未満の周のうち直近の周を返す。進捗は周に所属する。
@@ -139,7 +141,8 @@ func (q *Queries) GetCoachingReferralProgress(ctx context.Context, ownerID uuid.
 		&i.Active,
 		&i.FriendCount,
 		&i.GrantedAt,
-		&i.ExpiresAt,
+		&i.TicketExpiresAt,
+		&i.CouponExpiresAt,
 	)
 	return i, err
 }
@@ -206,7 +209,7 @@ func (q *Queries) RecordCoachingReferral(ctx context.Context, arg RecordCoaching
 
 const referralRewardHasRefund = `-- name: ReferralRewardHasRefund :one
 SELECT EXISTS(SELECT FROM coaching_referral_rewards
-    WHERE lot_id = $1 AND qualifying_refund_at IS NOT NULL)::boolean
+    WHERE lot_id = $1::uuid AND qualifying_refund_at IS NOT NULL)::boolean
 `
 
 func (q *Queries) ReferralRewardHasRefund(ctx context.Context, lotID uuid.UUID) (bool, error) {
