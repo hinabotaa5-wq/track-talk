@@ -5,6 +5,6 @@ import Link from "next/link";
 export function ServiceConsentText() {
   return (
     <span>
-      <Link href="/terms" className="text-blue-400 underline">{L("利用規約")}</Link>{L("・")}<Link href="/guidelines" className="text-blue-400 underline">{L("コミュニティガイドライン")}</Link>{L("・")}<Link href="/privacy" className="text-blue-400 underline">{L("プライバシーポリシー")}</Link>{L("（海外への個人情報提供を含む）に同意する")}</span>
+      <Link href="/terms" className="text-blue-400 underline">{L("利用規約")}</Link>{L("・")}<Link href="/guidelines" className="text-blue-400 underline">{L("コミュニティガイドライン")}</Link>{L("・")}<Link href="/privacy" className="text-blue-400 underline">{L("プライバシーポリシー")}</Link>{L("に同意する")}</span>
   );
 }
