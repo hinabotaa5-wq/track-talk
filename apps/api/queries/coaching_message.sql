@@ -69,6 +69,7 @@ WHERE id = $1;
 -- 非公開動画の ID がもうどこかで使われているか。ID は再生 URL に出るので、他人の動画の ID を
 -- 自分のやりとりや見本動画に付けて流用（保存期間が過ぎると元の動画まで消える）させないために見る。
 SELECT (EXISTS (SELECT 1 FROM review_requests WHERE video_public_id = sqlc.arg(public_id)::text)
+     OR EXISTS (SELECT 1 FROM review_request_videos WHERE video_public_id = sqlc.arg(public_id)::text)
      OR EXISTS (SELECT 1 FROM review_responses WHERE demo_video_public_id = sqlc.arg(public_id)::text)
      OR EXISTS (SELECT 1 FROM coaching_messages WHERE video_public_id = sqlc.arg(public_id)::text)
      OR EXISTS (SELECT 1 FROM coaching_consultations WHERE video_public_id=sqlc.arg(public_id)::text OR answer_video_public_id=sqlc.arg(public_id)::text))::boolean AS in_use;

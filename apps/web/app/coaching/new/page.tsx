@@ -37,6 +37,7 @@ import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { PremiumRequestForm } from "./premium-form";
 
 // フォーム添削の依頼を送る。支払いのある環境では誰でも申し込める（招待コードのゲートは外した。本体 #569）。
 // 依頼するコーチは選手が選ぶ（運営からの割り当てはしない）。料金はどのコーチでも同じ。
@@ -76,7 +77,19 @@ function athleteInfoBody(info: ReviewAthleteInfo): Record<ReviewAthleteInfoKey, 
   return Object.fromEntries(reviewAthleteInfoKeys.map((key) => [key, info[key]?.trim() || null])) as Record<ReviewAthleteInfoKey, string | null>;
 }
 
+// プレミアム（本体 #1053）は ?plan=premium で別のフォームを出す。スタンダードのフォームはそのまま。
 export default function NewReviewRequestPage() {
+  const [plan, setPlan] = useState<"standard" | "premium" | null>(null);
+  useEffect(() => {
+    // 静的書き出しのため、URL のクエリは表示後にしか読めない。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPlan(new URLSearchParams(window.location.search).get("plan") === "premium" ? "premium" : "standard");
+  }, []);
+  if (plan === null) return <PageLoading screen label={L("読み込み中...")} />;
+  return plan === "premium" ? <PremiumRequestForm /> : <StandardRequestPage />;
+}
+
+function StandardRequestPage() {
   const { session, token, loading, profile } = useAuth();
   const router = useRouter();
   const [me, setMe] = useState<CoachingMe | null>(null);

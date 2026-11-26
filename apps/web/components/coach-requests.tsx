@@ -1,5 +1,7 @@
 "use client";
 
+import { PremiumBadge } from "@/components/premium-review";
+import { isPremium } from "@/lib/premium";
 import { ReviewInfoHistory } from "@/components/review-info-request";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -13,10 +15,11 @@ import { useCallback, useEffect, useState } from "react";
 function RequestSummary({ request, locale }: { request: CoachReviewRequest; locale: Locale }) {
   return (
     <div className="space-y-0.5">
-      <p className="font-semibold text-white">
-        {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
+      <p className="flex flex-wrap items-center gap-2 font-semibold text-white">
+        <span>{coachEventLabels[request.event]} · {coachTierLabels[request.tier]}</span>
+        {isPremium(request) ? <PremiumBadge /> : null}
       </p>
-      <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{t(locale, "coach.reviewing.question", { text: reviewQuestionText(request) })}</p>
+      {isPremium(request) ? null : <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{t(locale, "coach.reviewing.question", { text: reviewQuestionText(request) })}</p>}
       {request.status === "needs_info" ? null : <p className="text-xs text-slate-300">{t(locale, "coach.reviewing.due", { date: formatDateTime(request.due_at) })}</p>}
     </div>
   );

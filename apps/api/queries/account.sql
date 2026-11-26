@@ -150,4 +150,8 @@ SELECT 'image'::text, cp.photo_public_id::text
 FROM coach_profiles cp WHERE cp.profile_id = sqlc.arg('user_id') AND cp.photo_public_id IS NOT NULL
 UNION ALL
 SELECT 'coaching'::text, r.video_public_id
-FROM review_requests r WHERE r.requester_id = sqlc.arg('user_id');
+FROM review_requests r WHERE r.requester_id = sqlc.arg('user_id') AND r.video_public_id IS NOT NULL
+UNION ALL
+-- プレミアムの動画（本体 #1053）。依頼と一緒に消えるので、依頼の動画と同じく退会で消す。
+SELECT 'coaching'::text, v.video_public_id
+FROM review_request_videos v JOIN review_requests r ON r.id = v.request_id WHERE r.requester_id = sqlc.arg('user_id');

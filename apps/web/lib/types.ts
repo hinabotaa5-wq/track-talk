@@ -722,10 +722,13 @@ export type ReviewResponse =
   | { hidden: true; created_at: string }
   | {
       hidden: false;
+      // スタンダードの回答の型の欄。プレミアムの総括（本体 #1053）では null で、代わりに sections が入る。
       good_point: string;
       fix_points: string[];
       drill: string;
       hitokoto: string | null;
+      // プレミアムの総括の枠ごとのブロック（動画がある枠だけ、決まった順）。スタンダードでは無い。
+      sections?: PremiumSection[];
       // 回答の新しい型の3欄（本体 #1013）。この型より前の返答は null で、表示では節ごと出さない。訳は付かない。
       cue?: string | null;
       success_criteria?: string | null;
@@ -754,9 +757,36 @@ export type ReviewCoachOption = {
   id: string; nickname: string | null; photo_url: string; events: CoachEvent[]; years: number; best_record: string; achievements: string;
   // このコーチのいま有効なスタンダード価格（本体 #1052）。古い API では無い。
   price_yen?: number;
+  // プレミアムの指名候補（?plan=premium）にだけ入る、そのコーチのプレミアム価格（本体 #1053）。
+  premium_price_yen?: number;
 };
 
+// プレミアム（本体 #1053）。決まった5枠：レース全体／スタート／後半／練習／その他。
+export type PremiumSlot = "race" | "start" | "second_half" | "practice" | "other";
+export type ReviewPlan = "standard" | "premium";
+
+// プレミアムの動画1本。レース全体だけタイム・風速・コンディション、練習だけ目的が入る（未入力は null）。
+export type PremiumVideo = {
+  position: number;
+  video_url: string | null;
+  thumbnail_url: string | null;
+  race_time?: string | null;
+  wind_speed?: string | null;
+  body_condition?: string | null;
+  practice_purpose?: string | null;
+};
+
+// 枠ごとにまとめた動画。動画がない枠は API が出さない。
+export type PremiumVideoGroup = { slot: PremiumSlot; videos: PremiumVideo[] };
+
+export type PremiumSection = { slot: PremiumSlot; body: string };
+
 export type ReviewRequest = {
+  // スタンダード／プレミアム（本体 #1053）。古い API では無い（スタンダードとして扱う）。
+  plan?: ReviewPlan;
+  // プレミアムの依頼にだけ入る、枠ごとの動画と本数。
+  premium_videos?: PremiumVideoGroup[];
+  video_count?: number;
   started_at?: string | null;
   canceled_at?: string | null;
   requested_coach_id?: string | null;
@@ -944,6 +974,7 @@ export type PublicCoach = {
   support_consult?: import("./support-consult").PublicSupportConsult | null;
   // いま有効な価格（本体 #1052）。スタンダードは未設定のコーチでも共通の価格が入る。プレミアムは未設定なら null。古い API では無い。
   review_price_yen?: number;
+  // プレミアムの価格（本体 #1053）。価格がないコーチは null で、プレミアムタブに出ない。
   premium_price_yen?: number | null;
 };
 

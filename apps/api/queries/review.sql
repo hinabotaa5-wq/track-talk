@@ -50,8 +50,9 @@ WHERE coach_id = $1 AND returned_at IS NOT NULL;
 
 -- name: CreateReviewRequest :one
 -- status は queued（支払いなしのデモ版）か awaiting_payment（支払いが届いたら queued になる）。
-INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, pb, goal_time, wind_speed, body_condition, coupon_discount_yen)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+-- plan はスタンダード（standard）かプレミアム（premium、本体 #1053）。プレミアムの動画は review_request_videos に持ち、video_public_id は NULL。
+INSERT INTO review_requests (id, requester_id, tier, event, focus, video_public_id, due_at, status, question, requested_coach_id, requested_coach_name, base_price_yen, use_tickets, pb, goal_time, wind_speed, body_condition, coupon_discount_yen, plan)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 RETURNING *;
 
 -- name: ListMyReviewRequests :many

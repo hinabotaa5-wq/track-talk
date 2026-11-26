@@ -55,10 +55,11 @@ func (s *Server) reviewResponseJSON(rs db.ReviewResponse) map[string]any {
 		return map[string]any{"hidden": true, "created_at": rs.CreatedAt}
 	}
 	out := map[string]any{
-		"hidden":     false,
-		"good_point": rs.GoodPoint,
+		"hidden": false,
+		// スタンダードの型の3欄。プレミアムの総括（本体 #1053）では null で、代わりに sections を出す。
+		"good_point": stringOrNil(rs.GoodPoint),
 		"fix_points": rs.FixPoints,
-		"drill":      rs.Drill,
+		"drill":      stringOrNil(rs.Drill),
 		"hitokoto":   rs.Hitokoto,
 		// 回答の新しい型の3欄（本体 #1013）。000191 より前の返答は null で、表示側で節ごと隠す。訳は付けない。
 		"cue":                  rs.Cue,
@@ -162,6 +163,11 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.withReviewTranslations(r.Context(), out, rr)
+	// プレミアム（本体 #1053）は、枠ごとの動画（動画ごとの入力つき）と総括のブロックを足す。
+	if err := s.withPremium(r.Context(), s.q, out, rr, coachSeesVideo(rr)); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	delete(out, "rating")
 	// 引き受けた時に書き留めた取引条件。引き受ける前の版のコードで受けた依頼には無い。
 	wo, err := s.q.GetReviewWorkOrder(r.Context(), db.GetReviewWorkOrderParams{ReviewRequestID: &rr.ID, CoachID: &p.ID})
@@ -190,6 +196,8 @@ type reviewResponseReq struct {
 	SuccessCriteria   string   `json:"success_criteria"`
 	NextVideo         string   `json:"next_video"`
 	DemoVideoPublicID string   `json:"demo_video_public_id"`
+	// プレミアムの総括の枠ごとのブロック（本体 #1053）。スタンダードでは使わない。
+	Sections []premiumSectionReq `json:"sections"`
 }
 
 // submitReviewResponse は、引き受けたコーチが返答を送る。返却目安を過ぎたら送れない。
@@ -205,6 +213,14 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	var req reviewResponseReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	// プレミアム（本体 #1053）は総括（全体の一言診断＋枠ごとのブロック）で返す。担当でない依頼は従来どおり下の返却で 409 になる。
+	if current, err := s.q.GetCoachReviewRequest(r.Context(), db.GetCoachReviewRequestParams{ID: id, CoachID: p.ID}); err == nil && current.Plan == planPremium {
+		s.submitPremiumReviewResponse(w, r, p, current, req)
+		return
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		MapDBError(w, err)
 		return
 	}
 	good := strings.TrimSpace(req.GoodPoint)
@@ -298,9 +314,9 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	rs, err := q.CreateReviewResponse(r.Context(), db.CreateReviewResponseParams{
 		RequestID:         rr.ID,
 		CoachID:           &p.ID,
-		GoodPoint:         good,
+		GoodPoint:         &good,
 		FixPoints:         fixes,
-		Drill:             drill,
+		Drill:             &drill,
 		DemoVideoPublicID: demo,
 		Hitokoto:          &hitokoto,
 		Cue:               &cue,
@@ -438,6 +454,11 @@ func (s *Server) writeRequesterReview(w http.ResponseWriter, r *http.Request, rr
 		return
 	}
 	s.withReviewTranslations(r.Context(), out, rr)
+	// プレミアム（本体 #1053）は、枠ごとの動画と総括のブロックを足す。
+	if err := s.withPremium(r.Context(), s.q, out, rr, true); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	coach, err := s.reviewCoachJSON(r.Context(), out, rr)
 	if err != nil {
 		MapDBError(w, err)

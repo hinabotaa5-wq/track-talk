@@ -3,6 +3,7 @@ import { coachText, coachTexts, originalTextClass } from "@/lib/coaching-display
 import { clarifyReasonLabels } from "@/lib/review";
 import type { ReviewResponse } from "@/lib/types";
 import { formatDateTime } from "@/lib/format";
+import { PremiumSummarySections } from "@/components/premium-review";
 import type { ReactNode } from "react";
 
 // 回答ドキュメントに出すコーチ（顔写真と名前）。コーチ本人の画面では渡さない。
@@ -20,9 +21,11 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
     );
   }
   const mine = viewer === "coach";
-  const good = coachText(response.good_point, response.good_point_ja, { mine });
-  const fixes = coachTexts(response.fix_points, response.fix_points_ja, { mine });
-  const drill = coachText(response.drill, response.drill_ja, { mine });
+  // プレミアムの総括（本体 #1053）は、全体の一言診断と枠ごとのブロックだけを出す（スタンダードの型の欄はない）。
+  const premium = Array.isArray(response.sections);
+  const good = coachText(response.good_point ?? "", response.good_point_ja, { mine });
+  const fixes = premium ? [] : coachTexts(response.fix_points, response.fix_points_ja, { mine });
+  const drill = coachText(response.drill ?? "", response.drill_ja, { mine });
   const name = mine ? L("あなたの回答") : coach?.nickname ? L("{v0}コーチの回答", { v0: coach.nickname }) : L("コーチの回答");
   return (
     <article aria-label={L("コーチの回答")} className="space-y-4 rounded-2xl border border-white/20 glass bg-white/5 p-4">
@@ -43,6 +46,7 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
           <p className="whitespace-pre-wrap text-slate-100">{response.hitokoto}</p>
         </DocSection>
       ) : null}
+      {premium ? <PremiumSummarySections sections={response.sections ?? []} /> : (<>
       <DocSection title={L("良い点")} tone="text-emerald-300">
         <p className="whitespace-pre-wrap text-slate-100">{good.text}</p>
         {good.original !== null ? <p lang="en" className={originalTextClass}>{good.original}</p> : null}
@@ -72,6 +76,7 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
           <p className="whitespace-pre-wrap text-slate-100">{response.next_video}</p>
         </DocSection>
       ) : null}
+      </>)}
       {response.demo_video_url ? (
         <DocSection title={L("見本動画")} tone="text-slate-300">
           <video src={response.demo_video_url} controls playsInline preload="metadata" className="mx-auto w-full max-w-[260px] max-h-[300px] rounded-lg bg-black" />

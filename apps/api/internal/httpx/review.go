@@ -76,6 +76,7 @@ func newDemoCode() (string, error) {
 func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 	return map[string]any{
 		"id":       rr.ID,
+		"plan":     rr.Plan, // standard／premium（本体 #1053）
 		"tier":     rr.Tier,
 		"event":    rr.Event,
 		"focus":    rr.Focus,
@@ -295,6 +296,9 @@ type reviewRequestReq struct {
 	GoalTime      *string `json:"goal_time"`
 	WindSpeed     *string `json:"wind_speed"`
 	BodyCondition *string `json:"body_condition"`
+	// プラン（standard／premium。空はスタンダード）と、プレミアムの動画（本体 #1053）。スタンダードでは videos を使わない。
+	Plan   string            `json:"plan"`
+	Videos []premiumVideoReq `json:"videos"`
 	// 18歳未満が自分で払うときの、購入のたびの宣言（minor_purchase.go）。
 	minorDeclarationReq
 }
@@ -313,6 +317,15 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	var req reviewRequestReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	switch req.Plan {
+	case planPremium:
+		s.createPremiumReviewRequest(w, r, p, req)
+		return
+	case "", planStandard:
+	default:
+		FieldError(w, map[string]string{"plan": "プランを選び直してください"})
 		return
 	}
 	fields := map[string]string{}
@@ -483,6 +496,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。
 		Status: map[bool]string{true: "awaiting_payment", false: "queued"}[payments],
+		Plan:   planStandard,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -516,6 +530,12 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.finishReviewRequestCreate(w, r, p, rr, payments, req)
+}
+
+// finishReviewRequestCreate は、作った依頼の支払い画面を作る（払うものがなければ通知と訳を済ませる）までを行い、応答を書く。
+// スタンダードとプレミアム（本体 #1053）の両方がここを通る。
+func (s *Server) finishReviewRequestCreate(w http.ResponseWriter, r *http.Request, p db.Profile, rr db.ReviewRequest, payments bool, req reviewRequestReq) {
 	if payments {
 		url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.ReferralCode, req.minorDeclarationReq)
 		if err != nil {
@@ -540,6 +560,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		out := s.reviewRequestJSON(rr)
 		out["checkout_url"] = url
+		if err := s.withPremium(r.Context(), s.q, out, rr, true); err != nil {
+			MapDBError(w, err)
+			return
+		}
 		JSON(w, http.StatusCreated, out)
 		return
 	}
@@ -550,6 +574,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	out := s.reviewRequestJSON(rr)
 	s.withReviewTranslations(r.Context(), out, rr)
+	if err := s.withPremium(r.Context(), s.q, out, rr, true); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusCreated, out)
 }
 
