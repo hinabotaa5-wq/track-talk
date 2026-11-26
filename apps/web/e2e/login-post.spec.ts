@@ -12,7 +12,7 @@ test("login then publish a text post", async ({ page }) => {
   // 登録画面を通らずにログインした人も、規約などと海外への提供に1回で同意する。
   await expect(page.getByRole("heading", { name: "利用にあたっての同意" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("checkbox")).toHaveCount(1);
-  await expect(page.getByRole("checkbox")).toHaveAccessibleName("利用規約・コミュニティガイドライン・プライバシーポリシー（海外への個人情報提供を含む）に同意する");
+  await expect(page.getByRole("checkbox")).toHaveAccessibleName("利用規約・コミュニティガイドライン・プライバシーポリシーに同意する");
   await expect(page.getByRole("button", { name: "同意して続ける" })).toBeDisabled();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "同意して続ける" }).click();

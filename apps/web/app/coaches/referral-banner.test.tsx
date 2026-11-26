@@ -91,6 +91,40 @@ it("見出しは13pxで、390px以上では16pxの1行表示にする", async ()
   }
 });
 
+it("見出しは左右アイコンの間で中央寄せにし、既存クラスと文言は変えない（本体 #1043）", async () => {
+  setActiveLocale("ja");
+  await act(async () => root.render(<ReferralBanner />));
+  const headline = container.querySelector('a[href="/referral"] > span > span');
+  expect(headline?.textContent).toBe(HEADLINE_JA);
+  expect(headline?.classList.contains("text-center")).toBe(true);
+  for (const name of ["block", "truncate", "text-[13px]", "font-semibold", "min-[390px]:text-base"]) {
+    expect(headline?.classList.contains(name)).toBe(true);
+  }
+  // 外側の span は従来どおり左右アイコンの間の全幅を占める。
+  const outer = headline?.parentElement;
+  for (const name of ["min-w-0", "flex-1"]) expect(outer?.classList.contains(name)).toBe(true);
+});
+
+it("バナーの構造は変えず、アイコンは Gift が左端・ChevronRight が右端のまま（本体 #1043）", async () => {
+  setActiveLocale("ja");
+  await act(async () => root.render(<ReferralBanner />));
+  const link = container.querySelector('a[href="/referral"]');
+  expect(link?.getAttribute("aria-label")).toBe(HEADLINE_JA);
+  for (const name of ["flex", "items-center", "h-14", "px-3", "gap-2", "bg-yellow-400/70", "text-slate-900", "rounded-xl"]) {
+    expect(link?.classList.contains(name)).toBe(true);
+  }
+  expect(link?.classList.contains("justify-center")).toBe(false);
+  const children = [...(link?.children ?? [])];
+  expect(children).toHaveLength(3);
+  expect(children[0].tagName.toLowerCase()).toBe("svg");
+  expect(children[0].getAttribute("class")).toContain("lucide-gift");
+  expect(children[0].getAttribute("class")).toContain("size-6");
+  expect(children[1].tagName.toLowerCase()).toBe("span");
+  expect(children[2].tagName.toLowerCase()).toBe("svg");
+  expect(children[2].getAttribute("class")).toContain("lucide-chevron-right");
+  expect(children[2].getAttribute("class")).toContain("size-5");
+});
+
 it("黄色地に濃色文字で、見出しはセミボールド・閉じるボタンなし", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));

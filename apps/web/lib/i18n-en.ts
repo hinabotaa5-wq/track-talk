@@ -1931,7 +1931,7 @@ export const en: Readonly<Record<string, string>> = {
   "このまとめは、もとになった感覚を保存する前に作成されたものです。": "This summary was created before source notes were saved.",
   "AI がまとめた目安です。": "A guide summarized by AI.",
   "まとめを読み込めませんでした": "Couldn't load the summary",
-  "（海外への個人情報提供を含む）に同意する": " (including providing personal information overseas)",
+  "に同意する": "",
   "TrackTalkを起動しています": "Starting TrackTalk",
   "このままお待ちください": "Please wait",
   "答え（500文字まで）": "Answer (up to 500 characters)",
