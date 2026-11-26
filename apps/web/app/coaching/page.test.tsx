@@ -7,14 +7,14 @@ import CoachingPage, { metadata } from "./page";
 // /coaching はカードメニューではなく、/coaches と同じ一覧画面を出す（本体 #641）。
 // 旧ハブの文言（カード・利用中の方・準備中の説明）は一覧側に出さない。
 const apiFetch = vi.fn();
-const flags = vi.hoisted(() => ({ coaching: false, list: false, supportList: true, featured: null as string | null }));
+const flags = vi.hoisted(() => ({ coaching: false, list: false, supportList: true, featured: [] as string[] }));
 const navigation = { tab: null as string | null };
 vi.mock("@/lib/features", async (original) => ({
   ...await original<typeof import("@/lib/features")>(),
   get coachingEnabled() { return flags.coaching; },
   get coachingCoachListEnabled() { return flags.list; },
   get supportPlanListEnabled() { return flags.supportList; },
-  get featuredCoachID() { return flags.featured; },
+  get featuredCoachIDs() { return flags.featured; },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -32,7 +32,7 @@ let container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
-  flags.coaching = false; flags.list = false; flags.supportList = true; flags.featured = null;
+  flags.coaching = false; flags.list = false; flags.supportList = true; flags.featured = [];
   navigation.tab = null;
   apiFetch.mockReset();
   apiFetch.mockImplementation(async (path: string) => {
@@ -94,7 +94,7 @@ it("開始の告知がある間も、閉じているときだけ告知と準備�
 it("特集モードでは一覧の代わりに特集ページを出す", async () => {
   flags.coaching = true;
   flags.list = true;
-  flags.featured = "c-featured";
+  flags.featured = ["c-featured"];
   await render();
   // 特集ページ（本体 #991）：ヒーローの h1 は無く、「コーチについて」の見出しに名前が出る。
   expect(container.querySelector("h1")).toBeNull();
@@ -109,4 +109,17 @@ it("特集モードを切ると従来の一覧に戻る", async () => {
   await render();
   expect(container.querySelector('[role="tabpanel"]')).not.toBeNull();
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coaches")).toBe(true);
+});
+
+it("特集コーチが複数なら、並び順に取得してプロフィールを横スライドにする（本体 #1063）", async () => {
+  flags.coaching = true;
+  flags.list = true;
+  flags.featured = ["c-featured", "c-second"];
+  const base = apiFetch.getMockImplementation()!;
+  apiFetch.mockImplementation(async (path: string) => (path === "/v1/coaches/c-second" ? { id: "c-second", nickname: "二人目", photo_url: "", events: ["100m"], best_record: "", achievements: "", hitokoto: "", sns_urls: [], on_duty: true, plans: [] } : base(path)));
+  await render();
+  expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/c-featured", "/v1/coaches/c-second"]);
+  expect(container.querySelectorAll('[data-testid="featured-slide"]')).toHaveLength(2);
+  expect(container.querySelector("#featured-about")?.textContent).toBe("特集コーチについて");
+  expect(container.querySelector('[role="tabpanel"]')).toBeNull();
 });
