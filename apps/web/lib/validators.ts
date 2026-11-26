@@ -92,6 +92,26 @@ export const nicknameSchema = z.object({
   event: z.enum(appEventValues, { error: () => L("種目を選んでください") }),
 });
 
+// 日本時間の今年（生まれた年の上限。API と同じく日本時間で数える）。
+export function currentJstYear(now: Date = new Date()) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric" }).format(now));
+}
+
+// 全角の数字は半角にそろえる（スマホの日本語入力で全角になることがあるため）。
+export function normalizeBirthYear(raw: string) {
+  return raw.trim().replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+}
+
+// 生まれた年（本体 #1045）の入力を確かめる。西暦4桁で、1900〜日本時間の今年。正しければ null、だめなら理由。
+export function birthYearError(raw: string, now: Date = new Date()): string | null {
+  const value = normalizeBirthYear(raw);
+  if (!value) return L("生まれた年を入力してください");
+  if (!/^[0-9]{4}$/.test(value)) return L("生まれた年は西暦4桁で入力してください");
+  const year = Number(value);
+  if (year < 1900 || year > currentJstYear(now)) return L("生まれた年が正しくありません");
+  return null;
+}
+
 export const resetSchema = z.object({
   email: z.string({ error: () => L("メールアドレスを確認してください") }).email({ error: () => L("メールアドレスを確認してください") }),
 });

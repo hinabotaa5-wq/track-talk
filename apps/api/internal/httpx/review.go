@@ -399,7 +399,8 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		FieldError(w, fields)
 		return
 	}
-	if err := requirePurchaseNotice(payments, req.GuardianPermission); err != nil {
+	// 購入前チェックは、未成年（の可能性がある人）の支払いだけで求める（本体 #1045）。
+	if err := requirePurchaseNotice(payments && purchaseNoticeRequired(p, time.Now()), req.GuardianPermission); err != nil {
 		writeCheckoutError(w, err)
 		return
 	}

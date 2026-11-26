@@ -9,6 +9,12 @@ describe("profileIncomplete", () => {
     expect(profileIncomplete({ nickname: "ラン", event: null })).toBe(true);
     expect(profileIncomplete({ nickname: "ラン", event: "100m" })).toBe(false);
   });
+
+  it("生まれた年の情報がない人も、決めていないとみなす（本体 #1045）。値が来ない古い API では止めない", () => {
+    expect(profileIncomplete({ nickname: "ラン", event: "100m", birth_year_known: false })).toBe(true);
+    expect(profileIncomplete({ nickname: "ラン", event: "100m", birth_year_known: true })).toBe(false);
+    expect(profileIncomplete({ nickname: "ラン", event: "100m", birth_year_known: undefined })).toBe(false);
+  });
 });
 
 describe("mustCompleteProfile", () => {
@@ -21,6 +27,16 @@ describe("mustCompleteProfile", () => {
     expect(mustCompleteProfile("/terms", empty)).toBe(false);
     expect(mustCompleteProfile("/contact", empty)).toBe(false);
     expect(mustCompleteProfile("/reset-password/update", empty)).toBe(false);
+  });
+
+  it("生まれた年だけがまだの人も、プロフィール画面へ送る。退会の画面は塞がない（本体 #1045）", () => {
+    const noYear = { nickname: "ラン", event: "100m", birth_year_known: false };
+    expect(mustCompleteProfile("/", noYear)).toBe(true);
+    expect(mustCompleteProfile("/coaching/new", noYear)).toBe(true);
+    expect(mustCompleteProfile("/me/profile", noYear)).toBe(false);
+    expect(mustCompleteProfile("/me/delete", noYear)).toBe(false);
+    expect(mustCompleteProfile("/goodbye", noYear)).toBe(false);
+    expect(mustCompleteProfile("/me/deleteX", noYear)).toBe(true);
   });
 
   it("決め終えた人と、まだ読み込み中の人は止めない", () => {

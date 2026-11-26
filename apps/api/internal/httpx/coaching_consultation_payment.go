@@ -46,8 +46,9 @@ func (s *Server) consultationCheckout(ctx context.Context, initial db.CoachingCo
 			return err
 		}
 		if current.ContractID == nil {
-			// 添削のあとの追加質問は、本人が自分で払う。保護者同意と月の上限では止めず、購入のたびの宣言をこのロックの中で確かめて残す。
-			if err := requirePurchaseNotice(true, decl.GuardianPermission); err != nil {
+			// 添削のあとの追加質問は、本人が自分で払う。保護者同意と月の上限では止めず、未成年（の可能性がある人）だけ
+			// 購入のたびの宣言をこのロックの中で確かめて残す（本体 #1045）。
+			if err := requirePurchaseNotice(purchaseNoticeRequired(owner, time.Now()), decl.GuardianPermission); err != nil {
 				return err
 			}
 			if err := recordPurchaseNotice(ctx, q, owner, minorPurchase{refType: "consultation", refID: current.ID, amount: current.PriceYen, coachID: current.CoachID}, decl); err != nil {

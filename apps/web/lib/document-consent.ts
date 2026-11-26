@@ -1,8 +1,8 @@
 // Keep these in sync with document_consent.go; bump the changed document on revision.
 export const documentConsentVersions = {
-  terms: "terms-2026-11-25b",
+  terms: "terms-2026-11-26",
   guidelines: "guidelines-2026-11-25",
-  privacy: "privacy-2026-11-25",
+  privacy: "privacy-2026-11-26",
 } as const;
 
 export type DocumentConsentVersions = Record<keyof typeof documentConsentVersions, string>;

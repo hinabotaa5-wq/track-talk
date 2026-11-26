@@ -20,6 +20,9 @@ func TestReservedProfileNicknames(t *testing.T) {
 
 	patch := func(t *testing.T, auth, nickname string, status int, fragment string) {
 		t.Helper()
+		// 生まれた年（本体 #1045）は年の情報がない人には必須。ここではニックネームの判定だけを確かめるので、先に年を入れておく。
+		doJSON(t, h, http.MethodGet, "/v1/me", auth, nil)
+		execSQLArgs(t, `UPDATE profiles SET birth_year = 2000 WHERE birth_year IS NULL AND birth_month IS NULL`)
 		rec := doJSON(t, h, http.MethodPatch, "/v1/me", auth, map[string]any{
 			"nickname": nickname, "nickname_public": true, "event": "100m",
 		})

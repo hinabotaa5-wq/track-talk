@@ -669,8 +669,8 @@ func (s *Server) submitConsultation(w http.ResponseWriter, r *http.Request) {
 			return &ticketRuleError{"payment_unavailable", "追加質問の決済は準備中です"}
 		}
 		if current.ContractID == nil {
-			// フォーム添削のあとの追加質問も、全員の購入前チェックを記録する。
-			if err := requirePurchaseNotice(true, declared.GuardianPermission); err != nil {
+			// フォーム添削のあとの追加質問も、未成年（の可能性がある人）には購入前チェックを求める（本体 #1045）。
+			if err := requirePurchaseNotice(purchaseNoticeRequired(owner, time.Now()), declared.GuardianPermission); err != nil {
 				return err
 			}
 		} else if current.Minor {

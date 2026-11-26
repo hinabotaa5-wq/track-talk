@@ -20,8 +20,9 @@ vi.mock("next/navigation", () => ({
   useRouter: () => routerMock,
   useSearchParams: () => new URLSearchParams(searchState.paid ? "paid=1" : ""),
 }));
+const authProfile = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 vi.mock("@/components/auth-provider", () => ({
-  useAuth: () => ({ session: { user: { id: "athlete" } }, token: "token", loading: false }),
+  useAuth: () => ({ session: { user: { id: "athlete" } }, token: "token", loading: false, profile: authProfile.current }),
 }));
 const confirmMock = vi.hoisted(() => vi.fn<(options: { title: string; body: string; confirmLabel: string }) => Promise<boolean>>(async () => true));
 vi.mock("@/components/confirm-dialog", () => ({
@@ -575,6 +576,40 @@ const unpaidRequest = (status: string, extra: Record<string, unknown> = {}) => (
   requested_coach_name: "デモコーチ",
   total_price_yen: 500,
   ...extra,
+});
+
+// 支払いの開き直しの購入前チェックは、未成年（の可能性がある人）だけに出す（本体 #1045 の T8・T9）。
+it.each([
+  { required: false, shown: false },
+  { required: true, shown: true },
+])("お支払い待ちの開き直し: purchase_notice_required=$required なら購入前チェックを出す=$shown", async ({ required, shown }) => {
+  authProfile.current = { purchase_notice_required: required };
+  const posted: Record<string, unknown>[] = [];
+  apiFetch.mockImplementation(async (path: string, init?: { method?: string; body?: string }) => {
+    if (path === "/v1/coaching/requests/review-1/checkout" && init?.method === "POST") {
+      posted.push(JSON.parse(init.body ?? "{}"));
+      return unpaidRequest("awaiting_payment");
+    }
+    if (path === "/v1/coaching/requests/review-1") return unpaidRequest("awaiting_payment");
+    if (path.endsWith("/referral")) return { referral: null };
+    return {};
+  });
+  const { container, root } = await renderPage();
+  try {
+    const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    const pay = [...container.querySelectorAll("button")].find((b) => b.textContent === "確定してお支払いへ")!;
+    expect(container.textContent?.includes("未成年の方は保護者に許可を取ってください")).toBe(shown);
+    expect(!!box).toBe(shown);
+    expect(pay.disabled).toBe(shown);
+    if (!shown) {
+      await click(pay);
+      expect(posted).toHaveLength(1);
+      expect(posted[0]).not.toHaveProperty("guardian_permission");
+    }
+  } finally {
+    authProfile.current = null;
+    await unmountPage(container, root);
+  }
 });
 
 function cancelButton(container: HTMLDivElement) {

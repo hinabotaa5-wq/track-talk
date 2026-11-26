@@ -85,7 +85,7 @@ func TestInjuryGroupJoinValidation(t *testing.T) {
 // 種目は登録のときに選ぶので、ケガのグループに入る前に、プロフィールに種目を入れておく。
 func setProfileEvent(t *testing.T, h http.Handler, tok, event string) {
 	t.Helper()
-	body := map[string]any{"nickname": "テスト", "nickname_public": false, "event": event}
+	body := map[string]any{"nickname": "テスト", "nickname_public": false, "event": event, "birth_year": 2000}
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", tok, body); rec.Code != http.StatusOK {
 		t.Fatalf("set event %d %s", rec.Code, rec.Body.String())
 	}
@@ -372,10 +372,10 @@ func TestInjuryGroupFacesHidePrivateNicknames(t *testing.T) {
 	h := setup(t)
 	public, private := token(t, uuid.New()), token(t, uuid.New())
 
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true, "event": "100m"}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", public, map[string]any{"nickname": "こうかい", "nickname_public": true, "event": "100m", "birth_year": 2000}); rec.Code != http.StatusOK {
 		t.Fatalf("public nickname %d %s", rec.Code, rec.Body.String())
 	}
-	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false, "event": "100m"}); rec.Code != http.StatusOK {
+	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", private, map[string]any{"nickname": "ひみつ", "nickname_public": false, "event": "100m", "birth_year": 2000}); rec.Code != http.StatusOK {
 		t.Fatalf("private nickname %d %s", rec.Code, rec.Body.String())
 	}
 	for _, tok := range []string{public, private} {

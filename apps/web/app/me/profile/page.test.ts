@@ -20,6 +20,7 @@ const { state } = vi.hoisted(() => ({
       nickname_public: boolean;
       event?: string;
       is_admin?: boolean;
+      birth_year_known?: boolean;
     } | null,
     loading: false,
   },
@@ -166,6 +167,108 @@ describe("ProfilePage", () => {
       });
       expect(analytics.save).toHaveBeenCalledTimes(1);
       expect(analytics.track).not.toHaveBeenCalled();
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  // 生まれた年（本体 #1045 の T1〜T4）。
+  async function submit(view: { div: HTMLDivElement }) {
+    await act(async () => {
+      view.div.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+  }
+  const yearInput = (div: HTMLDivElement) => div.querySelector<HTMLInputElement>("input[inputmode='numeric']");
+
+  it("年の情報がない人には、種目の下・公開チェックの上に生まれた年の欄を出す", async () => {
+    state.profile = { nickname: null, nickname_public: false, birth_year_known: false };
+    const view = await renderPage();
+    try {
+      const nickname = view.div.querySelector("input[placeholder='ニックネーム']")!;
+      const event = view.div.querySelector("select[name='event']")!;
+      const year = yearInput(view.div)!;
+      const publicBox = view.div.querySelector("input[type='checkbox']")!;
+      const save = view.div.querySelector("button[type='submit']")!;
+      expect(year).not.toBeNull();
+      expect(year.closest("label")?.textContent).toContain("生まれた年");
+      const order = [nickname, event, year, publicBox, save];
+      for (let i = 1; i < order.length; i++) {
+        expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it.each([
+    { value: "", message: "生まれた年を入力してください" },
+    { value: "20", message: "生まれた年は西暦4桁で入力してください" },
+    { value: "abcd", message: "生まれた年は西暦4桁で入力してください" },
+    { value: "1899", message: "生まれた年が正しくありません" },
+    { value: "2999", message: "生まれた年が正しくありません" },
+  ])("生まれた年が「$value」なら保存せず理由を出す", async ({ value, message }) => {
+    state.profile = { nickname: "ランナー", nickname_public: false, event: "100m", birth_year_known: false };
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setInput(yearInput(view.div)!, value);
+      });
+      await submit(view);
+      expect(analytics.save).not.toHaveBeenCalled();
+      expect(view.div.querySelector('[role="alert"]')?.textContent).toBe(message);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("生まれた年を数値で送り、年だけがまだの既存の人は表示言語を上書きしない", async () => {
+    state.profile = { nickname: "ランナー", nickname_public: false, event: "100m", birth_year_known: false };
+    const view = await renderPage();
+    try {
+      expect(view.div.textContent).toContain("生まれた年を登録してください");
+      await act(async () => {
+        setInput(yearInput(view.div)!, "２００８");
+      });
+      await submit(view);
+      expect(analytics.save).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(analytics.save.mock.calls[0][1].body);
+      expect(body.birth_year).toBe(2008);
+      expect(body).not.toHaveProperty("locale");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("登録直後は、ニックネーム・種目・生まれた年と表示言語をまとめて送る", async () => {
+    state.profile = { nickname: null, nickname_public: false, birth_year_known: false };
+    const view = await renderPage();
+    try {
+      await act(async () => {
+        setInput(view.div.querySelector("input[placeholder='ニックネーム']")!, "はしる");
+        const select = view.div.querySelector<HTMLSelectElement>("select[name='event']")!;
+        select.value = select.options[1].value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        setInput(yearInput(view.div)!, "2010");
+      });
+      await submit(view);
+      expect(analytics.save).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(analytics.save.mock.calls[0][1].body);
+      expect(body).toMatchObject({ nickname: "はしる", birth_year: 2010 });
+      expect(body).toHaveProperty("locale");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("年を登録済み（旧方式の生年月を含む）の人には欄を出さず、年も送らない", async () => {
+    state.profile = { nickname: "ランナー", nickname_public: false, event: "100m", birth_year_known: true };
+    const view = await renderPage();
+    try {
+      expect(yearInput(view.div)).toBeNull();
+      expect(view.div.textContent).not.toContain("生まれた年");
+      await submit(view);
+      expect(analytics.save).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(analytics.save.mock.calls[0][1].body)).not.toHaveProperty("birth_year");
     } finally {
       await view.unmount();
     }

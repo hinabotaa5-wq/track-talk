@@ -252,7 +252,7 @@ func TestProfileNicknameAndPostVisibility(t *testing.T) {
 		t.Fatalf("update with unknown event %d %s", rec.Code, rec.Body.String())
 	}
 	rec = doJSON(t, h, http.MethodPatch, "/v1/me", tok, map[string]any{
-		"nickname": "変更後", "nickname_public": false, "event": "100m",
+		"nickname": "変更後", "nickname_public": false, "event": "100m", "birth_year": 2000,
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update %d %s", rec.Code, rec.Body.String())

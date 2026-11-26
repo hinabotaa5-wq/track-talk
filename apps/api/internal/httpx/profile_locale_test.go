@@ -24,7 +24,7 @@ func TestProfileLocaleDefaultAndUpdate(t *testing.T) {
 		t.Fatalf("default locale is not ja: %s", rec.Body.String())
 	}
 
-	body := map[string]any{"nickname": "はしる", "nickname_public": true, "event": "100m", "locale": "en"}
+	body := map[string]any{"nickname": "はしる", "nickname_public": true, "event": "100m", "locale": "en", "birth_year": 2000}
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", tok, body); rec.Code != http.StatusOK {
 		t.Fatalf("PATCH locale en = %d %s", rec.Code, rec.Body.String())
 	}
@@ -69,7 +69,7 @@ func TestProfileLocaleOnlyEndpoint(t *testing.T) {
 	h := setupConfig(t, func(c *config.Config) {})
 	tok := token(t, uuid.New())
 
-	setup := map[string]any{"nickname": "はしる", "nickname_public": true, "event": "100m"}
+	setup := map[string]any{"nickname": "はしる", "nickname_public": true, "event": "100m", "birth_year": 2000}
 	if rec := doJSON(t, h, http.MethodPatch, "/v1/me", tok, setup); rec.Code != http.StatusOK {
 		t.Fatalf("PATCH /v1/me setup = %d %s", rec.Code, rec.Body.String())
 	}

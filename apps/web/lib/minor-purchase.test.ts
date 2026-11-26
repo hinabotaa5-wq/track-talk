@@ -1,5 +1,12 @@
 import { expect, it } from "vitest";
-import { minorDeclarationBody } from "./minor-purchase";
+import { minorDeclarationBody, purchaseNoticeShown } from "./minor-purchase";
+
+it("購入前チェックは、API が成人と判定した人（false）にだけ出さない。値がなければ安全側で出す（本体 #1045）", () => {
+  expect(purchaseNoticeShown({ purchase_notice_required: false })).toBe(false);
+  expect(purchaseNoticeShown({ purchase_notice_required: true })).toBe(true);
+  expect(purchaseNoticeShown({})).toBe(true);
+  expect(purchaseNoticeShown(null)).toBe(true);
+});
 
 it("18歳以上には何も送らない", () => {
   expect(minorDeclarationBody(false, true, { shownAt: "2026-11-05T00:00:00.000Z" })).toEqual({});

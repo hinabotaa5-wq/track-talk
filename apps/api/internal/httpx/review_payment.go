@@ -142,11 +142,11 @@ func (s *Server) checkoutReviewRequest(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, out)
 }
 
-// reviewCheckoutFor は、全員の購入前チェック（decl）を確かめ、支払い画面の URL を返す。
+// reviewCheckoutFor は、未成年（の可能性がある人）の購入前チェック（decl）を確かめ、支払い画面の URL を返す。
 // 支払い画面を作るのと同じトランザクションで宣言を残す。保護者同意の有無と月の上限では止めない。
-// 本人・依頼のロック内で記録し、年齢による分岐は置かない。
+// 本人・依頼のロック内で記録する。成人と確定できる人はチェックを求めず、記録も作らない（本体 #1045）。
 func (s *Server) reviewCheckoutFor(ctx context.Context, rr db.ReviewRequest, p db.Profile, method, referralCode string, decl minorDeclarationReq) (string, error) {
-	if err := requirePurchaseNotice(true, decl.GuardianPermission); err != nil {
+	if err := requirePurchaseNotice(purchaseNoticeRequired(p, time.Now()), decl.GuardianPermission); err != nil {
 		return "", err
 	}
 	tx, err := s.pool.Begin(ctx)

@@ -106,7 +106,7 @@ func (q *Queries) InsertMinorPurchaseDeclaration(ctx context.Context, arg Insert
 const keepMinorPurchaseDeclarationsOnWithdraw = `-- name: KeepMinorPurchaseDeclarationsOnWithdraw :exec
 UPDATE minor_purchase_declarations d
 SET account_deleted_at = now(),
-    birth_month = CASE WHEN d.text_version = 'purchase-notice-2026-11-13' THEN NULL ELSE (SELECT pr.birth_month FROM profiles pr WHERE pr.id = d.minor_id) END,
+    birth_month = CASE WHEN d.text_version IN ('purchase-notice-2026-11-13', 'purchase-notice-2026-11-26') THEN NULL ELSE (SELECT pr.birth_month FROM profiles pr WHERE pr.id = d.minor_id) END,
     last_transaction_at = (
         SELECT max(t) FROM (
             SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
@@ -117,7 +117,7 @@ SET account_deleted_at = now(),
             UNION ALL
             SELECT max(GREATEST(t.paid_at, (SELECT max(r.updated_at) FROM coaching_ticket_refunds r WHERE r.purchase_id = t.id AND r.status = 'succeeded'))) FROM coaching_ticket_purchases t
             WHERE t.owner_id = d.minor_id AND t.status IN ('paid', 'partially_refunded', 'refunded')
-              AND d.text_version = 'purchase-notice-2026-11-13'
+              AND d.text_version IN ('purchase-notice-2026-11-13', 'purchase-notice-2026-11-26')
         ) x
     )
 WHERE d.minor_id = $1 AND d.account_deleted_at IS NULL
@@ -126,6 +126,8 @@ WHERE d.minor_id = $1 AND d.account_deleted_at IS NULL
 // 退会の時に、宣言の記録を残すための印を付ける。退会した日時と、その時点での最後の完了した取引の日時を書き留める
 // （KeepGuardianRecordsOnWithdraw と同じ数え方。退会のあとは支払いの記録から本人が外れるため）。
 // 保管期間を本人の年齢で数えるため、生まれた年月も書き写す（プロフィールはこのあと消える）。
+// 購入前チェック（purchase-notice-* の版。2026-11-26 版から未成年だけに表示、本体 #1045）は年齢で数えず、
+// 最後の完了した取引から数える（生まれた年月は写さない）。
 func (q *Queries) KeepMinorPurchaseDeclarationsOnWithdraw(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, keepMinorPurchaseDeclarationsOnWithdraw, userID)
 	return err

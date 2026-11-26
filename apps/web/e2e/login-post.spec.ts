@@ -16,10 +16,12 @@ test("login then publish a text post", async ({ page }) => {
   await expect(page.getByRole("button", { name: "同意して続ける" })).toBeDisabled();
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "同意して続ける" }).click();
-  // はじめてのログインは、ニックネームと種目を決めるまで先に進めない。
+  // はじめてのログインは、ニックネーム・種目・生まれた年を決めるまで先に進めない。
   await expect(page.getByRole("heading", { name: "ニックネームと種目を決めよう" })).toBeVisible({ timeout: 20_000 });
   await page.getByPlaceholder("ニックネーム").fill("あされん");
   await page.getByLabel("種目").selectOption("100m");
+  // 生まれた年も登録するまで先に進めない（本体 #1045）。欄は種目の下に出る。
+  await page.getByLabel("生まれた年").fill("2000");
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page).toHaveURL("/coaching", { timeout: 20_000 });
 
