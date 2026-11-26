@@ -80,14 +80,18 @@ it("バナーは56pxの高さで、横パディングと間隔を狭める", asy
   expect(link?.classList.contains("p-4")).toBe(false);
 });
 
-it("見出しは13pxで、390px以上では16pxの1行表示にする", async () => {
+// 本体 #1065：枠（h-14）はそのままで見出しだけを大きくする。390px未満は16px、390px以上は18px。
+// 390px幅で20pxだと日英とも省略されたため、枠内に収まる18pxにした（実測は PR 本文）。
+it("見出しは16pxで、390px以上では18pxの1行表示にする（本体 #1065）", async () => {
   setActiveLocale("ja");
   await act(async () => root.render(<ReferralBanner />));
   const headline = container.querySelector('a[href="/referral"] > span > span');
   expect(headline?.textContent).toBe(HEADLINE_JA);
-  expect(headline?.classList.contains("text-[13px]")).toBe(true);
-  for (const name of ["min-[390px]:text-base", "truncate", "font-semibold", "block"]) {
+  for (const name of ["text-base", "min-[390px]:text-[18px]", "block", "truncate", "text-center", "font-semibold"]) {
     expect(headline?.classList.contains(name)).toBe(true);
+  }
+  for (const name of ["text-[13px]", "min-[390px]:text-base", "min-[390px]:text-xl"]) {
+    expect(headline?.classList.contains(name)).toBe(false);
   }
 });
 
@@ -97,7 +101,7 @@ it("見出しは左右アイコンの間で中央寄せにし、既存クラス�
   const headline = container.querySelector('a[href="/referral"] > span > span');
   expect(headline?.textContent).toBe(HEADLINE_JA);
   expect(headline?.classList.contains("text-center")).toBe(true);
-  for (const name of ["block", "truncate", "text-[13px]", "font-semibold", "min-[390px]:text-base"]) {
+  for (const name of ["block", "truncate", "text-base", "font-semibold", "min-[390px]:text-[18px]"]) {
     expect(headline?.classList.contains(name)).toBe(true);
   }
   // 外側の span は従来どおり左右アイコンの間の全幅を占める。
