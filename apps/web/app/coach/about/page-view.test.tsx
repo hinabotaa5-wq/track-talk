@@ -50,3 +50,11 @@ it("スタンダードの案内は変わっていない", async () => {
   expect(container.textContent).toContain("受付をオンにすると、申込みが対応中の一覧に届きます");
   expect(container.textContent).toContain("届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください");
 });
+
+// 本体 #1058：価格申請制に合わせ、料金はコーチごと・報酬はその70%。チケットの回だけ700円（一律700円とは書かない）。
+it("料金はコーチごとに異なり、報酬はその依頼の料金の70%（チケットは700円）と書く", async () => {
+  await act(async () => root.render(<CoachAboutView />));
+  const text = container.textContent ?? "";
+  expect(text).toContain("料金はコーチごとに異なります（コーチが自分で申請し、運営の承認の後に切り替わります）。コーチの報酬は、その依頼の料金の70％です。利用者がチケットで申し込んだスタンダードの報酬は700円です。");
+  for (const word of ["どのコーチでも同じ", "1回1,000円", "（700円）", "報酬は同じ700円"]) expect(text).not.toContain(word);
+});
