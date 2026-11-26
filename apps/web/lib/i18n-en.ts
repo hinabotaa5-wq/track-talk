@@ -3178,7 +3178,7 @@ export const en: Readonly<Record<string, string>> = {
   "チケットの販売は終了しました。発行済みのチケットは有効期限まで利用できます。": "Ticket sales have ended. Tickets already issued can be used until they expire.",
   "友達は、スタンダードの都度払いで申し込みます。": "Your friends pay for a Standard request each time.",
   "友達2人が購入すると、¥500クーポンをプレゼント": "When 2 friends buy, you get a ¥500 coupon",
-  "あと何人かは、マイページで確認できます。クーポンはスタンダードの申込みで使え、1,000円の申込みならお支払いは500円になります。": "You can check how many more are needed on My Page. The coupon can be used on a Standard request; on a ¥1,000 request you pay ¥500.",
+  "あと何人かは、マイページで確認できます。クーポンは申込みで使うと、お支払いの額から500円差し引かれます。": "You can check how many more are needed on My Page. When you use the coupon on a request, ¥500 is deducted from the amount you pay.",
   "対象はスタンダードの都度払いです。クーポンを使った申込みと追加質問は対象外です。": "Only pay-per-request Standard purchases count. Requests using a coupon and follow-up questions don't count.",
   "¥500クーポンは、プレゼントされてから6か月有効です。もらった本人だけが使えます。現金への払戻しはできません。": "The ¥500 coupon is valid for 6 months from when it is given. Only the person who receives it can use it. It cannot be exchanged for cash.",
   "1回の申込みに使えるクーポンは1枚までです。チケットとは一緒に使えません。": "You can use up to one coupon per request. Coupons can't be combined with tickets.",
