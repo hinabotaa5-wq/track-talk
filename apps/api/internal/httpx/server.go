@@ -246,6 +246,9 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			r.Get("/admin/coach-applications", s.listCoachApplications)
 			r.Post("/admin/coach-applications/{id}/approve", s.approveCoachApplication)
 			r.Post("/admin/coach-applications/{id}/reject", s.rejectCoachApplication)
+			// コーチの価格申請（本体 #1052）。応募フォームの希望価格もここで承認するので、閉じない方に置く。
+			r.Get("/admin/coaching/coach-prices", s.adminCoachPrices)
+			r.Post("/admin/coaching/coach-prices/{id}/approve", s.adminApproveCoachPrice)
 			r.Get("/admin/coaching/demo-codes", s.listDemoCodes)
 			r.Post("/admin/coaching/demo-codes", s.createDemoCode)
 			r.Get("/admin/coaching/probation", s.listCoachProbation)
@@ -414,6 +417,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Post("/coach/stripe/onboarding", s.startCoachOnboarding)
 				r.Get("/coach/me/availability", s.getMyCoachAvailability)
 				r.Put("/coach/me/availability", s.saveCoachAvailability)
+				// 価格の申請（本体 #1052）。承認待ちのあいだは上書き・取り下げができる。
+				r.Get("/coach/me/prices", s.myCoachPrices)
+				r.Put("/coach/me/prices/{plan}", s.applyCoachPrice)
+				r.Post("/coach/me/prices/{plan}/withdraw", s.withdrawCoachPrice)
 				r.Get("/coach/me/plans", s.listMyCoachingPlans)
 				r.Post("/coach/me/plans", s.createCoachingPlan)
 				r.Patch("/coach/me/plans/{id}", s.updateCoachingPlan)

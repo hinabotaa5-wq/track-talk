@@ -124,6 +124,29 @@ type CoachPayout struct {
 	PaidAt           *time.Time `json:"paid_at"`
 }
 
+type CoachPrice struct {
+	CoachID       uuid.UUID  `json:"coach_id"`
+	Plan          string     `json:"plan"`
+	PriceYen      int32      `json:"price_yen"`
+	ApplicationID *uuid.UUID `json:"application_id"`
+	EffectiveAt   time.Time  `json:"effective_at"`
+}
+
+type CoachPriceApplication struct {
+	ID          uuid.UUID  `json:"id"`
+	CoachID     uuid.UUID  `json:"coach_id"`
+	Plan        string     `json:"plan"`
+	PriceYen    int32      `json:"price_yen"`
+	Source      string     `json:"source"`
+	Status      string     `json:"status"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	ApprovedAt  *time.Time `json:"approved_at"`
+	ApprovedBy  *uuid.UUID `json:"approved_by"`
+	AppliedAt   *time.Time `json:"applied_at"`
+	WithdrawnAt *time.Time `json:"withdrawn_at"`
+}
+
 type CoachProfile struct {
 	ProfileID       uuid.UUID  `json:"profile_id"`
 	Tier            string     `json:"tier"`

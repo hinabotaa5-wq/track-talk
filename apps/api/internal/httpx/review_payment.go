@@ -20,14 +20,21 @@ import (
 // カード（Apple Pay・Google Pay を含む）は仮押さえして、返却で確定、目安を過ぎたら取り消す。
 // PayPay は仮押さえができないので、その場で払って、目安を過ぎたら返金する（今は受け付けていない。reviewPaymentMethods）。
 
-// 動画添削の料金（単発1回）。どのコーチを選んでも同じ（コーチごとの価格差はつくらない）。
-// 報酬はこの70%（700円）。チケット（6枚5,000円）で払った回も報酬は同じ700円（本体 #569、価格は #983）。
+// 動画添削（スタンダード）の共通の料金（単発1回）。価格申請制（本体 #1052）で、コーチごとの有効価格
+// （coach_prices、承認・切り替え済みのもの）があればそれを使い、価格が未設定のコーチにはこの額を使う（フォールバック）。
+// 依頼の base_price_yen は作成時の価格で固定され、報酬はその70%。チケット（6枚5,000円）で払った回は
+// コーチによらずこの額を元にし、報酬は700円のまま（本体 #569、価格は #983）。
 // 変えるときは migrations の review_requests.base_price_yen の既定値と、画面の lib/review-pricing.ts も揃える。
 const reviewPriceYen int32 = 1000
 
 // 保護者が同意していない18歳未満の、保護者が払う契約の上限（design-review.md「18歳未満の支払い」）。
 // 本人が自分で払う動画添削・追加相談は、この上限ではなく購入のたびの宣言で確かめる（minor_purchase.go）。
 const defaultMinorMonthlyLimit = 3000
+
+// fullPriceReviewPayment は、クーポンを使わずにその依頼の価格どおりに払った支払いか（紹介の対象）。
+func fullPriceReviewPayment(pay db.ReviewPayment, rr db.ReviewRequest) bool {
+	return !rr.UseTickets && rr.CouponDiscountYen == 0 && pay.AmountYen == rr.BasePriceYen
+}
 
 // validReviewPayMethod は、動画添削の申込みで受け付ける支払い方法か。今使えない方法（PayPay）は断る。
 func validReviewPayMethod(m string) bool { return slices.Contains(reviewPaymentMethods, m) }
@@ -252,13 +259,15 @@ func (s *Server) completeReviewCheckout(ctx context.Context, sess stripe.Checkou
 			return err
 		}
 		started = &rr
-		if status == "captured" && pay.AmountYen == reviewPriceYen {
+		// 紹介の対象は、クーポンを使わず定価（その依頼の base_price_yen）で払った申込みだけ（本体 #1052 でコーチごとの価格に）。
+		fullPrice := fullPriceReviewPayment(pay, rr)
+		if status == "captured" && fullPrice {
 			return recordCoachingReferral(ctx, q, pay.PayerID, nil, &pay.ID, pay.ReferralCode)
 		}
 		// 単発カードは決済完了（仮押さえ）の時点で紹介IDを発行し、カウントは capture で行う（本体 #686）。
 		// 紹介IDを入れた購入は capture で数えられ得るので、ここでは起点にしない（数えられなければ capture で発行）。
 		// この起点の周は capture まで付与を保留し、仮押さえが解放されたら DB のトリガーで無効になる。
-		if status == "authorized" && pay.AmountYen == reviewPriceYen && pay.PayerID != nil && pay.ReferralCode == nil {
+		if status == "authorized" && fullPrice && pay.PayerID != nil && pay.ReferralCode == nil {
 			return q.IssueCoachingReferralOrigin(ctx, db.IssueCoachingReferralOriginParams{Owner: *pay.PayerID, PaymentID: &pay.ID})
 		}
 		return nil
@@ -407,7 +416,14 @@ func (s *Server) captureReviewPayment(ctx context.Context, pay db.ReviewPayment)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		if err != nil || captured.AmountYen != reviewPriceYen {
+		if err != nil || captured.RequestID == nil {
+			return err
+		}
+		rr, err := q.GetReviewRequest(ctx, *captured.RequestID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil || !fullPriceReviewPayment(captured, rr) {
 			return err
 		}
 		return recordCoachingReferral(ctx, q, captured.PayerID, nil, &captured.ID, captured.ReferralCode)

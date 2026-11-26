@@ -1368,3 +1368,19 @@ it("チケットとクーポンの両方があるときは、どちらか一方�
   expect(pressed("チケット（残り")).toBe("true");
   expect(container.querySelector('[aria-label="クーポンの内訳"]')).toBeNull();
 });
+
+// 本体 #1052 T10：申込画面の料金は、選んだコーチのいま有効な価格（指名候補の price_yen）に追随する。
+it("選んだコーチの有効価格を料金に出す（#1052 T10）", async () => {
+  window.history.replaceState(null, "", "/coaching/new?coach=c1");
+  mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
+  mocks.api.mockImplementation(async (path: string) => {
+    if (path === "/v1/me/coaching") return mocks.me;
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [{ id: "c1", nickname: "テストコーチ", photo_url: "", events: ["100m"], years: 3, best_record: "", achievements: "", price_yen: 2500 }] };
+    if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: false, sales_open: false, products: [] };
+    if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 1000, payments: true, due_at: "2026-11-06T00:00:00Z" };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  const choices = [...(paymentFieldset()?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
+  expect(choices).toEqual(["2,500円／回"]);
+});

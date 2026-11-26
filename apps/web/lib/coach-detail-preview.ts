@@ -2,7 +2,7 @@ import type { PublicCoach } from "./types";
 
 type CoachDetailPreview =
   Pick<PublicCoach, "id" | "nickname" | "photo_url" | "events"> &
-  Partial<Pick<PublicCoach, "rating_count" | "rating_average" | "best_record" | "achievements" | "service_types" | "sns_urls" | "hitokoto" | "plans" | "support_consult" | "nickname_en" | "hitokoto_en" | "achievements_en" | "best_record_en">>;
+  Partial<Pick<PublicCoach, "rating_count" | "rating_average" | "best_record" | "achievements" | "service_types" | "sns_urls" | "hitokoto" | "plans" | "support_consult" | "nickname_en" | "hitokoto_en" | "achievements_en" | "best_record_en" | "review_price_yen">>;
 
 const previewLifetimeMs = 60_000;
 let preview: { coach: CoachDetailPreview; fetchedAt: number } | undefined;

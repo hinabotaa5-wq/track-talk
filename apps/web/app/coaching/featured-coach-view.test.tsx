@@ -30,7 +30,7 @@ const { clearLinkPending } = await import("@/lib/pending-link");
 const coach = {
   id: "2f6d0a8e-1111-4c2b-9a7e-3c332627b25f", nickname: "テスト太郎", nickname_en: null, photo_url: "https://img.example/c.jpg", tier: "coach",
   events: ["100m", "200m", "400m"], best_record: "100m 10.76／400m 47.54", achievements: "福岡のスプリントコーチ\n全国大会 優勝",
-  years: 5, sns_urls: ["https://www.instagram.com/example_account/"], hitokoto: "一緒に速くなりましょう。", on_duty: true, country_code: "JP",
+  years: 5, sns_urls: ["https://www.instagram.com/example_account/"], hitokoto: "一緒に速くなりましょう。", on_duty: true, country_code: "JP", review_price_yen: 1000,
   plans: [], service_types: [], rating_count: 0, rating_average: 0,
 };
 
@@ -225,6 +225,13 @@ it("受付停止中は、CTA を停止表示にし、依頼へ進めない", asy
 });
 
 const ctaHref = "/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card";
+
+it("固定 CTA の価格は特集コーチのいま有効な価格（API の応答）に追随する（本体 #1052 T10）", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, review_price_yen: 2500 }));
+  await render();
+  expect(cta()?.querySelector("a")?.textContent).toBe("このコーチに依頼する ¥2,500");
+  expect(container.textContent).not.toContain("¥1,000");
+});
 
 it("受付中の固定 CTA は、href・文言・色はそのままで、移動中表示の属性を持つ（本体 #1041 T1）", async () => {
   await render();

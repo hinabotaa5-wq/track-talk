@@ -54,6 +54,8 @@ var pushTitleEN = map[string]string{
 	"依頼の受付を始めました":             "Started accepting requests",
 	"スタンダードの通知テスト":            "Standard notification test",
 	"コーチの応募の審査が終わりました":        "Coach application review finished",
+	"価格の申請が承認されました":           "Price request approved",
+	"新しい価格に切り替わりました":          "Your new price is now active",
 	"コーチの応募が承認されました":          "Coach application approved",
 	// 追加相談
 	"追加相談が届きました":     "New consultation received",
@@ -107,6 +109,8 @@ var pushTitleEN = map[string]string{
 // 名前・金額・日時が入る本文はここに置かず、日本語のまま出す。
 // 通知は表題1行だけにして本文は原則空にした（本体 #609）。空の本文は置き換えずに空のまま出す。
 var pushBodyEN = map[string]string{
+	"対応中の依頼がすべて終わると、新しい価格に切り替わります": "Your new price takes effect once all your current requests are finished",
+	"これからの申込みは新しい価格で受け付けます":        "New requests will use your new price",
 	// 添削ワークフロー
 	"返答が届くまでお待ちください":           "Please wait for the response",
 	"この依頼の引受受付は終了しました":         "Accepting for this request has ended",

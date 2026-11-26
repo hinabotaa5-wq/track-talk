@@ -13,7 +13,6 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachDisplayText } from "@/lib/coach-display";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { markLinkPending } from "@/lib/pending-link";
-import { reviewPriceYen } from "@/lib/review-pricing";
 import type { PublicCoach } from "@/lib/types";
 import { CoachSelfButton } from "../coaches/coach-self-button";
 import { ReferralBanner } from "../coaches/referral-banner";
@@ -131,6 +130,10 @@ function FeaturedContent({ result }: { result: Loaded }) {
   const records = recordChips(coachDisplayText(coach.best_record, coach.best_record_en));
   const achievements = (coachDisplayText(coach.achievements, coach.achievements_en) ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
   const hitokoto = coachDisplayText(coach.hitokoto, coach.hitokoto_en);
+  // 固定 CTA の価格は、特集コーチのいま有効な価格（API の応答。本体 #1052）。古い API で無いときは価格を出さない。
+  const ctaLabel = typeof coach.review_price_yen === "number"
+    ? L("このコーチに依頼する ¥{v0}", { v0: coach.review_price_yen.toLocaleString("ja-JP") })
+    : L("このコーチに依頼する");
   const events = coach.events.map((event) => coachEventLabels[event]).join(L("・"));
   const open = coach.on_duty;
 
@@ -189,11 +192,11 @@ function FeaturedContent({ result }: { result: Loaded }) {
           <div className="flex gap-2">
             {open ? (
               <FeaturedCtaLink href={`/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`}>
-                {L("このコーチに依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
+                {ctaLabel}
               </FeaturedCtaLink>
             ) : (
               <span aria-disabled="true" className="flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400">
-                {L("このコーチに依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
+                {ctaLabel}
               </span>
             )}
           </div>

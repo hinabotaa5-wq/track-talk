@@ -752,6 +752,8 @@ export type ReviewRating = {
 // 動画添削で選べるコーチ。料金はどのコーチでも同じなので値段は持たない。人気の指標（件数・評価）も持たない。
 export type ReviewCoachOption = {
   id: string; nickname: string | null; photo_url: string; events: CoachEvent[]; years: number; best_record: string; achievements: string;
+  // このコーチのいま有効なスタンダード価格（本体 #1052）。古い API では無い。
+  price_yen?: number;
 };
 
 export type ReviewRequest = {
@@ -760,6 +762,8 @@ export type ReviewRequest = {
   requested_coach_id?: string | null;
   requested_coach_name?: string;
   base_price_yen?: number;
+  // クーポンで引いた額（本体 #1031）。古い API では無い。
+  coupon_discount_yen?: number;
   total_price_yen?: number;
   cash_price_yen?: number;
   use_tickets?: boolean;
@@ -907,6 +911,9 @@ export type AdminCoachApplication = Omit<CoachApplication, "status"> & {
   photo_url: string;
   // コーチの国（ISO 3166-1 alpha-2、本体 #932）。運営が設定する。
   country_code: string;
+  // 応募フォームの希望価格（円、本体 #1052）。未入力なら null。承認は価格申請の一覧で行う。
+  desired_standard_price_yen?: number | null;
+  desired_premium_price_yen?: number | null;
 };
 
 // 依頼する前に見られるコーチ一覧の1人。★はこれまでの全部。
@@ -935,6 +942,9 @@ export type PublicCoach = {
   plans: CoachingPlan[];
   // 1ヶ月プランの無料相談の入口。相談を受け付けていないコーチは null。
   support_consult?: import("./support-consult").PublicSupportConsult | null;
+  // いま有効な価格（本体 #1052）。スタンダードは未設定のコーチでも共通の価格が入る。プレミアムは未設定なら null。古い API では無い。
+  review_price_yen?: number;
+  premium_price_yen?: number | null;
 };
 
 // コーチが受けた★の件数と平均。paused は、評価が低くて依頼が回ってこない状態。

@@ -289,7 +289,8 @@ function ReviewRequestView() {
 
   return (
     <div className="mx-auto max-w-md space-y-5">
-      {completedPayment && request.payment?.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} variant="compact" /> : null}
+      {/* 紹介の案内は、クーポンを使わず定価（この依頼の価格。本体 #1052 でコーチごと）で払った申込みだけ。 */}
+      {completedPayment && request.payment?.amount_yen === (request.base_price_yen ?? reviewPriceYen) && !request.coupon_discount_yen ? <LoadedReferralCard token={token} variant="compact" /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">

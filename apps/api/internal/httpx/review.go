@@ -381,15 +381,25 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		coachName = nominees[0].Nickname
 	}
-	// 料金は全コーチ共通。チケットで払うときは現金の支払いはない。
+	// 料金は指名したコーチのいま有効なスタンダード価格（本体 #1052。未設定のコーチは reviewPriceYen）。
+	// チケットで払うときは現金の支払いはなく、報酬の元になる額も従来どおり reviewPriceYen（チケットの扱いは変えない）。
 	// クーポンを使うときは価格から額面を引いた額を払う（0円になれば支払いはない。本体 #1031）。
+	basePrice := reviewPriceYen
+	if !useTickets && len(fields) == 0 {
+		price, err := s.coachStandardPriceYen(r.Context(), s.q, req.RequestedCoachID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		basePrice = price
+	}
 	cashPrice := int32(0)
 	couponYen := int32(0)
 	if useCoupon {
-		couponYen = couponDiscount(reviewPriceYen, referralCouponYen)
+		couponYen = couponDiscount(basePrice, referralCouponYen)
 	}
 	if !useTickets {
-		cashPrice = couponCashPrice(reviewPriceYen, couponYen)
+		cashPrice = couponCashPrice(basePrice, couponYen)
 	}
 	payments := reviewNeedsPayment(s.stripe.Configured(), cashPrice)
 	if payments && !validReviewPayMethod(req.Method) {
@@ -467,7 +477,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Focus:            focus,
 		Question:         question,
 		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
-		BasePriceYen: reviewPriceYen, UseTickets: useTickets, CouponDiscountYen: couponYen,
+		BasePriceYen: basePrice, UseTickets: useTickets, CouponDiscountYen: couponYen,
 		Pb: pb, GoalTime: goalTime, WindSpeed: windSpeed, BodyCondition: bodyCondition,
 		VideoPublicID: video,
 		DueAt:         due,

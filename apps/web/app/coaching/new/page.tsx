@@ -112,7 +112,8 @@ export default function NewReviewRequestPage() {
   const [coachNotice, setCoachNotice] = useState("");
   const appliedCoachRef = useRef("");
   const coach = coaches.find((c) => c.id === coachID);
-  const totalPrice = estimate?.price_yen ?? reviewPriceYen;
+  // 料金は選んだコーチのいま有効な価格（本体 #1052）。コーチを選ぶ前・古い API では共通の価格。
+  const totalPrice = coach?.price_yen ?? estimate?.price_yen ?? reviewPriceYen;
   // 使えるクーポンがある人にだけ、クーポンの選択肢を出す（本体 #1031）。
   const couponsLeft = couponCount(ticketSummary);
   const couponsUsable = couponsLeft >= 1;

@@ -124,7 +124,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   const couponZero = coupons === 0;
   const ticketKind: TicketKind | null = counts ? (counts.reward >= 1 ? "reward" : counts.normal >= 1 ? "normal" : null) : null;
   const entries: ReviewEntry[] = [
-    { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
+    { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(coach?.review_price_yen ?? reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
     {
       key: "coupon", Icon: Gift, label: L("¥500クーポン"),
       note: coupons !== null ? L("残り {n} 枚", { n: coupons }) : undefined,
