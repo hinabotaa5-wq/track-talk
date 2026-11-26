@@ -6,7 +6,8 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 // コーチタブの特集ページ（本体 #985、#991 で並びを変更）。特集コーチ1人の詳細だけを取り、一覧・種目チップは出さない。
-// 並び：紹介バナー → 切り替え（スタンダード／プレミアム、本体 #1026）＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋固定 CTA）。
+// 並び（本体 #1054）：紹介バナー → 見出し文＋選手・コーチのボタン → コーチについて → スタンダードの流れ → プレミアムの流れ（＋固定 CTA の2ボタン）。
+// 上部の切り替えとよくある質問は #1054 で無くした。
 const apiFetch = vi.fn();
 const auth = { token: null as string | null };
 const flags = { supportList: false };
@@ -56,14 +57,15 @@ const link = (text: string) => Array.from(container.querySelectorAll("a")).find(
 
 const about = () => container.querySelector('section[aria-labelledby="featured-about"]');
 const steps = () => container.querySelector('[data-testid="featured-steps"]');
-const switchButton = (label: string) => [...container.querySelectorAll('[role="group"][aria-label="コーチの一覧を切り替える"] a')].find((a) => a.textContent === label) as HTMLAnchorElement | undefined;
-const switchOptions = () => [...container.querySelectorAll('[role="group"][aria-label="コーチの一覧を切り替える"] a')].map((a) => a.textContent);
+const premiumSteps = () => container.querySelector('[data-testid="featured-premium-steps"]');
+const lead = () => container.querySelector('[data-testid="featured-lead"]');
+const stepTexts = (el: Element | null) => Array.from(el?.querySelectorAll("li") ?? []).map((li) => li.textContent);
+const stepHeading = (el: Element | null) => el?.closest("section")?.querySelector("h2")?.textContent;
 const cta = () => container.querySelector('[data-testid="featured-cta"]');
 const faqSection = () => container.querySelector('section[aria-labelledby="featured-faq"]');
-const coachFetches = () => apiFetch.mock.calls.filter(([path]) => path === "/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f").length;
 const before = (a: Element | null | undefined, b: Element | null | undefined) => Boolean(a && b && a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
-it("紹介バナー → 切り替え → コーチについて（顔写真・記録チップ）→ 3ステップ → よくある質問 の順に出し、固定 CTA（¥1,000、特集コーチ指名で依頼へ）を出す", async () => {
+it("紹介バナー → 見出し文 → コーチについて（顔写真・記録チップ）→ スタンダードの流れ → プレミアムの流れ の順に出し、固定 CTA（¥1,000、特集コーチ指名で依頼へ）を出す", async () => {
   await render();
   expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f"]);
   // T1'：ヒーロー（コーチの紹介）とキャッチコピー・ページ見出しは出さない。
@@ -84,35 +86,42 @@ it("紹介バナー → 切り替え → コーチについて（顔写真・記
   expect(about()?.textContent).toContain("一緒に速くなりましょう。");
   expect(about()?.textContent).toContain("福岡のスプリントコーチ");
   expect(about()?.querySelector('a[href="https://www.instagram.com/example_account/"]')).not.toBeNull();
-  // 3ステップは見出しなしで番号付きリストだけ。見出し「どんな添削が返ってくるか」と回答の見本は出さない。
+  // T2（本体 #1054）：流れはスタンダード3点 → プレミアム3点の順で、それぞれ小見出し付き。見出し「どんな添削が返ってくるか」と回答の見本は出さない。
   expect(steps()?.tagName).toBe("OL");
-  expect(Array.from(steps()?.querySelectorAll("li") ?? []).map((li) => li.textContent)).toEqual(["1動画を1本送るだけ", "2コーチが動画を見て回答", "324時間以内に返却"]);
+  expect(stepTexts(steps())).toEqual(["1動画を1本送るだけ", "2コーチが動画を見て回答", "324時間以内に返却"]);
+  expect(stepHeading(steps())).toBe("スタンダード");
+  expect(premiumSteps()?.tagName).toBe("OL");
+  expect(premiumSteps()?.className).toBe(steps()?.className);
+  expect(stepTexts(premiumSteps())).toEqual(["1枠ごとに動画を送るだけ（最大10本まで）", "2コーチがまとめて見て診断", "324時間以内に総括で返却"]);
+  expect(stepHeading(premiumSteps())).toBe("プレミアム");
+  expect(before(steps(), premiumSteps())).toBe(true);
   expect(container.textContent).not.toContain("どんな添削が返ってくるか");
   expect(container.querySelector('article[aria-label="回答の見本"]')).toBeNull();
   expect(container.querySelector('[aria-labelledby="featured-sample"], #featured-sample')).toBeNull();
   expect(container.textContent).not.toContain("回答の見本");
-  // 並び：紹介バナー → 切り替え → コーチについて → 3ステップ → よくある質問。
+  // T1（本体 #1054）：切り替えは出さず、その位置に見出し文を出す。並び：紹介バナー → 見出し文 → コーチについて → 流れ。
   const banner = container.querySelector('a[href="/referral"]');
-  const group = container.querySelector('[role="group"][aria-label="コーチの一覧を切り替える"]');
-  const faq = container.querySelector('section[aria-labelledby="featured-faq"]');
   expect(banner?.textContent).toContain("2人に紹介すると500円分無料！");
-  expect(before(banner, group)).toBe(true);
-  expect(before(group, about())).toBe(true);
+  expect(container.querySelector('[role="group"][aria-label="コーチの一覧を切り替える"]')).toBeNull();
+  expect(lead()?.textContent).toBe("フォームや練習内容を診断してもらおう！");
+  expect(before(banner, lead())).toBe(true);
+  expect(before(lead(), about())).toBe(true);
   expect(before(about(), steps())).toBe(true);
-  expect(before(steps(), faq)).toBe(true);
-  expect(faq?.textContent).toContain("よくある質問");
-  // F1：切り替えと選手・コーチの丸ボタン。選択肢はスタンダード／プレミアムの2択（本体 #1026）。
-  expect(switchOptions()).toEqual(["スタンダード", "プレミアム"]);
-  expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
-  expect(switchButton("プレミアム")?.getAttribute("href")).toBe("/coaching?tab=premium");
   expect(container.textContent).not.toContain("プレミアムは準備中です");
-  expect(switchButton("継続プラン")).toBeUndefined();
+  // T3（本体 #1054）：よくある質問は見出しも質問も出さない。
+  expect(faqSection()).toBeNull();
+  expect(container.querySelector("details")).toBeNull();
+  for (const text of ["よくある質問", "返却までどのくらいかかりますか？", "どんな動画を送ればいいですか？", "受付が止まっているときはどうなりますか？"]) {
+    expect(container.textContent).not.toContain(text);
+  }
   expect(container.querySelector('a[href="/player"][aria-label="選手"]')).not.toBeNull();
   expect(container.querySelector('a[href="/coach"][aria-label="コーチ"]')).not.toBeNull();
   // 継続プランの文言を出さない。
   expect(container.textContent).not.toContain("継続プランは準備中です");
   expect(link("継続プランを見る")).toBeUndefined();
-  const requestLink = link("このコーチに依頼する ¥1,000");
+  // 価格のないコーチ（premium_price_yen なし）はスタンダードの1ボタンだけ。
+  expect(cta()?.querySelectorAll("a")).toHaveLength(1);
+  const requestLink = link("スタンダード ¥1,000");
   expect(requestLink?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
   expect(requestLink?.className).toContain("bg-[#EF442D]");
   expect(requestLink?.className).not.toContain("bg-blue-600");
@@ -133,88 +142,81 @@ it("写真が未登録でも、コーチについての先頭に頭文字の丸�
   expect(Array.from(about()?.querySelectorAll('ul[aria-label="記録と対応種目"] li') ?? []).map((li) => li.textContent)).toContain("対応種目 100m・200m・400m");
 });
 
-// F2
-it("「プレミアム」を押すと準備中の一文だけになり、特集コンテンツと固定 CTA を消す。紹介バナーと円ボタンは残り、取り直さない", async () => {
-  await render();
-  const replaceState = vi.spyOn(window.history, "replaceState");
-  await act(async () => switchButton("プレミアム")!.click());
-  expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaching?tab=premium");
-  replaceState.mockRestore();
-  expect(switchButton("プレミアム")?.getAttribute("aria-current")).toBe("page");
-  expect(container.textContent).toContain("プレミアムは準備中です");
-  expect(about()).toBeNull();
-  expect(steps()).toBeNull();
-  expect(faqSection()).toBeNull();
-  expect(cta()).toBeNull();
-  expect(link("このコーチに依頼する")).toBeUndefined();
-  expect(link("チケットを買う")).toBeUndefined();
-  expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
-  expect(container.querySelector('a[href="/player"][aria-label="選手"]')).not.toBeNull();
-  expect(container.querySelector('a[href="/coach"][aria-label="コーチ"]')).not.toBeNull();
-  // 準備中の一文のほかに価格・案内・導線を出さない。
-  const notice = [...container.querySelectorAll("p")].find((p) => p.textContent === "プレミアムは準備中です");
-  expect(notice).not.toBeUndefined();
-  expect(container.textContent).not.toMatch(/[¥$]/);
-  expect(coachFetches()).toBe(1);
-});
-
-// F3
-it("プレミアムからスタンダードに戻すと特集コンテンツと CTA が戻り、取り直さない", async () => {
-  await render();
-  const replaceState = vi.spyOn(window.history, "replaceState");
-  await act(async () => switchButton("プレミアム")!.click());
-  await act(async () => switchButton("スタンダード")!.click());
-  expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaching");
-  replaceState.mockRestore();
-  expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
-  expect(container.textContent).not.toContain("プレミアムは準備中です");
-  expect(about()).not.toBeNull();
-  expect(steps()).not.toBeNull();
-  expect(faqSection()).not.toBeNull();
-  expect(cta()).not.toBeNull();
-  expect(link("このコーチに依頼する ¥1,000")).not.toBeUndefined();
-  expect(coachFetches()).toBe(1);
-});
-
-// F4
-it("?tab=premium で開くと、読み込み後にプレミアム側から出す", async () => {
-  nav.search = "tab=premium";
-  await render();
-  expect(switchOptions()).toEqual(["スタンダード", "プレミアム"]);
-  expect(switchButton("プレミアム")?.getAttribute("aria-current")).toBe("page");
-  expect(container.textContent).toContain("プレミアムは準備中です");
-  expect(about()).toBeNull();
-  expect(cta()).toBeNull();
-  expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
-  expect(coachFetches()).toBe(1);
-});
-
-// F5（本体 #1007 B2 を書き換え）：継続プランは休眠。?tab=support で開いてもスタンダード側（特集コンテンツと固定 CTA）を出し、
-// 「継続プランは準備中です」は出さない。一覧フラグの真偽にかかわらない。
-for (const supportList of [true, false]) {
-  it(`?tab=support で開いてもスタンダード側を出し、継続プランの選択肢・準備中表示を出さない（一覧フラグ=${supportList}）`, async () => {
-    flags.supportList = supportList;
-    nav.search = "tab=support";
+// T1（本体 #1054）：?tab=premium・?tab=support で開いても内容は切り替わらず、同じ特集ページを出す。
+for (const search of ["tab=premium", "tab=support"]) {
+  it(`?${search} で開いても切り替えずに同じ特集ページを出す`, async () => {
+    nav.search = search;
     await render();
-    expect(switchOptions()).toEqual(["スタンダード", "プレミアム"]);
-    expect(switchButton("スタンダード")?.getAttribute("aria-current")).toBe("page");
-    expect(switchButton("スタンダード")?.getAttribute("href")).toBe("/coaching");
+    expect(container.querySelector('[role="group"]')).toBeNull();
+    expect(lead()?.textContent).toBe("フォームや練習内容を診断してもらおう！");
+    expect(container.textContent).not.toContain("プレミアムは準備中です");
     expect(container.textContent).not.toContain("継続プラン");
-    expect(container.querySelector('a[href="/referral"]')).not.toBeNull();
     expect(about()).not.toBeNull();
     expect(steps()).not.toBeNull();
-    expect(container.querySelector('[data-testid="featured-cta"]')).not.toBeNull();
-    expect(link("このコーチに依頼する ¥1,000")).not.toBeUndefined();
+    expect(premiumSteps()).not.toBeNull();
+    expect(cta()).not.toBeNull();
+    expect(link("スタンダード ¥1,000")).not.toBeUndefined();
     expect(apiFetch.mock.calls.map(([path]) => path)).toEqual(["/v1/coaches/2f6d0a8e-1111-4c2b-9a7e-3c332627b25f"]);
   });
 }
+
+const premiumHref = "/coaching/new?plan=premium&coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card";
+
+// T4（本体 #1054）
+it("プレミアム価格のあるコーチは、固定 CTA に左スタンダード・右プレミアムの2ボタンを横並びで出す（API の有効価格・遷移先）", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, review_price_yen: 1200, premium_price_yen: 6000 }));
+  await render();
+  const buttons = [...(cta()?.querySelectorAll("a") ?? [])];
+  expect(buttons.map((a) => a.textContent)).toEqual(["スタンダード ¥1,200", "プレミアム ¥6,000"]);
+  expect(buttons.map((a) => a.getAttribute("href"))).toEqual(["/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card", premiumHref]);
+  expect(buttons[0].parentElement).toBe(buttons[1].parentElement);
+  expect(buttons[0].parentElement?.className).toContain("flex gap-2");
+  for (const a of buttons) {
+    expect(a.className).toContain("flex-1");
+    expect(a.hasAttribute("data-pending-link")).toBe(true);
+    expect(a.hasAttribute("data-screen-loader")).toBe(true);
+  }
+  expect(container.textContent).not.toContain("¥1,000");
+});
+
+it("プレミアム価格が null のコーチは、プレミアムボタンを出さずスタンダードだけを全幅で出す", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, premium_price_yen: null }));
+  await render();
+  const buttons = [...(cta()?.querySelectorAll("a") ?? [])];
+  expect(buttons.map((a) => a.textContent)).toEqual(["スタンダード ¥1,000"]);
+  expect(buttons[0].className).toContain("flex-1");
+  expect(cta()?.textContent).not.toContain("プレミアム");
+  expect(container.querySelector(`a[href="${premiumHref}"]`)).toBeNull();
+});
+
+it("プレミアムボタンをタップしても画面を開いている幕を出す", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, premium_price_yen: 6000 }));
+  await act(async () => root.render(<><FeaturedCoachView coachID="2f6d0a8e-1111-4c2b-9a7e-3c332627b25f" /><ScreenLoader /></>));
+  await act(async () => { await Promise.resolve(); });
+  const onNavigate = navigateHandlers.get(premiumHref);
+  expect(onNavigate).toBeTypeOf("function");
+  await act(async () => onNavigate?.());
+  expect(container.querySelector(".screen-loader")?.className).not.toContain("hidden");
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("画面を開いています");
+});
+
+// T5（本体 #1054）
+it("受付停止中は、スタンダード・プレミアムの両ボタンとも無効表示にする", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, on_duty: false, premium_price_yen: 6000 }));
+  await render();
+  expect(container.textContent).toContain("現在は受付を停止しています");
+  expect(cta()?.querySelector("a")).toBeNull();
+  const disabled = [...(cta()?.querySelectorAll('[aria-disabled="true"]') ?? [])];
+  expect(disabled.map((el) => [el.tagName, el.textContent])).toEqual([["SPAN", "スタンダード ¥1,000"], ["SPAN", "プレミアム ¥6,000"]]);
+  expect(cta()?.querySelector("[data-pending-link], [data-screen-loader]")).toBeNull();
+});
 
 it("受付停止中は、CTA を停止表示にし、依頼へ進めない", async () => {
   apiFetch.mockImplementation(async () => ({ ...coach, on_duty: false }));
   await render();
   expect(container.textContent).toContain("現在は受付を停止しています");
-  expect(link("このコーチに依頼する")).toBeUndefined();
-  expect(container.querySelector('[aria-disabled="true"]')?.textContent).toBe("このコーチに依頼する ¥1,000");
+  expect(link("スタンダード")).toBeUndefined();
+  expect(container.querySelector('[aria-disabled="true"]')?.textContent).toBe("スタンダード ¥1,000");
   // T3（本体 #1041）：停止中の span はリンクにせず、移動中表示の属性も付けない。
   const disabled = cta()?.querySelector('[aria-disabled="true"]');
   expect(disabled?.tagName).toBe("SPAN");
@@ -229,17 +231,17 @@ const ctaHref = "/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=ca
 it("固定 CTA の価格は特集コーチのいま有効な価格（API の応答）に追随する（本体 #1052 T10）", async () => {
   apiFetch.mockImplementation(async () => ({ ...coach, review_price_yen: 2500 }));
   await render();
-  expect(cta()?.querySelector("a")?.textContent).toBe("このコーチに依頼する ¥2,500");
+  expect(cta()?.querySelector("a")?.textContent).toBe("スタンダード ¥2,500");
   expect(container.textContent).not.toContain("¥1,000");
 });
 
-it("受付中の固定 CTA は、href・文言・色はそのままで、移動中表示の属性を持つ（本体 #1041 T1）", async () => {
+it("受付中の固定 CTA は、href・色はそのままで、移動中表示の属性を持つ（本体 #1041 T1）", async () => {
   await render();
   const a = cta()?.querySelector("a");
   expect(a?.hasAttribute("data-pending-link")).toBe(true);
   expect(a?.hasAttribute("data-screen-loader")).toBe(true);
   expect(a?.getAttribute("href")).toBe(ctaHref);
-  expect(a?.textContent).toBe("このコーチに依頼する ¥1,000");
+  expect(a?.textContent).toBe("スタンダード ¥1,000");
   expect(a?.className).toBe("flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]");
   expect(a?.hasAttribute("prefetch")).toBe(false);
 });
@@ -278,15 +280,16 @@ it("特集コーチが非公開なら、ほかのコーチを出さずに非公�
 it("英語表示では固定文を英語で出す", async () => {
   installEnglish(en);
   setActiveLocale("en");
+  apiFetch.mockImplementation(async () => ({ ...coach, premium_price_yen: 6000 }));
   await render();
-  expect(link("Request this coach ¥1,000")?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
-  expect(container.textContent).not.toContain("Request video feedback");
+  expect(link("Standard ¥1,000")?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
+  expect(link("Premium ¥6,000")?.getAttribute("href")).toBe(premiumHref);
+  expect(lead()?.textContent).toBe("Get your form and training diagnosed!");
   expect(container.textContent).toContain("Returned within 24 hours");
-  expect([...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent)).toEqual(["Standard", "Premium"]);
-  expect(container.textContent).toContain("FAQ");
-  await act(async () => ([...container.querySelectorAll('[role="group"] a')].find((a) => a.textContent === "Premium") as HTMLAnchorElement).click());
-  expect(container.textContent).toContain("Premium is in preparation");
-  expect(container.textContent).not.toContain("よくある質問");
+  expect(stepHeading(steps())).toBe("Standard");
+  expect(stepHeading(premiumSteps())).toBe("Premium");
+  expect(stepTexts(premiumSteps())).toEqual(["1Just send videos for each slot (up to 10)", "2The coach reviews them all and diagnoses", "3Summary returned within 24 hours"]);
+  expect(container.textContent).not.toContain("FAQ");
 });
 
 it("記録の欄を区切りでチップに分ける", () => {
