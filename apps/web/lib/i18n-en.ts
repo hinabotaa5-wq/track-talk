@@ -290,7 +290,6 @@ export const en: Readonly<Record<string, string>> = {
   "購入の前に、保護者の方に許可をもらったことを確認して、チェックを入れてください。": "Before purchasing, please confirm that you have your guardian's permission and check the box.",
   "未成年の方は、保護者の同意のチェックが必要です。": "Minors must check the parental consent box.",
   "デモ版": "Demo",
-  "スタンダード（フォーム添削や競技に関する悩み）": "Standard (form feedback or concerns about competing)",
   "フォーム添削や競技に関する悩み": "Form feedback or concerns about competing",
   "コーチを選んで、動画を送ります。料金はどのコーチでも同じです。": "Choose a coach and send your video. The price is the same for every coach.",
   "スタンダードは準備中です。いまはデモ版として、運営から招待コードを受け取った人だけが使えます。": "Standard is in preparation. For now, only people with an invite code from the team can use the demo.",
