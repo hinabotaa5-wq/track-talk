@@ -92,7 +92,7 @@ it("支払い方法は単発だけを出し、PayPay の案内は出さない", 
   await render();
   const payment = [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent?.startsWith("お支払い"));
   const choices = [...(payment?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
-  expect(choices).toEqual(["単発 1,500円／回"]);
+  expect(choices).toEqual(["1,500円／回"]);
   expect(payment?.querySelector("legend")?.textContent).toBe("お支払い方法");
   expect(container.textContent).not.toContain("販売者:");
   expect(container.querySelector('a[href="/terms"], a[href="/legal/commerce"]')).toBeNull();
@@ -171,9 +171,9 @@ it("チケットを持っている人には、申込画面に残りの枚数と�
 it("チケット残高があるときは単発とチケットの二択で、切り替えで内訳と未成年チェックが出し分けられる", async () => {
   await renderWithTickets(true);
   const payment = [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent?.startsWith("お支払い"));
-  const single = [...(payment?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.startsWith("単発"))!;
+  const single = [...(payment?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.startsWith("1,500円"))!;
   const tickets = [...(payment?.querySelectorAll("button") ?? [])].find((b) => b.textContent?.startsWith("チケット（残り"))!;
-  expect(single.textContent).toBe("単発 1,500円／回");
+  expect(single.textContent).toBe("1,500円／回");
   expect(tickets.getAttribute("aria-pressed")).toBe("true");
   expect(single.getAttribute("aria-pressed")).toBe("false");
   expect(container.textContent).not.toContain("カード・Apple Pay・Google Pay");
@@ -194,7 +194,7 @@ it("チケットがなく購入不可のときはチケットの選択肢が出�
   await render();
   const payment = [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent?.startsWith("お支払い"));
   const choices = [...(payment?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
-  expect(choices).toEqual(["単発 1,500円／回"]);
+  expect(choices).toEqual(["1,500円／回"]);
   expect(payment?.querySelector("a")).toBeNull();
   expect(container.textContent).not.toContain("チケット（6枚）");
 });
@@ -225,7 +225,7 @@ it("チケットがなければ、販売終了後はお支払い方法にチケ�
   await render();
   const payment = paymentFieldset();
   const choices = [...(payment?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
-  expect(choices).toEqual(["単発 1,000円／回"]);
+  expect(choices).toEqual(["1,000円／回"]);
   expect(payment?.querySelector("a")).toBeNull();
   expect(container.textContent).not.toContain("チケット（6枚）");
   expect(container.textContent).not.toContain("通常価格");
@@ -768,7 +768,7 @@ it("入口の指定がなければチケットを選び、内訳は両方あれ�
   expect(free.textContent).toContain("2027");
   expect(container.textContent).toContain("スタンダード1件はチケット1枚です。");
   // 単発に切り替えると内訳は出ない。
-  await act(async () => { button("単発")!.click(); });
+  await act(async () => { button("500円")!.click(); });
   expect(button("通常チケット")).toBeUndefined();
 });
 
@@ -783,7 +783,7 @@ it("片方だけ持っていれば、その側を初期選択する", async () =
 
 it("?pay=card は単発、?pay=normal は通常チケット、?pay=reward は無料チケットを初期選択する", async () => {
   await renderKinds("&pay=card", 2, 1);
-  expect(pressed("単発")).toBe("true");
+  expect(pressed("500円")).toBe("true");
   expect(pressed("チケット（残り")).toBe("false");
   await act(async () => root.unmount());
   root = createRoot(container);
@@ -806,7 +806,7 @@ it("指定の種別が使えなくなっていたら使える側に直し、ど�
   await act(async () => root.unmount());
   root = createRoot(container);
   await renderKinds("&pay=normal", 0, 0);
-  expect(pressed("単発")).toBe("true");
+  expect(pressed("500円")).toBe("true");
   expect(button("通常チケット")).toBeUndefined();
 });
 
@@ -904,32 +904,46 @@ it("コーチ未選択では理由を表示し、コーチを選ぶと消える"
   expect(paragraphExactly("コーチを選んでください。")).toBeFalsy();
 });
 
-it("未成年宣言が必要で未チェックだと理由を表示し、チェックすると消える", async () => {
+// 本体 #1033: ボタン下の未成年の理由文は出さない。チェックボックスと送信可否は従来どおり。
+const minorReason = "未成年の方は、保護者の同意のチェックが必要です。";
+
+it("未成年宣言が必要で未チェックでも理由文や空の理由領域は出さず、ボタンは無効のまま。チェックすると有効になる", async () => {
   window.history.replaceState(null, "", "/coaching/new?coach=c1");
   mockReviewOpen([reviewCoach("c1")]);
   await render();
   await act(async () => {});
+  const box = container.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  expect(box).not.toBeNull();
+  expect(box.closest("label")?.textContent).toBe("未成年の方は保護者に許可を取ってください");
+  expect(box.checked).toBe(false);
+  const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+  expect(submit.disabled).toBe(true);
   expect(paragraphExactly("コーチを選んでください。")).toBeFalsy();
-  expect(paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。")).toBeTruthy();
-  await act(async () => { container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
-  expect(paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。")).toBeFalsy();
+  expect(paragraphExactly(minorReason)).toBeFalsy();
+  expect(container.textContent).not.toContain(minorReason);
+  expect(submit.nextElementSibling?.getAttribute("role")).not.toBe("status");
+  expect(container.querySelector("form")!.querySelector('[role="status"]')).toBeNull();
+  await act(async () => { box.click(); });
+  expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+  expect(container.textContent).not.toContain(minorReason);
 });
 
-it("コーチ未選択かつ宣言未チェックのとき、理由が2件とも確認ボタンの直下に表示される", async () => {
+it("コーチ未選択かつ宣言未チェックのとき、確認ボタンの直下にはコーチの理由だけが出る", async () => {
   mockReviewOpen([reviewCoach("c1")]);
   await render();
   await act(async () => {});
   const coachReason = paragraphExactly("コーチを選んでください。");
-  const declarationReason = paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。");
   expect(coachReason).toBeTruthy();
-  expect(declarationReason).toBeTruthy();
+  expect(container.querySelector('input[type="checkbox"]')).not.toBeNull();
+  expect(paragraphExactly(minorReason)).toBeFalsy();
+  expect(container.textContent).not.toContain(minorReason);
   const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!;
   expect(submit.disabled).toBe(true);
-  // 理由の領域は1つで、確認ボタンの直後にある。
+  // 理由の領域は1つで、確認ボタンの直後にあり、中身はコーチの理由だけ。
   const region = submit.nextElementSibling;
   expect(region?.getAttribute("role")).toBe("status");
   expect(region?.contains(coachReason!)).toBe(true);
-  expect(region?.contains(declarationReason!)).toBe(true);
+  expect(region?.querySelectorAll("p").length).toBe(1);
 });
 
 it("条件が全てそろうと理由が表示されず、確認ボタンが有効になる", async () => {
@@ -940,17 +954,20 @@ it("条件が全てそろうと理由が表示されず、確認ボタンが有�
   await act(async () => { container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
   expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
   expect(paragraphExactly("コーチを選んでください。")).toBeFalsy();
-  expect(paragraphExactly("未成年の方は、保護者の同意のチェックが必要です。")).toBeFalsy();
+  expect(paragraphExactly(minorReason)).toBeFalsy();
 });
 
-it("未成年宣言の理由は英語でも出る", async () => {
+it("英語表示でも未成年の理由文は出ず、支払いのピルは既存訳で出る", async () => {
   installEnglish(en);
   setActiveLocale("en");
   window.history.replaceState(null, "", "/coaching/new?coach=c1");
   mockReviewOpen([reviewCoach("c1")]);
   await render();
   await act(async () => {});
-  expect(paragraphExactly("Minors must check the parental consent box.")).toBeTruthy();
+  expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);
+  expect(container.textContent).not.toContain("Minors must check the parental consent box.");
+  expect(container.textContent).not.toContain("Single ");
+  expect(container.textContent).toMatch(/\/ review/);
 });
 
 // ---- 本体 #917：確定後の待ち表示と、動画の署名の先取り ----
@@ -1119,7 +1136,7 @@ it("先取りした署名でも、署名と違う public_id で上がったら�
 
 // W3（#1036）: 申込の動画は必須。動画を選ばないと確認画面へ進まず、署名も申込も送らない。カード・チケット・クーポンのどれでも同じ。
 it.each([
-  ["カード", "", 0, 0, "単発"],
+  ["カード", "", 0, 0, "1,000円"],
   ["チケット", "", 0, 2, "チケット（残り"],
   ["クーポン", "&pay=coupon", 1, 0, "¥500クーポン"],
 ] as const)("W3: 動画未選択では確認画面へ進まず「動画を選んでください」を出す（%s）", async (_label, search, coupons, tickets, chip) => {
@@ -1297,7 +1314,7 @@ it("クーポンを持っている人にはクーポンの選択肢を出し、�
   expect(chipButton).toBeDefined();
   // 入口の指定がなければ、チケット→クーポン→単発の順に使えるものを選ぶ。
   expect(chipButton!.getAttribute("aria-pressed")).toBe("true");
-  await act(async () => { button("単発")!.click(); });
+  await act(async () => { button("1,000円")!.click(); });
   expect(container.querySelector('[aria-label="クーポンの内訳"]')).toBeNull();
   await act(async () => { chipButton!.click(); });
   expect(chipButton!.getAttribute("aria-pressed")).toBe("true");
