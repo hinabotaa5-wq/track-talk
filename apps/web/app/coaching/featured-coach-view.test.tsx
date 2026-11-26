@@ -330,7 +330,10 @@ it("W1・W2・W6：特集2人では初期表示が1人目で、スワイプと�
   expect(container.querySelectorAll('[data-testid="featured-steps"]')).toHaveLength(1);
   expect(container.querySelectorAll('section[aria-labelledby="featured-faq"]')).toHaveLength(1);
   expect(scroller().contains(steps())).toBe(false);
-  expect(before(container.querySelector('[data-testid="featured-dots"]'), steps())).toBe(true);
+  // ドットは写真（スライド）の上、3ステップはスライドの下。
+  expect(before(container.querySelector('[data-testid="featured-dots"]'), scroller())).toBe(true);
+  expect(before(container.querySelector('[data-testid="featured-dots"]'), slides()[0].querySelector('span.rounded-full, img'))).toBe(true);
+  expect(before(scroller(), steps())).toBe(true);
   // スワイプ（スクロールスナップ）で2人目へ。
   await swipeTo(1);
   expect(visibleName()).toBe("テスト次郎コーチについて");

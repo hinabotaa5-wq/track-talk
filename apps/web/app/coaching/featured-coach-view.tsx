@@ -29,7 +29,7 @@ import { ReferralBanner } from "../coaches/referral-banner";
 // 「継続プランは準備中です」は描画しない。
 // 外すもの：コーチカードの2列一覧・種目チップの絞り込み。
 // 特集コーチは複数にできる（本体 #1063。NEXT_PUBLIC_COACHING_FEATURED_COACH_ID のカンマ区切りの並び）。
-// 2人以上表示できるときは、プロフィール（写真〜SNS）だけを横スライドで切り替え、下にドットで現在位置を出す。
+// 2人以上表示できるときは、プロフィール（写真〜SNS）だけを横スライドで切り替え、写真の上にドットで現在位置を出す。
 // 3ステップ・よくある質問はページに1組だけ。固定 CTA は表示中のコーチに連動する。初期表示は常に先頭（前回の表示は覚えない）。
 // 公開されていない（404）コーチはスライドから外す。1人だけのときはスライドもドットも出さず、従来の表示と同じ。
 
@@ -233,6 +233,7 @@ function CoachProfile({ coach, headingID }: { coach: PublicCoach; headingID: str
 }
 
 // 2人以上のときのプロフィールの横スライド（本体 #1063）。横スワイプ（スクロールスナップ）とドットのタップで切り替える。
+// ドットはスライドの上（写真の上）に置く（運営者指示 2026-11-26）。
 // 横に動くのはこの領域の中だけ（ページ全体は横スクロールしない）。表示していないスライドは読み上げ・フォーカスの対象から外す。
 function CoachSlides({ coaches, current, onChange }: { coaches: PublicCoach[]; current: number; onChange: (index: number) => void }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -254,19 +255,6 @@ function CoachSlides({ coaches, current, onChange }: { coaches: PublicCoach[]; c
 
   return (
     <div data-testid="featured-slides" className="space-y-3">
-      <div
-        ref={scroller}
-        onScroll={handleScroll}
-        aria-label={L("コーチのプロフィール")}
-        role="region"
-        className="flex snap-x snap-mandatory items-start overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {coaches.map((coach, i) => (
-          <div key={coach.id} data-testid="featured-slide" aria-hidden={i !== current} inert={i !== current} className="w-full shrink-0 snap-start snap-always">
-            <CoachProfile coach={coach} headingID={i === 0 ? "featured-about" : `${baseID}-about-${i}`} />
-          </div>
-        ))}
-      </div>
       <div className="flex justify-center gap-2" data-testid="featured-dots">
         {coaches.map((coach, i) => (
           <button
@@ -279,6 +267,19 @@ function CoachSlides({ coaches, current, onChange }: { coaches: PublicCoach[]; c
           >
             <span className={`block size-2 rounded-full transition-colors ${i === current ? "bg-[#1f9fff]" : "bg-slate-400/50"}`} />
           </button>
+        ))}
+      </div>
+      <div
+        ref={scroller}
+        onScroll={handleScroll}
+        aria-label={L("コーチのプロフィール")}
+        role="region"
+        className="flex snap-x snap-mandatory items-start overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {coaches.map((coach, i) => (
+          <div key={coach.id} data-testid="featured-slide" aria-hidden={i !== current} inert={i !== current} className="w-full shrink-0 snap-start snap-always">
+            <CoachProfile coach={coach} headingID={i === 0 ? "featured-about" : `${baseID}-about-${i}`} />
+          </div>
         ))}
       </div>
     </div>
