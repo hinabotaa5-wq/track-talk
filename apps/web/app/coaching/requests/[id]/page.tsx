@@ -346,7 +346,6 @@ function ReviewRequestView() {
         ) : null}
         {isPremium(request) ? null : (
           <div className="space-y-1">
-            <h3 className="text-xs font-semibold text-slate-300">{L("相談内容")}</h3>
             <p className="whitespace-pre-wrap break-words text-sm">{reviewQuestionText(request)}</p>
           </div>
         )}

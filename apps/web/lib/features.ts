@@ -37,7 +37,11 @@ export const senseSummaryEnabled = flagEnabled(process.env.NEXT_PUBLIC_SENSE_SUM
 // 一覧の API は /v1/coaches/support-plan（COACHING_COACH_LIST_ENABLED の側）。
 export const supportPlanListEnabled = flagEnabled(process.env.NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED);
 
-// コーチタブの特集モード（本体 #985）。空でない間は、/coaching をこのコーチ（プロフィール ID）の特集ページにし、
-// ほかのコーチの詳細（/coaches/[id]）は特集ページへ戻す。API の COACHING_FEATURED_COACH_ID と同じ値にすること。
+// コーチタブの特集モード（本体 #985）。空でない間は、/coaching を特集コーチ（プロフィール ID）の特集ページにし、
+// 特集に含まれないコーチの詳細（/coaches/[id]）は特集ページへ戻す。API の COACHING_FEATURED_COACH_ID と同じ値にすること。
+// カンマ区切りで複数の ID を書ける（本体 #1063）。並び順が特集ページのスライドの順（先頭が初期表示）。空の要素は無視する。
 // 空に戻すと従来のコーチ一覧に戻る。コードにコーチの名前などは書かない。
-export const featuredCoachID: string | null = (process.env.NEXT_PUBLIC_COACHING_FEATURED_COACH_ID ?? "").trim() || null;
+export function parseFeaturedCoachIDs(value: string | undefined): string[] {
+  return (value ?? "").split(",").map((part) => part.trim()).filter(Boolean);
+}
+export const featuredCoachIDs: string[] = parseFeaturedCoachIDs(process.env.NEXT_PUBLIC_COACHING_FEATURED_COACH_ID);

@@ -368,14 +368,16 @@ function CoachProbationAdmin({ token }: { token: string | null }) {
             <p className="whitespace-pre-wrap">良い点: {r.good_point}</p>
             {r.fix_points.map((f, i) => (
               <p key={i} className="whitespace-pre-wrap">
-                直す点{r.fix_points.length > 1 ? i + 1 : ""}: {f}
+                改善点{r.fix_points.length > 1 ? i + 1 : ""}: {f}
               </p>
             ))}
-            {/* 回答の新しい型の3欄（本体 #1013）。この型より前の返答は null なので出さない。 */}
+            {/* 回答の型は本体 #1067 の4項目。キュー・成功の目安・次に撮る動画は 2026-11-25 の型（本体 #1013）の返答だけにあるので、値があるときだけ出す。 */}
             {r.cue ? <p className="whitespace-pre-wrap">キュー: {r.cue}</p> : null}
-            <p className="whitespace-pre-wrap">ドリル: {r.drill}</p>
+            <p className="whitespace-pre-wrap">おすすめのドリル: {r.drill}</p>
             {r.success_criteria ? <p className="whitespace-pre-wrap">成功の目安: {r.success_criteria}</p> : null}
             {r.next_video ? <p className="whitespace-pre-wrap">次に撮る動画: {r.next_video}</p> : null}
+            {/* 第4項目（hitokoto 列を流用）。審査で見えるように出す。無い返答は出さない。 */}
+            {r.hitokoto ? <p className="whitespace-pre-wrap">コーチなら明日から何をするか: {r.hitokoto}</p> : null}
             {r.clarification ? <p className="whitespace-pre-wrap">補足: {r.clarification}</p> : null}
             {r.hidden_at ? null : (
               <button type="button" onClick={() => void hide(r.request_id)} className="text-red-300 underline">

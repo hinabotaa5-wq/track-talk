@@ -30,7 +30,7 @@ export default function CoachHistoryPage() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    apiFetch<CoachRequests>("/v1/coach/requests", { token })
+    apiFetch<CoachRequests>("/v1/coach/requests?scope=completed", { token })
       .then((d) => { if (!cancelled) setRows(d.completed ?? []); })
       .catch(() => { if (!cancelled) setError(L("履歴を読み込めませんでした")); });
     return () => { cancelled = true; };

@@ -91,3 +91,74 @@ func TestFeaturedCoachModeInvalidIDShowsNobody(t *testing.T) {
 		t.Fatalf("coaches %d %s", r.Code, r.Body.String())
 	}
 }
+
+// 特集 ID はカンマ区切りで複数書ける（本体 #1063）。並びの全員が一覧・詳細・指名候補に出て、並びの外のコーチは出ない。
+// コーチを選ばずに送った申込みは先頭の特集コーチへの指名になる。
+func TestFeaturedCoachModeMultipleIDs(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	first, second := uuid.New(), uuid.New()
+	h, _ := setupStripeConfig(t, func(c *config.Config) {
+		c.ReviewRandomAssign = false
+		c.CoachingCoachList = true
+		c.FeaturedCoachID = first.String() + ", " + second.String() + ","
+	})
+	admin := adminToken(t, h)
+	onDutyCoachID(t, h, admin, first)
+	onDutyCoachID(t, h, admin, second)
+	other, _ := onDutyCoach(t, h, admin)
+	requester, tu := demoRequester(t, h, admin)
+
+	for _, path := range []string{"/v1/coaches", "/v1/coaching/nominees?event=100m"} {
+		r := doJSON(t, h, http.MethodGet, path, tu, nil)
+		body := r.Body.String()
+		if r.Code != http.StatusOK || !strings.Contains(body, first.String()) || !strings.Contains(body, second.String()) || strings.Contains(body, other.String()) {
+			t.Fatalf("%s %d %s", path, r.Code, body)
+		}
+	}
+	for _, id := range []uuid.UUID{first, second} {
+		if r := doJSON(t, h, http.MethodGet, "/v1/coaches/"+id.String(), "", nil); r.Code != http.StatusOK {
+			t.Fatalf("featured detail %s %d %s", id, r.Code, r.Body.String())
+		}
+	}
+	if r := doJSON(t, h, http.MethodGet, "/v1/coaches/"+other.String(), "", nil); r.Code != http.StatusNotFound || !strings.Contains(r.Body.String(), "coach_not_public") {
+		t.Fatalf("other detail %d %s", r.Code, r.Body.String())
+	}
+	// 2人目への指名は通り、並びの外のコーチへの指名は断る。
+	body := reviewBodyFor(t, h, tu)
+	body["method"] = "card"
+	body["requested_coach_id"] = other.String()
+	if r := createReviewWith(t, h, tu, "card", body); r.Code != http.StatusUnprocessableEntity || !strings.Contains(r.Body.String(), "requested_coach_id") {
+		t.Fatalf("nominate other %d %s", r.Code, r.Body.String())
+	}
+	body = reviewBodyFor(t, h, tu)
+	body["method"] = "card"
+	body["requested_coach_id"] = second.String()
+	if r := createReviewWith(t, h, tu, "card", body); r.Code >= 300 {
+		t.Fatalf("nominate second %d %s", r.Code, r.Body.String())
+	}
+	var requested string
+	queryRowArgs(t, `SELECT requested_coach_id::text FROM review_requests WHERE requester_id=$1 ORDER BY created_at DESC LIMIT 1`, []any{requester}, &requested)
+	if requested != second.String() {
+		t.Fatalf("requested %s, want %s", requested, second)
+	}
+}
+
+// 特集 ID の並びに ID として読めない要素が1つでも混ざると、並びの他のコーチも含めて誰も出さない（安全側、本体 #1063）。
+func TestFeaturedCoachModeInvalidElementShowsNobody(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	featured := uuid.New()
+	h, _ := setupStripeConfig(t, func(c *config.Config) {
+		c.CoachingCoachList = true
+		c.FeaturedCoachID = featured.String() + ",not-a-uuid"
+	})
+	admin := adminToken(t, h)
+	onDutyCoachID(t, h, admin, featured)
+	other, _ := onDutyCoach(t, h, admin)
+	r := doJSON(t, h, http.MethodGet, "/v1/coaches", "", nil)
+	if r.Code != http.StatusOK || strings.Contains(r.Body.String(), featured.String()) || strings.Contains(r.Body.String(), other.String()) {
+		t.Fatalf("coaches %d %s", r.Code, r.Body.String())
+	}
+	if r := doJSON(t, h, http.MethodGet, "/v1/coaches/"+featured.String(), "", nil); r.Code != http.StatusNotFound {
+		t.Fatalf("featured detail %d %s", r.Code, r.Body.String())
+	}
+}

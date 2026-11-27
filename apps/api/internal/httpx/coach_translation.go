@@ -170,7 +170,8 @@ func (s *Server) ensureCoachProfileTranslation(ctx context.Context, c db.ListPub
 
 // generateCoachProfileTranslationFor は公開行を取り直してから訳を作る。失敗はログだけ（fail-open）。
 func (s *Server) generateCoachProfileTranslationFor(ctx context.Context, coachID uuid.UUID) {
-	rows, err := s.q.ListPublicCoaches(ctx, &coachID)
+	// 訳の作成・参照は内部処理なので口座の状態で対象を変えない（Payments: false、本体 #1063）。
+	rows, err := s.q.ListPublicCoaches(ctx, db.ListPublicCoachesParams{ProfileID: &coachID})
 	if err != nil || len(rows) == 0 {
 		if err != nil {
 			slog.Warn("coach profile translation: public coach lookup", "err", err, "coach_id", coachID)
@@ -209,7 +210,8 @@ func (s *Server) coachTranslationsFor(ctx context.Context, rows []db.ListPublicC
 
 // coachNicknameEnFor はプラン詳細など単独コーチ用の nickname_en（同ルール、無ければ nil）。
 func (s *Server) coachNicknameEnFor(ctx context.Context, coachID uuid.UUID) any {
-	rows, err := s.q.ListPublicCoaches(ctx, &coachID)
+	// 訳の作成・参照は内部処理なので口座の状態で対象を変えない（Payments: false、本体 #1063）。
+	rows, err := s.q.ListPublicCoaches(ctx, db.ListPublicCoachesParams{ProfileID: &coachID})
 	if err != nil || len(rows) == 0 {
 		if err != nil {
 			slog.Warn("coach profile translation lookup", "err", err, "coach_id", coachID)
@@ -227,7 +229,8 @@ func (s *Server) backfillCoachProfileTranslations(w http.ResponseWriter, r *http
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
 	}
-	rows, err := s.q.ListPublicCoaches(r.Context(), nil)
+	// 管理者のバックフィルも承認済み全員が対象（Payments: false、本体 #1063）。
+	rows, err := s.q.ListPublicCoaches(r.Context(), db.ListPublicCoachesParams{})
 	if err != nil {
 		MapDBError(w, err)
 		return

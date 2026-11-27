@@ -18,8 +18,10 @@ import (
 )
 
 // 添削の返答・評価。
-// コーチは回答の型（本体 #1013）どおり、一言診断（hitokoto）・良い点1つ・ボトルネック（fix_points、UIは1つ・APIは1〜2つ）・
-// キュー・ドリル・成功の目安・次に撮る動画（各300字・必須）と、任意で見本動画を返す。
+// コーチは回答の型（本体 #1067）どおり、良い点1つ・改善点（fix_points、UIは1つ・APIは1〜2つ）・おすすめのドリル・
+// コーチなら明日から何をするか（hitokoto 列を流用）の4項目（各300字・必須）と、任意で見本動画を返す。
+// キュー・成功の目安・次に撮る動画（本体 #1013 の型）は任意。旧 Web からの送信の互換のため、値があるときだけ検証して保存し、
+// 無い・空のときは NULL で保存する。
 // ★の評価と、7日後の「役に立ちましたか」も扱う。
 
 const maxResponseChars = 300
@@ -241,12 +243,12 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case len(fixes) == 0:
-		fields["fix_points"] = "直す点を入力してください"
+		fields["fix_points"] = "改善点を入力してください"
 	case len(fixes) > 2:
-		fields["fix_points"] = "直す点は2つまでです"
+		fields["fix_points"] = "改善点は2つまでです"
 	default:
 		for _, f := range fixes {
-			if e := responseTextError("直す点", f); e != "" {
+			if e := responseTextError("改善点", f); e != "" {
 				fields["fix_points"] = e
 				break
 			}
@@ -255,17 +257,24 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	if e := responseTextError("ドリル", drill); e != "" {
 		fields["drill"] = e
 	}
-	if e := responseTextError("ひとこと", hitokoto); e != "" {
+	if e := responseTextError("コーチなら明日から何をするか", hitokoto); e != "" {
 		fields["hitokoto"] = e
 	}
-	if e := responseTextError("キュー", cue); e != "" {
-		fields["cue"] = e
+	// キュー・成功の目安・次に撮る動画は任意（本体 #1067）。値があるときだけ従来どおり確かめる。
+	if cue != "" {
+		if e := responseTextError("キュー", cue); e != "" {
+			fields["cue"] = e
+		}
 	}
-	if e := responseTextError("成功の目安", success); e != "" {
-		fields["success_criteria"] = e
+	if success != "" {
+		if e := responseTextError("成功の目安", success); e != "" {
+			fields["success_criteria"] = e
+		}
 	}
-	if e := responseTextError("次に撮る動画", nextVideo); e != "" {
-		fields["next_video"] = e
+	if nextVideo != "" {
+		if e := responseTextError("次に撮る動画", nextVideo); e != "" {
+			fields["next_video"] = e
+		}
 	}
 	var demo *string
 	if req.DemoVideoPublicID != "" {
@@ -319,9 +328,9 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		Drill:             &drill,
 		DemoVideoPublicID: demo,
 		Hitokoto:          &hitokoto,
-		Cue:               &cue,
-		SuccessCriteria:   &success,
-		NextVideo:         &nextVideo,
+		Cue:               optionalText(cue),
+		SuccessCriteria:   optionalText(success),
+		NextVideo:         optionalText(nextVideo),
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {

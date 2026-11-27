@@ -829,7 +829,8 @@ func publicCoachNotFound(w http.ResponseWriter) {
 }
 
 func (s *Server) publicCoaches(ctx context.Context, coachID *uuid.UUID) ([]map[string]any, error) {
-	rows, err := s.q.ListPublicCoaches(ctx, coachID)
+	// Stripe 設定済みなら受け取り口座の手続きが済んだコーチだけを公開面に出す（本体 #1063）。
+	rows, err := s.q.ListPublicCoaches(ctx, db.ListPublicCoachesParams{Payments: s.stripe.Configured(), ProfileID: coachID})
 	if err != nil {
 		return nil, err
 	}

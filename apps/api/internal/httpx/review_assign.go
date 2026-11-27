@@ -480,31 +480,40 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 	return out
 }
 
-// listCoachRequests は、コーチの対応中一覧。
+// listCoachRequests は、コーチの対応中一覧と履歴。
+// scope=reviewing なら対応中だけ、scope=completed なら履歴だけを取り、もう片方は空配列で返す（本体 #1071）。
+// scope なし・未知の値は従来どおり両方（ダッシュボードの件数表示が使う）。キー構成と各行の形はどの場合も同じ。
 func (s *Server) listCoachRequests(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.requireApprovedReviewCoach(w, r)
 	if !ok {
 		return
 	}
-	reviewing, err := s.q.ListCoachReviewing(r.Context(), p.ID)
-	if err != nil {
-		MapDBError(w, err)
-		return
+	scope := r.URL.Query().Get("scope")
+	wantReviewing := scope != "completed"
+	wantCompleted := scope != "reviewing"
+	reviewOut := make([]map[string]any, 0)
+	if wantReviewing {
+		reviewing, err := s.q.ListCoachReviewing(r.Context(), p.ID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		for _, rr := range reviewing {
+			reviewOut = append(reviewOut, s.coachRequestJSON(rr, coachSeesVideo(rr)))
+		}
 	}
-	reviewOut := make([]map[string]any, 0, len(reviewing))
-	for _, rr := range reviewing {
-		reviewOut = append(reviewOut, s.coachRequestJSON(rr, coachSeesVideo(rr)))
-	}
-	// 履歴（本体 #1014）：返却済み・補足回答待ちを、返却の新しい順に最大100件。
-	completed, err := s.q.ListCoachCompleted(r.Context(), p.ID)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	// 一覧では動画を出さない（動画と自分の返答は詳細を開いたときに見る。運営者決定 2026-11-25）。
-	completedOut := make([]map[string]any, 0, len(completed))
-	for _, rr := range completed {
-		completedOut = append(completedOut, s.coachRequestJSON(rr, false))
+	completedOut := make([]map[string]any, 0)
+	if wantCompleted {
+		// 履歴（本体 #1014）：返却済み・補足回答待ちを、返却の新しい順に最大100件。
+		completed, err := s.q.ListCoachCompleted(r.Context(), p.ID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		// 一覧では動画を出さない（動画と自分の返答は詳細を開いたときに見る。運営者決定 2026-11-25）。
+		for _, rr := range completed {
+			completedOut = append(completedOut, s.coachRequestJSON(rr, false))
+		}
 	}
 	JSON(w, http.StatusOK, map[string]any{"offers": []any{}, "reviewing": reviewOut, "completed": completedOut})
 }

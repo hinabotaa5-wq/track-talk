@@ -781,6 +781,17 @@ export type PremiumVideoGroup = { slot: PremiumSlot; videos: PremiumVideo[] };
 
 export type PremiumSection = { slot: PremiumSlot; body: string };
 
+// 選手の依頼一覧（GET /v1/me/coaching/requests）の1行。一覧ページが使う項目だけ（本体 #1072 の6項目＋プレミアムの印の plan、本体 #1053）。
+export type MyReviewRequestListItem = {
+  id: string;
+  plan: ReviewPlan;
+  event: CoachEvent;
+  status: ReviewStatus;
+  canceled_at: string | null;
+  withdrawal: ReviewWithdrawal | null;
+  created_at: string;
+};
+
 export type ReviewRequest = {
   // スタンダード／プレミアム（本体 #1053）。古い API では無い（スタンダードとして扱う）。
   plan?: ReviewPlan;

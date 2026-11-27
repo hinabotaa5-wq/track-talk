@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -186,25 +187,40 @@ func (s *Server) coachEarnings(w http.ResponseWriter, r *http.Request) {
 	if coach.Status == "approved" {
 		coach = s.refreshPayoutsEnabled(ctx, coach)
 	}
-	date, yen, err := s.previewCoachPayout(ctx, coach)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	summary, err := s.q.GetCoachEarningsSummary(r.Context(), &coach.ProfileID)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	payouts, err := s.q.ListCoachPayouts(r.Context(), &coach.ProfileID)
-	if err != nil {
-		MapDBError(w, err)
-		return
-	}
-	earnings, err := s.q.ListRecentCoachEarnings(r.Context(), &coach.ProfileID)
-	if err != nil {
-		MapDBError(w, err)
-		return
+	// 後段の4つの読み取りは互いに独立で、確定した coach だけに依存するので並行に読む（#1073）。
+	// 全部の完了を待ってから、従来の直列の順（preview → summary → payouts → recent）で最初のエラーを返す。
+	var (
+		date                                        *string
+		yen                                         *int32
+		summary                                     db.GetCoachEarningsSummaryRow
+		payouts                                     []db.CoachPayout
+		earnings                                    []db.CoachEarning
+		previewErr, summaryErr, payoutsErr, listErr error
+		wg                                          sync.WaitGroup
+	)
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		date, yen, previewErr = s.previewCoachPayout(ctx, coach)
+	}()
+	go func() {
+		defer wg.Done()
+		summary, summaryErr = s.q.GetCoachEarningsSummary(ctx, &coach.ProfileID)
+	}()
+	go func() {
+		defer wg.Done()
+		payouts, payoutsErr = s.q.ListCoachPayouts(ctx, &coach.ProfileID)
+	}()
+	go func() {
+		defer wg.Done()
+		earnings, listErr = s.q.ListRecentCoachEarnings(ctx, &coach.ProfileID)
+	}()
+	wg.Wait()
+	for _, err := range []error{previewErr, summaryErr, payoutsErr, listErr} {
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
 	}
 	outPayouts := make([]map[string]any, 0, len(payouts))
 	for _, p := range payouts {

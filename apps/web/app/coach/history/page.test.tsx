@@ -41,7 +41,7 @@ function request(overrides: Partial<CoachReviewRequest>): CoachReviewRequest {
 
 function mockCompleted(completed: CoachReviewRequest[]) {
   apiFetch.mockImplementation(async (path: string) => {
-    if (path !== "/v1/coach/requests") throw new Error(`Unexpected request: ${path}`);
+    if (path !== "/v1/coach/requests?scope=completed") throw new Error(`Unexpected request: ${path}`);
     return { offers: [], reviewing: [], completed };
   });
 }
@@ -76,7 +76,7 @@ it("返却済みの添削を1件ずつ、見出し・相談内容・返却日時
   ]);
   const { container, root } = await renderPage();
   try {
-    expect(apiFetch).toHaveBeenCalledWith("/v1/coach/requests", { token: "token" });
+    expect(apiFetch).toHaveBeenCalledWith("/v1/coach/requests?scope=completed", { token: "token" });
     expect(apiFetch).toHaveBeenCalledTimes(1);
     expect(container.querySelector("h1")?.textContent).toBe("履歴");
     const items = rows(container);

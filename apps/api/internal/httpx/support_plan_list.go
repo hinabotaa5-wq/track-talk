@@ -39,7 +39,8 @@ func rotateCoaches(ids []uuid.UUID, now time.Time) []uuid.UUID {
 
 func (s *Server) listSupportPlanCoaches(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	rows, err := s.q.ListPublicCoaches(ctx, nil)
+	// 継続プランの一覧も公開面なので、受け取り口座の手続きが済んだコーチだけ（本体 #1063）。
+	rows, err := s.q.ListPublicCoaches(ctx, db.ListPublicCoachesParams{Payments: s.stripe.Configured()})
 	if err != nil {
 		MapDBError(w, err)
 		return

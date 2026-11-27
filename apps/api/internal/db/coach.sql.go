@@ -394,9 +394,15 @@ CROSS JOIN LATERAL (
     ) x
 ) r
 WHERE c.status = 'approved'
-  AND ($1::uuid IS NULL OR c.profile_id = $1)
+  AND (NOT $1::boolean OR c.payouts_enabled)
+  AND ($2::uuid IS NULL OR c.profile_id = $2)
 ORDER BY c.tier, c.reviewed_at, c.profile_id
 `
+
+type ListPublicCoachesParams struct {
+	Payments  bool       `json:"payments"`
+	ProfileID *uuid.UUID `json:"profile_id"`
+}
 
 type ListPublicCoachesRow struct {
 	ProfileID     uuid.UUID `json:"profile_id"`
@@ -417,8 +423,10 @@ type ListPublicCoachesRow struct {
 }
 
 // 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部(添削とパーソナル指導)。
-func (q *Queries) ListPublicCoaches(ctx context.Context, profileID *uuid.UUID) ([]ListPublicCoachesRow, error) {
-	rows, err := q.db.Query(ctx, listPublicCoaches, profileID)
+// payments が true(Stripe 設定済み)のときは、受け取り口座の手続きが済んだ(payouts_enabled)コーチだけ(本体 #1063)。
+// 翻訳などの内部処理は false を渡して従来どおり承認済み全員を対象にする。
+func (q *Queries) ListPublicCoaches(ctx context.Context, arg ListPublicCoachesParams) ([]ListPublicCoachesRow, error) {
+	rows, err := q.db.Query(ctx, listPublicCoaches, arg.Payments, arg.ProfileID)
 	if err != nil {
 		return nil, err
 	}

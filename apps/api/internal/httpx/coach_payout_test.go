@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -627,5 +628,92 @@ func TestCoachPayoutPreviewCases(t *testing.T) {
 				t.Fatalf("previous month's earning in current total: %d", view.ThisMonthYen)
 			}
 		})
+	}
+}
+
+// #1073 C2：後段の読み取りを並行にしても、応答の全項目（キーの集合・値・配列の並び）が従来どおりになる。
+func TestCoachEarningsFullResponse(t *testing.T) {
+	h, _ := setupStripe(t)
+	coach, tok := onDutyCoach(t, h, adminToken(t, h))
+	older, newer := uuid.New(), uuid.New()
+	execSQLArgs(t, `INSERT INTO coach_payouts (id, coach_id, month, amount_yen, status, stripe_transfer_id, paid_at) VALUES
+		($1, $3, (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '3 months')::date, 3500, 'paid', $4, now() - interval '80 days'),
+		($2, $3, (date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') - interval '2 months')::date, 4200, 'failed', NULL, NULL)`, older, newer, coach, "tr_"+older.String())
+	paid, payable, current := uuid.New(), uuid.New(), uuid.New()
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, payout_id, confirmed_at) VALUES
+		($1, $4, 'review', 5000, 70, 3500, $5, `+lastMonthJST+` - interval '3 months'),
+		($2, $4, 'personal', 4400, 75, 3300, NULL, `+lastMonthJST+`),
+		($3, $4, 'review', 1000, 70, 700, NULL, now())`, paid, payable, current, coach, older)
+
+	rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/earnings", tok, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("earnings %d %s", rec.Code, rec.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+
+	// 期待値は DB の値から組み立て、ハンドラと同じ encoding/json で JSON にしてから比べる。
+	var date string
+	queryRowArgs(t, `SELECT to_char(date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') + interval '14 days' +
+		CASE WHEN extract(day FROM now() AT TIME ZONE 'Asia/Tokyo') > 15 THEN interval '1 month' ELSE interval '0' END, 'YYYY-MM-DD')`, nil, &date)
+	payoutJSON := func(id uuid.UUID) map[string]any {
+		var month time.Time
+		var amount int
+		var status string
+		var paidAt *time.Time
+		queryRowArgs(t, `SELECT month, amount_yen, status, paid_at FROM coach_payouts WHERE id = $1`, []any{id}, &month, &amount, &status, &paidAt)
+		return map[string]any{"id": id, "month": month.Format("2006-01"), "amount_yen": amount, "status": status, "paid_at": paidAt}
+	}
+	earningJSON := func(id uuid.UUID) map[string]any {
+		var source string
+		var gross, share, amount int
+		var payoutID *uuid.UUID
+		var createdAt, confirmedAt time.Time
+		queryRowArgs(t, `SELECT source, gross_yen, share_percent, amount_yen, payout_id, created_at, confirmed_at FROM coach_earnings WHERE id = $1`,
+			[]any{id}, &source, &gross, &share, &amount, &payoutID, &createdAt, &confirmedAt)
+		return map[string]any{"id": id, "source": source, "gross_yen": gross, "share_percent": share, "amount_yen": amount,
+			"paid": payoutID != nil, "created_at": createdAt, "confirmed_at": confirmedAt}
+	}
+	expected := map[string]any{
+		"payments": true, "stripe_linked": true, "payouts_enabled": true,
+		"review_share": 70, "personal_fee": 25, "min_payout_yen": 3000,
+		"this_month_yen": 700, "unpaid_yen": 4000,
+		"next_payout_date": date, "next_payout_yen": 3300,
+		"payouts":  []any{payoutJSON(newer), payoutJSON(older)},
+		"earnings": []any{earningJSON(current), earningJSON(payable), earningJSON(paid)},
+	}
+	raw, err := json.Marshal(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want map[string]any
+	if err := json.Unmarshal(raw, &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("earnings response\n got  %s\n want %s", rec.Body.String(), raw)
+	}
+}
+
+// #1073 C4：後段の読み取りの1つ（ここでは集計の int 溢れ）が失敗したら、従来どおり MapDBError の 500 を返す。
+// 接続を1本に絞っても詰まらず（失敗のあとに読み取りが残って接続を掴んだままにならない）、直せば次から正常に返る。
+func TestCoachEarningsReadFailure(t *testing.T) {
+	testPoolMaxConns = 1
+	t.Cleanup(func() { testPoolMaxConns = 0 })
+	h := setup(t)
+	coach, tok := onDutyCoach(t, h, adminToken(t, h))
+	execSQLArgs(t, `INSERT INTO coach_earnings (id, coach_id, source, gross_yen, share_percent, amount_yen, confirmed_at)
+		SELECT gen_random_uuid(), $1, 'review', 2000000000, 100, 2000000000, now() FROM generate_series(1, 2)`, coach)
+	for range 3 {
+		rec := doJSON(t, h, http.MethodGet, "/v1/coach/me/earnings", tok, nil)
+		if rec.Code != http.StatusInternalServerError || !strings.Contains(rec.Body.String(), `"code":"internal_error"`) {
+			t.Fatalf("earnings with failing read %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	execSQLArgs(t, `DELETE FROM coach_earnings WHERE coach_id = $1`, coach)
+	if e := coachEarnings(t, h, tok); e.ThisMonthYen != 0 || e.UnpaidYen != 0 || len(e.Earnings) != 0 {
+		t.Fatalf("after fix %+v", e)
 	}
 }
