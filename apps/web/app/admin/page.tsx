@@ -378,6 +378,10 @@ function CoachProbationAdmin({ token }: { token: string | null }) {
             {r.next_video ? <p className="whitespace-pre-wrap">次に撮る動画: {r.next_video}</p> : null}
             {/* 第4項目（hitokoto 列を流用）。審査で見えるように出す。無い返答は出さない。 */}
             {r.hitokoto ? <p className="whitespace-pre-wrap">コーチなら明日から何をするか: {r.hitokoto}</p> : null}
+            {/* 追加項目（本体 #1086 補足 S8）。タイトル＋本文で出し、運営に見えない形にしない。 */}
+            {(r.offer_items ?? []).map((item, i) => (
+              <p key={`${i}-${item.title}`} className="whitespace-pre-wrap break-words" data-testid="probation-offer-item">{item.title}: {item.body}</p>
+            ))}
             {r.clarification ? <p className="whitespace-pre-wrap">補足: {r.clarification}</p> : null}
             {r.hidden_at ? null : (
               <button type="button" onClick={() => void hide(r.request_id)} className="text-red-300 underline">

@@ -76,6 +76,9 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
   const [fix1, setFix1] = useState("");
   const [drill, setDrill] = useState("");
   const [hitokoto, setHitokoto] = useState("");
+  // 依頼の作成時に固定した追加項目（本体 #1086）。固定の4項目の後に、同じ検証（300字・必須）の欄として出す。
+  const offerItems = request.offer_items ?? [];
+  const [offerBodies, setOfferBodies] = useState<string[]>(() => offerItems.map(() => ""));
   const [file, setFile] = useState<File | null>(null);
   const uploaded = useRef<{ file: File; id: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -97,7 +100,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!guard.allow([good, fix1, drill, hitokoto].join("\n"))) return;
+    if (!guard.allow([good, fix1, drill, hitokoto, ...offerBodies].join("\n"))) return;
     if (!acquire()) return;
     setErrors({});
     try {
@@ -121,6 +124,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
           fix_points: [fix1],
           drill,
           hitokoto,
+          ...(offerItems.length ? { offer_items: offerBodies } : {}),
           demo_video_public_id: demo,
         }),
       });
@@ -145,6 +149,17 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
       <Field label={L("改善点")} value={fix1} onChange={setFix1} error={errors.fix_points} placeholder={L("一番の課題を1つ。なぜ遅くなるかまで書く")} />
       <Field label={t(locale, "coach.detail.drill")} value={drill} onChange={setDrill} error={errors.drill} placeholder={L("ドリル名と回数（例：壁押しドリル 10秒×3本）")} />
       <Field label={L("コーチなら明日から何をするか")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} placeholder={L("自分なら明日から何をするか、具体的に書く")} />
+      {/* 追加項目（本体 #1086）。タイトルはコーチの自由入力なので原文のまま出す。 */}
+      {offerItems.map((title, i) => (
+        <Field
+          key={`${i}-${title}`}
+          label={title}
+          value={offerBodies[i] ?? ""}
+          onChange={(v) => setOfferBodies((prev) => prev.map((b, j) => (j === i ? v : b)))}
+          error={errors[`offer_items.${i}`]}
+        />
+      ))}
+      {errors.offer_items ? <p className="text-sm text-red-400">{errors.offer_items}</p> : null}
       <label className="block space-y-1 text-sm">
         <span className="font-semibold">{t(locale, "coach.detail.demoVideo", { seconds: maxReviewSeconds })}</span>
         <input

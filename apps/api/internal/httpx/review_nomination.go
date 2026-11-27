@@ -64,12 +64,18 @@ func (s *Server) listReviewNominees(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 申込確認の「得られるもの」に使う、コーチのいま有効な追加項目（本体 #1086）。依頼の作成時に固定するものと同じ。
+	offers, err := s.effectiveCoachOffers(r.Context(), s.q, ids)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
 		// 選ぶ材料は種目・経験年数・記録・紹介文だけ。添削の件数・評価・売上などの人気の指標は出さない。
 		out = append(out, map[string]any{"id": c.ProfileID, "nickname": c.Nickname, "photo_url": s.coachPhotoURL(c.PhotoPublicID),
 			"events": c.Events, "years": c.Years, "best_record": c.BestRecord, "achievements": c.Achievements,
-			"price_yen": prices[c.ProfileID].Standard})
+			"price_yen": prices[c.ProfileID].Standard, "offer_items": offers[c.ProfileID].Items})
 	}
 	JSON(w, http.StatusOK, map[string]any{"coaches": out, "price_yen": reviewPriceYen})
 }

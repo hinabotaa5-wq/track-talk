@@ -197,3 +197,22 @@ it("W8: 回答表示の文字サイズのクラスが付く", async () => {
   // 補足の見出し h4 は従来どおり小さい。
   expect(doc.querySelector("h4")?.classList).toContain("text-xs");
 });
+
+// 本体 #1086 W5・W6：追加項目は固定項目の後にタイトル付きで出し、英語表示でもタイトル・本文とも原文のまま。
+it("W5: 追加項目は固定の4項目の後（見本動画の前）にタイトル付きで出る", async () => {
+  const withItems = { ...baseResponse, demo_video_url: "https://example.com/demo.mp4", offer_items: [{ title: "スタート局面の詳しい分析", body: "低く出られています" }] };
+  await act(async () => root.render(<ReviewResponseView response={withItems} />));
+  const headings = [...container.querySelectorAll("h3")].map((h) => h.textContent);
+  expect(headings).toEqual(["良い点", "改善点", "おすすめのドリル", "コーチなら明日から何をするか", "スタート局面の詳しい分析", "見本動画"]);
+  expect(container.textContent).toContain("低く出られています");
+});
+
+it("W6: 英語表示では固定項目が英語、追加項目のタイトルと本文は原文のまま", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  const withItems = { ...baseResponse, offer_items: [{ title: "スタート局面の詳しい分析", body: "低く出られています" }] };
+  await act(async () => root.render(<ReviewResponseView response={withItems} />));
+  const headings = [...container.querySelectorAll("h3")].map((h) => h.textContent);
+  expect(headings).toEqual(["Strong point", "What to improve", "Recommended drill", "What I would do starting tomorrow if I were you", "スタート局面の詳しい分析"]);
+  expect(container.textContent).toContain("低く出られています");
+});

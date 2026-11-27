@@ -249,7 +249,7 @@ it.each([
     throw new Error(`unexpected ${path}`);
   });
   await render();
-  expect(sectionIDs()).toEqual(["coach-video-review"]);
+  expect(sectionIDs()).toEqual(["coach-offer-items", "coach-video-review"]);
   expect(container.querySelector("#coach-plans")).toBeNull();
   expect(container.textContent).not.toContain("継続プラン");
   expect(container.textContent).not.toContain("従来の1ヶ月指導");
@@ -281,7 +281,7 @@ it("tab=support で開いても動画添削の節に24時間の文を出し、�
   mocks.search = "tab=support";
   withTickets({ balance: { available: 3, reserved: 0 }, ...byKind(2, 1) });
   await render();
-  expect(sectionIDs()).toEqual(["coach-video-review"]);
+  expect(sectionIDs()).toEqual(["coach-offer-items", "coach-video-review"]);
   expect(container.querySelector("#coach-plans")).toBeNull();
   expect(container.querySelector('section[aria-labelledby="coach-video-review"]')?.textContent).toContain(replyNote);
   expect(container.textContent).not.toContain(paymentNote);

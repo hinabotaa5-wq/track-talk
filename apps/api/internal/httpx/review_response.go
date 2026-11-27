@@ -2,9 +2,11 @@ package httpx
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -79,6 +81,8 @@ func (s *Server) reviewResponseJSON(rs db.ReviewResponse) map[string]any {
 		"good_point_ja": nil,
 		"fix_points_ja": nil,
 		"drill_ja":      nil,
+		// 依頼に固定した追加項目の回答（本体 #1086、タイトル＋本文）。withResponse・返却の応答が入れる。
+		"offer_items": []map[string]any{},
 	}
 	if rs.DemoVideoPublicID != nil {
 		out["demo_video_url"] = s.cloud.CoachingPlaybackURL(*rs.DemoVideoPublicID)
@@ -98,6 +102,14 @@ func (s *Server) withResponse(ctx context.Context, out map[string]any, requestID
 		return err
 	}
 	resp := s.reviewResponseJSON(rs)
+	// 追加項目（本体 #1086）。固定項目のあとにタイトル付きで出す。訳は付けない（原文のまま）。運営が隠した返答には出さない。
+	if rs.HiddenAt == nil {
+		items, err := reviewResponseItemsByRequest(ctx, s.q, []uuid.UUID{requestID})
+		if err != nil {
+			return err
+		}
+		resp["offer_items"] = responseItemsJSON(items[requestID])
+	}
 	// 動画ファイルを消した後は、コーチの見本動画も出さない。
 	if out["videos_purged"] == true {
 		resp["demo_video_url"] = nil
@@ -200,6 +212,8 @@ type reviewResponseReq struct {
 	DemoVideoPublicID string   `json:"demo_video_public_id"`
 	// プレミアムの総括の枠ごとのブロック（本体 #1053）。スタンダードでは使わない。
 	Sections []premiumSectionReq `json:"sections"`
+	// 依頼に固定した追加項目の本文（本体 #1086）。依頼の offer_items と同じ順・同じ数。
+	OfferItems []string `json:"offer_items"`
 }
 
 // submitReviewResponse は、引き受けたコーチが返答を送る。返却目安を過ぎたら送れない。
@@ -218,7 +232,8 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// プレミアム（本体 #1053）は総括（全体の一言診断＋枠ごとのブロック）で返す。担当でない依頼は従来どおり下の返却で 409 になる。
-	if current, err := s.q.GetCoachReviewRequest(r.Context(), db.GetCoachReviewRequestParams{ID: id, CoachID: p.ID}); err == nil && current.Plan == planPremium {
+	current, err := s.q.GetCoachReviewRequest(r.Context(), db.GetCoachReviewRequestParams{ID: id, CoachID: p.ID})
+	if err == nil && current.Plan == planPremium {
 		s.submitPremiumReviewResponse(w, r, p, current, req)
 		return
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -275,6 +290,23 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		if e := responseTextError("次に撮る動画", nextVideo); e != "" {
 			fields["next_video"] = e
 		}
+	}
+	// 追加項目（本体 #1086）は、依頼に固定したタイトルごとに固定項目と同じ検証（300字・必須・連絡先ガード）をかける。
+	// 担当でない依頼（current が取れない）は、下の返却で 409 になる。
+	offerTitles := current.OfferItems
+	offerBodies := make([]string, len(offerTitles))
+	for i, title := range offerTitles {
+		body := ""
+		if i < len(req.OfferItems) {
+			body = strings.TrimSpace(req.OfferItems[i])
+		}
+		if e := responseTextError("「"+title+"」", body); e != "" {
+			fields[offerItemField(i)] = e
+		}
+		offerBodies[i] = body
+	}
+	if len(req.OfferItems) > len(offerTitles) {
+		fields["offer_items"] = "この依頼にない項目が含まれています。画面を読み込み直してください"
 	}
 	var demo *string
 	if req.DemoVideoPublicID != "" {
@@ -341,6 +373,20 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// 依頼に固定した順に、追加項目の本文を残す。返却の時点の依頼（rr）の固定タイトルと突き合わせる。
+	if !slices.Equal(rr.OfferItems, offerTitles) {
+		Error(w, http.StatusConflict, "conflict", "この依頼の添削項目が読み込んだ時と違います。画面を読み込み直してください")
+		return
+	}
+	responseItems := make([]db.ReviewResponseItem, 0, len(offerTitles))
+	for i, title := range offerTitles {
+		item := db.CreateReviewResponseItemParams{RequestID: rr.ID, Position: int16(i), Title: title, Body: offerBodies[i]}
+		if err := q.CreateReviewResponseItem(r.Context(), item); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		responseItems = append(responseItems, db.ReviewResponseItem{RequestID: rr.ID, Position: item.Position, Title: title, Body: item.Body})
+	}
 	reservation, ticketErr := q.GetTicketReservationForReview(r.Context(), &rr.ID)
 	if ticketErr != nil && !errors.Is(ticketErr, pgx.ErrNoRows) {
 		MapDBError(w, ticketErr)
@@ -376,7 +422,9 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 	// 返却した回答3点を訳す（海外コーチのときだけ。失敗しても返却は成功のまま）。
 	s.translateReviewAfterWrite(r.Context(), rr, false, false, true)
 	out := s.coachRequestJSON(rr, true)
-	out["response"] = s.reviewResponseJSON(rs)
+	resp := s.reviewResponseJSON(rs)
+	resp["offer_items"] = responseItemsJSON(responseItems)
+	out["response"] = resp
 	s.withReviewTranslations(r.Context(), out, rr)
 	JSON(w, http.StatusOK, out)
 }
@@ -561,5 +609,30 @@ func (s *Server) listCoachProbation(w http.ResponseWriter, r *http.Request) {
 	if rows == nil {
 		rows = []db.ListCoachProbationRow{}
 	}
-	JSON(w, http.StatusOK, map[string]any{"responses": rows})
+	// 回答の追加項目（本体 #1086 補足 S8）も、タイトル＋本文で運営に見せる。
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.RequestID)
+	}
+	items, err := reviewResponseItemsByRequest(r.Context(), s.q, ids)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		b, err := json.Marshal(row)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		item := map[string]any{}
+		if err := json.Unmarshal(b, &item); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		item["offer_items"] = responseItemsJSON(items[row.RequestID])
+		out = append(out, item)
+	}
+	JSON(w, http.StatusOK, map[string]any{"responses": out})
 }

@@ -30,6 +30,7 @@ import {
 import { couponCashPrice, couponCount, initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatYen } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
+import { offerTitles } from "@/lib/coach-offer";
 import { reviewAthleteInfoKeys, reviewAthleteInfoLabel, reviewConfirmRows, type ReviewAthleteInfo, type ReviewAthleteInfoKey } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { looksLikeContact } from "@/lib/solicitation";
@@ -424,7 +425,7 @@ function StandardRequestPage() {
       ) : confirming ? (
         <div className="space-y-3">
           <PurchaseConfirm
-            rows={reviewConfirmRows({ method: method === "coupon" ? "card" : method, priceYen: totalPrice, couponYen, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind, athleteInfo })}
+            rows={reviewConfirmRows({ method: method === "coupon" ? "card" : method, priceYen: totalPrice, couponYen, hasVideo: !!file, question, eventLabel: coachEventLabels[event], videoFileName: file?.name ?? null, videoFileSizeBytes: file?.size ?? null, coachName: coach?.nickname ?? undefined, nextExpiry: chosenExpiry ? { expires_at: chosenExpiry } : null, ticketKind: chosenKind, athleteInfo, offerTitles: coach ? offerTitles(coach.offer_items) : undefined })}
             confirmLabel={chosenKind === "reward" ? L("確定して無料チケット1枚で送る") : method === "tickets" ? L("確定してチケット1枚で送る") : method === "coupon" && !cashPayment ? L("確定してクーポンで送る") : L("確定してお支払いへ")}
             onConfirm={() => void send()}
             onBack={() => { setConfirming(false); setError(""); }}

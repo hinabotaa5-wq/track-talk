@@ -249,6 +249,8 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 			// コーチの価格申請（本体 #1052）。応募フォームの希望価格もここで承認するので、閉じない方に置く。
 			r.Get("/admin/coaching/coach-prices", s.adminCoachPrices)
 			r.Post("/admin/coaching/coach-prices/{id}/approve", s.adminApproveCoachPrice)
+			r.Get("/admin/coaching/coach-offers", s.adminCoachOffers)
+			r.Post("/admin/coaching/coach-offers/{id}/approve", s.adminApproveCoachOffer)
 			r.Get("/admin/coaching/demo-codes", s.listDemoCodes)
 			r.Post("/admin/coaching/demo-codes", s.createDemoCode)
 			r.Get("/admin/coaching/probation", s.listCoachProbation)
@@ -421,6 +423,10 @@ func New(cfg config.Config, pool *pgxpool.Pool, v *auth.Verifier) http.Handler {
 				r.Get("/coach/me/prices", s.myCoachPrices)
 				r.Put("/coach/me/prices/{plan}", s.applyCoachPrice)
 				r.Post("/coach/me/prices/{plan}/withdraw", s.withdrawCoachPrice)
+				// 添削項目（追加項目）と見本動画の申請（本体 #1086）。価格とは別に出せる。
+				r.Get("/coach/me/offers", s.myCoachOffers)
+				r.Put("/coach/me/offers", s.applyCoachOffer)
+				r.Post("/coach/me/offers/withdraw", s.withdrawCoachOffer)
 				r.Get("/coach/me/plans", s.listMyCoachingPlans)
 				r.Post("/coach/me/plans", s.createCoachingPlan)
 				r.Patch("/coach/me/plans/{id}", s.updateCoachingPlan)
