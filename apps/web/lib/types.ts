@@ -745,7 +745,11 @@ export type ReviewResponse =
       good_point_ja?: string | null;
       fix_points_ja?: string[] | null;
       drill_ja?: string | null;
+      // 依頼に固定した追加項目の回答（本体 #1086）。訳は付けず原文のまま出す。古い API では無い。
+      offer_items?: ReviewResponseItem[];
     };
+
+export type ReviewResponseItem = { title: string; body: string };
 
 export type ReviewRating = {
   stars: number | null;
@@ -759,6 +763,8 @@ export type ReviewCoachOption = {
   price_yen?: number;
   // プレミアムの指名候補（?plan=premium）にだけ入る、そのコーチのプレミアム価格（本体 #1053）。
   premium_price_yen?: number;
+  // スタンダードの指名候補にだけ入る、このコーチのいま有効な追加項目のタイトル（本体 #1086）。申込確認の「得られるもの」に使う。
+  offer_items?: string[];
 };
 
 // プレミアム（本体 #1053）。決まった5枠：レース全体／スタート／後半／練習／その他。
@@ -838,6 +844,8 @@ export type ReviewRequest = {
   info_request_ja?: string | null;
   // コーチが引受後に辞退したときだけ入る。
   withdrawal?: ReviewWithdrawal | null;
+  // 依頼の作成時に固定した追加項目のタイトル（本体 #1086）。古い API では無い。
+  offer_items?: string[];
   // 詳細を開いたときだけ付く。
   response?: ReviewResponse | null;
   response_reported?: boolean;
@@ -883,6 +891,8 @@ export type CoachProbationResponse = {
   clarification: string | null;
   created_at: string;
   hidden_at: string | null;
+  // 回答の追加項目（本体 #1086 補足 S8）。古い API では無い。
+  offer_items?: ReviewResponseItem[];
 };
 
 // コーチに見せる、選手からの匿名の感想（本体 #911）。どの依頼・選手・日付かは含まない。
@@ -989,6 +999,9 @@ export type PublicCoach = {
   review_price_yen?: number;
   // プレミアムの価格（本体 #1053）。価格がないコーチは null で、プレミアムタブに出ない。
   premium_price_yen?: number | null;
+  // コーチ詳細にだけ入る、いま有効な追加項目のタイトル（原文のまま）と見本動画（本体 #1086）。一覧には無い。
+  offer_items?: string[];
+  demo_videos?: import("./coach-offer").CoachDemoVideo[];
 };
 
 // コーチが受けた★の件数と平均。paused は、評価が低くて依頼が回ってこない状態。

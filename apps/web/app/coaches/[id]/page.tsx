@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth-provider";
 
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
+import { CoachDemoVideos, CoachOfferItems } from "@/components/coach-offer-view";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { displayPriceAmount, formatDisplayPrice } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
@@ -186,6 +187,8 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
         </section>
         {/* 動画添削文脈：動画添削の節だけ。サポートプランの節とチケットの購入導線（販売終了、本体 #1031）は描画しない。 */}
         {videoContext ? <>
+        {/* 「このコーチの添削で得られるもの」（本体 #1086）。タイトルだけを固定4項目→追加項目の順に、申込みの入口の前に出す。 */}
+        <CoachOfferItems items={coach.offer_items} />
         <section className="space-y-3 text-sm" aria-labelledby="coach-video-review">
           {ctaEnabled ? null : <p className="mx-auto w-fit rounded-full border border-red-400/70 px-3 py-1 text-center text-sm font-semibold text-red-400">{L("現在は受付していません")}</p>}
           <h2 id="coach-video-review" className="text-lg font-bold">{L("フォーム添削や競技に関する悩み")}</h2>
@@ -211,6 +214,8 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
           </ul>
           <p className="text-slate-200">{L("申し込みが確定してから24時間以内に回答が来ます。")}</p>
         </section>
+        {/* 見本動画（本体 #1086）。入口を下に押しやらないよう、入口の節の後に別の節で出す。0本なら出さない。 */}
+        <CoachDemoVideos videos={coach.demo_videos} />
         </> : null}
       </>}
     </div>

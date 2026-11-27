@@ -452,3 +452,60 @@ it("B5: 選手情報が1つも無い依頼（過去の申込）は、選手情�
   expect(container.textContent).not.toContain("意識していること");
   expect(container.textContent).toContain("スタートが遅いです");
 });
+
+// 本体 #1086 W5：依頼に固定した追加項目が、固定の4項目の後に回答欄として出て、送信内容に順に入る。
+it("W5: 依頼に固定した追加項目の欄が固定4項目の後に出て、本文を順に送る", async () => {
+  let sentBody = "";
+  const withItems = { ...base, offer_items: ["スタート局面の詳しい分析", "Second half"] } as CoachReviewRequest;
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    if (options?.method === "POST") {
+      sentBody = options.body ?? "";
+      return responded;
+    }
+    return withItems;
+  });
+  await renderPage();
+  const form = responseForm();
+  const fields = [...form.querySelectorAll("label")].filter((l) => l.querySelector("textarea"));
+  expect(fields.map((l) => l.querySelector("span.font-semibold")?.textContent)).toEqual([
+    "良い点", "改善点", "おすすめのドリル", "コーチなら明日から何をするか", "スタート局面の詳しい分析", "Second half",
+  ]);
+  const areas = [...form.querySelectorAll("textarea")] as HTMLTextAreaElement[];
+  for (const [i, v] of ["良い", "課題", "ドリル", "明日から", "低く出る", "後半は腕"].entries()) await fillTextarea(areas[i], v);
+  await act(async () => submitButton("返答を送る").click());
+  expect(JSON.parse(sentBody).offer_items).toEqual(["低く出る", "後半は腕"]);
+});
+
+it("W5: 追加項目のない依頼は従来どおり4欄だけで、offer_items を送らない", async () => {
+  let sentBody = "";
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    if (options?.method === "POST") {
+      sentBody = options.body ?? "";
+      return responded;
+    }
+    return { ...base, offer_items: [] };
+  });
+  await renderPage();
+  const form = responseForm();
+  expect(form.querySelectorAll("textarea")).toHaveLength(4);
+  const areas = [...form.querySelectorAll("textarea")] as HTMLTextAreaElement[];
+  for (const [i, v] of ["良い", "課題", "ドリル", "明日から"].entries()) await fillTextarea(areas[i], v);
+  await act(async () => submitButton("返答を送る").click());
+  expect("offer_items" in JSON.parse(sentBody)).toBe(false);
+});
+
+it("W5: 追加項目の欄のエラーはその欄の下に出る", async () => {
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    if (options?.method === "POST") throw new ApiRequestError(422, { error: { code: "validation_error", message: "入力を確認してください", fields: { "offer_items.0": "「スタート局面の詳しい分析」を入力してください" } } });
+    return { ...base, offer_items: ["スタート局面の詳しい分析"] };
+  });
+  await renderPage();
+  const areas = [...responseForm().querySelectorAll("textarea")] as HTMLTextAreaElement[];
+  for (const [i, v] of ["良い", "課題", "ドリル", "明日から"].entries()) await fillTextarea(areas[i], v);
+  await act(async () => submitButton("返答を送る").click());
+  const label = [...responseForm().querySelectorAll("label")].find((l) => l.querySelector("span.font-semibold")?.textContent === "スタート局面の詳しい分析")!;
+  expect(label.textContent).toContain("「スタート局面の詳しい分析」を入力してください");
+});

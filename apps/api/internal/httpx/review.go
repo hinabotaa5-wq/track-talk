@@ -92,6 +92,8 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"created_at":         rr.CreatedAt,
 		"requested_coach_id": rr.RequestedCoachID, "requested_coach_name": rr.RequestedCoachName,
 		"base_price_yen": rr.BasePriceYen, "use_tickets": rr.UseTickets,
+		// 依頼の作成時に固定した追加項目のタイトル（本体 #1086）。指名コーチのいないスタンダード・プレミアムは空。
+		"offer_items":     nonNilStrings(rr.OfferItems),
 		"total_price_yen": rr.BasePriceYen, "cash_price_yen": reviewCashPrice(rr),
 		// 適用したクーポンの割引額（運営負担。本体 #1031）。使っていなければ 0。
 		"coupon_discount_yen": rr.CouponDiscountYen,
@@ -411,6 +413,17 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		basePrice = price
 	}
+	// 添削の追加項目（本体 #1086）。指名したコーチ（特集モードの自動指名を含む）のいま有効なタイトルを依頼に固定する。
+	// コーチ未定の依頼（ReviewRandomAssign）は空のまま（回答の欄は固定の4項目だけ）。
+	offerItems := []string{}
+	if req.RequestedCoachID != nil && len(fields) == 0 {
+		items, err := s.coachOfferItemsFor(r.Context(), req.RequestedCoachID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		offerItems = items
+	}
 	cashPrice := int32(0)
 	couponYen := int32(0)
 	if useCoupon {
@@ -512,6 +525,13 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		MapDBError(w, err)
 		return
+	}
+	if len(offerItems) > 0 {
+		if err := q.SetReviewRequestOfferItems(r.Context(), db.SetReviewRequestOfferItemsParams{ID: rr.ID, Items: offerItems}); err != nil {
+			MapDBError(w, err)
+			return
+		}
+		rr.OfferItems = offerItems
 	}
 	if useTickets {
 		if err := s.reserveReviewTickets(r.Context(), q, p, rr, req.TicketKind); err != nil {

@@ -212,3 +212,35 @@ it("W6: 試用期間の返答に改善点・おすすめのドリル・コーチ
   expect(lines(items[2])).toEqual(["良い点: 腕振りが良い", "改善点: 接地を直す", "おすすめのドリル: もも上げ"]);
   expect(container.textContent).not.toContain("直す点");
 });
+
+// 本体 #1086 W10：試用期間の返答に、追加項目（タイトル＋本文）が固定項目の後に出る。
+it("W10: 試用期間の返答に追加項目のタイトルと本文が出る", async () => {
+  mocks.api.mockImplementation((path: string) =>
+    Promise.resolve(
+      path.startsWith("/v1/admin/coaching/probation")
+        ? {
+            responses: [{
+              request_id: "r1", coach_id: "coach-1", coach_nickname: "審査コーチ", nth: 1, tier: "coach", event: "100m",
+              good_point: "腕振りが良い", fix_points: ["接地を直す"], drill: "もも上げ", clarification: null,
+              created_at: "2026-11-27T00:00:00Z", hidden_at: null, hitokoto: "明日から壁押し", cue: null, success_criteria: null, next_video: null,
+              offer_items: [{ title: "スタート局面の詳しい分析", body: "低く出られています" }],
+            }],
+          }
+        : path.startsWith("/v1/admin/coach-applications")
+          ? { applications: [], meta: { page: 1, per_page: 50, total: 0 } }
+          : path.startsWith("/v1/admin/reports") ? emptyList("reports") : emptyList("inquiries"),
+    ),
+  );
+  await act(async () => {
+    root.render(<ConfirmProvider><Page /></ConfirmProvider>);
+  });
+  await act(async () => {});
+  const coachTab = Array.from(container.querySelectorAll('[role="tab"]')).find((b) => b.textContent === "コーチ")!;
+  await act(async () => {
+    coachTab.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await act(async () => {});
+  const item = [...container.querySelectorAll("li")].find((li) => li.textContent?.includes("審査コーチ"))!;
+  const lines = [...item.querySelectorAll("p.whitespace-pre-wrap")].map((p) => p.textContent);
+  expect(lines).toEqual(["良い点: 腕振りが良い", "改善点: 接地を直す", "おすすめのドリル: もも上げ", "コーチなら明日から何をするか: 明日から壁押し", "スタート局面の詳しい分析: 低く出られています"]);
+});

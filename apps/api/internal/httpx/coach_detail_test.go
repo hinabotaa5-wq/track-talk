@@ -37,8 +37,15 @@ func TestPublicCoachDetailMatchesList(t *testing.T) {
 			t.Fatalf("support consultation missing: %s", entry)
 		}
 		detail := doJSON(t, h, http.MethodGet, "/v1/coaches/"+row.ID.String(), "", nil)
-		if detail.Code != http.StatusOK || !bytes.Equal(bytes.TrimSpace(detail.Body.Bytes()), entry) {
+		// 「得られるもの」の追加項目と見本動画（本体 #1086）は詳細だけに出す。それ以外は一覧の1行と同じ。
+		if detail.Code != http.StatusOK || !bytes.Equal(withoutDetailOnlyKeys(t, detail.Body.Bytes()), withoutDetailOnlyKeys(t, entry)) {
 			t.Fatalf("detail %d %s, want %s", detail.Code, detail.Body.String(), entry)
+		}
+		if !bytes.Contains(detail.Body.Bytes(), []byte(`"offer_items":[]`)) || !bytes.Contains(detail.Body.Bytes(), []byte(`"demo_videos":[]`)) {
+			t.Fatalf("detail-only keys missing: %s", detail.Body.String())
+		}
+		if bytes.Contains(entry, []byte(`"offer_items"`)) || bytes.Contains(entry, []byte(`"demo_videos"`)) {
+			t.Fatalf("list must not carry detail-only keys: %s", entry)
 		}
 		assertPublicCoachShape(t, entry)
 		assertPublicCoachShape(t, detail.Body.Bytes())
@@ -51,6 +58,22 @@ func TestPublicCoachDetailMatchesList(t *testing.T) {
 	if hidden.Code != http.StatusNotFound || missing.Code != hidden.Code || missing.Body.String() != hidden.Body.String() {
 		t.Fatalf("unpublished %d %s, missing %d %s", hidden.Code, hidden.Body.String(), missing.Code, missing.Body.String())
 	}
+}
+
+// withoutDetailOnlyKeys は、詳細だけに出すキー（本体 #1086）を除いた JSON（キー順は encoding/json の並び）。
+func withoutDetailOnlyKeys(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	delete(m, "offer_items")
+	delete(m, "demo_videos")
+	out, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 // 公開コーチの応答に評価の件数・平均は出さない（本体 #821）。それ以外のキーは従来どおり返す。

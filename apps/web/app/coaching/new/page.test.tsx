@@ -237,7 +237,7 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   mocks.me = { demo: false, review_open: true, birth_month: "1995-01", is_minor: false, guardian: null, push_devices: 0 };
   mocks.api.mockImplementation(async (path: string) => {
     if (path === "/v1/me/coaching") return mocks.me;
-    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [{ id: "c1", nickname: "テストコーチ", photo_url: "", events: ["100m"], years: 3, best_record: "", achievements: "" }] };
+    if (path.startsWith("/v1/coaching/nominees")) return { coaches: [{ id: "c1", nickname: "テストコーチ", photo_url: "", events: ["100m"], years: 3, best_record: "", achievements: "", offer_items: ["スタート局面の詳しい分析"] }] };
     if (path === "/v1/me/coaching/tickets") return { balance: { available: 0, reserved: 0 }, can_purchase: false };
     if (path.startsWith("/v1/coaching/estimate")) return { price_yen: 500, payments: true, due_at: "2026-11-06T00:00:00Z" };
     throw new Error(`unexpected ${path}`);
@@ -279,7 +279,9 @@ it("送る前に最終確認を出し、確定を押すまで動画を上げな�
   expect(confirm?.textContent).toContain("500円（税込）");
   const confirmDts = [...confirm!.querySelectorAll("dt")];
   const rowValue = (label: string) => confirmDts.find((d) => d.textContent === label)!.nextElementSibling as HTMLElement;
-  expect(confirmDts.slice(0, 5).map((d) => d.textContent)).toEqual(["内容", "種目", "相談内容", "動画", "回答期限"]);
+  expect(confirmDts.slice(0, 6).map((d) => d.textContent)).toEqual(["内容", "得られるもの", "種目", "相談内容", "動画", "回答期限"]);
+  // 「得られるもの」はコーチ詳細と同じ並び（固定4項目→そのコーチの追加項目）を連結して出す（本体 #1086 W4）。
+  expect(rowValue("得られるもの").textContent).toBe("良い点、改善点、おすすめのドリル、コーチなら明日から何をするか、スタート局面の詳しい分析");
   expect(rowValue("種目").textContent).toBe("100m");
   expect(rowValue("相談内容").textContent).toBe("後半に失速します。\n200mのラップは12.1 12.3です");
   expect(rowValue("動画").textContent).toBe("run.mp4（1 B）");
@@ -661,6 +663,7 @@ it("チケット版の確認は4項目で、有効期限はお支払い行の中
   const confirm = await renderTicketConfirm({ expires_at: "2027-05-01T00:00:00Z", available: 2 });
   expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
     "内容",
+    "得られるもの",
     "種目",
     "相談内容",
     "動画",
@@ -814,7 +817,7 @@ it("無料チケットの確認は無料チケット1枚と特典の期限を出
   await renderKinds("&pay=reward", 2, 1);
   const confirm = await fillAndConfirm();
   expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
-    "内容", "種目", "相談内容", "動画", "回答期限", "お支払い", "使うチケットの有効期限", "キャンセル・チケットの戻り",
+    "内容", "得られるもの", "種目", "相談内容", "動画", "回答期限", "お支払い", "使うチケットの有効期限", "キャンセル・チケットの戻り",
   ]);
   expect(confirm.textContent).toContain("無料チケット1枚（このあとのお支払いはありません）");
   const dd = [...confirm.querySelectorAll("dt")].find((d) => d.textContent === "使うチケットの有効期限")!.nextElementSibling!;
@@ -829,7 +832,7 @@ it("通常チケットの確認は通常ロットの最速期限を出し、tick
   await renderKinds("&pay=normal", 2, 1);
   const confirm = await fillAndConfirm();
   expect([...confirm.querySelectorAll("dt")].map((d) => d.textContent)).toEqual([
-    "内容", "種目", "相談内容", "動画", "回答期限", "お支払い", "キャンセル・チケットの戻り",
+    "内容", "得られるもの", "種目", "相談内容", "動画", "回答期限", "お支払い", "キャンセル・チケットの戻り",
   ]);
   // 全体の最速（無料チケットの 4/1）ではなく、通常ロットの中の最速（5/20）。
   expect(confirm.textContent).toContain("2027/05/20");

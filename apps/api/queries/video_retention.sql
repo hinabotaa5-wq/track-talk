@@ -32,6 +32,10 @@ LIMIT 20;
 SELECT r.video_public_id::text FROM review_requests r WHERE r.id = sqlc.arg(id) AND r.video_public_id IS NOT NULL
 UNION ALL
 SELECT rs.demo_video_public_id::text FROM review_responses rs WHERE rs.request_id = sqlc.arg(id) AND rs.demo_video_public_id IS NOT NULL
+  -- コーチ詳細の見本動画（本体 #1086）に同じ動画を使っているあいだは消さない（有効なセットか、承認待ち・切り替え待ちの申請）。
+  AND NOT EXISTS (SELECT 1 FROM coach_offer_application_videos v JOIN coach_offer_applications a ON a.id = v.application_id
+                  WHERE v.video_public_id = rs.demo_video_public_id
+                    AND (a.status IN ('pending', 'approved') OR EXISTS (SELECT 1 FROM coach_offers o WHERE o.application_id = a.id)))
 UNION ALL
 -- プレミアムの動画（本体 #1053）も、依頼の動画と同じ期限で消す。
 SELECT v.video_public_id::text FROM review_request_videos v WHERE v.request_id = sqlc.arg(id);

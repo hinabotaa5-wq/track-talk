@@ -2,6 +2,7 @@
 import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
+import { CoachOfferSection } from "@/components/coach-offer-form";
 import { CoachSubpageShell } from "@/components/coach-subpage";
 import { PageLoading } from "@/components/page-loading";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,8 @@ export default function CoachPricePage() {
           {data.plans.map((plan) => (
             <PlanPrice key={plan.plan} state={plan} token={token} onChange={setData} />
           ))}
+          {/* 添削項目・見本動画の申請（本体 #1086）。価格とは別に出せる。 */}
+          <CoachOfferSection token={token} />
         </>
       ) : null}
     </CoachSubpageShell>

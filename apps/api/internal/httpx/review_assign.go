@@ -252,6 +252,8 @@ type coachingTickResult struct {
 	PushResent int `json:"push_resent"`
 	// 承認の時点で対応中だった依頼が終わり、有効にしたコーチの価格（本体 #1052）。
 	CoachPricesApplied int `json:"coach_prices_applied"`
+	// 承認の時点で対応中だった依頼が終わり、有効にしたコーチの添削項目・見本動画（本体 #1086）。
+	CoachOffersApplied int `json:"coach_offers_applied"`
 }
 
 // runCoachingTick は、返却期限の処理・リマインド・決済の再試行を行う。
@@ -307,6 +309,10 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 	}
 	// 承認済みの価格のうち、承認の時点で対応中だった依頼が終わったものを有効にする（本体 #1052）。
 	if out.CoachPricesApplied, err = s.applyDueCoachPrices(ctx); err != nil {
+		return out, err
+	}
+	// 添削項目・見本動画の申請も同じ条件で有効にする（本体 #1086）。
+	if out.CoachOffersApplied, err = s.applyDueCoachOffers(ctx); err != nil {
 		return out, err
 	}
 	if out.TicketExpiryReminders, err = s.remindTicketExpiry(ctx); err != nil {
@@ -466,8 +472,10 @@ func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[strin
 		"returned_at":        rr.ReturnedAt, // 返却した時刻（本体 #1014）。返却前の状態では null。
 		"requested_coach_id": rr.RequestedCoachID,
 		"coach_reward_yen":   rr.BasePriceYen * reviewSharePercent / 100,
-		"info_request":       infoRequestJSON(rr),
-		"withdrawal":         withdrawalJSON(rr),
+		// 依頼の作成時に固定した追加項目のタイトル（本体 #1086）。回答フォームの追加の欄になる。
+		"offer_items":  nonNilStrings(rr.OfferItems),
+		"info_request": infoRequestJSON(rr),
+		"withdrawal":   withdrawalJSON(rr),
 		// 海外コーチとのやり取りの訳（本体 #916）。詳細の応答でだけ withReviewTranslations が入れ、それ以外は null。
 		"question_en":     nil,
 		"info_request_ja": nil,
