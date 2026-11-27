@@ -690,6 +690,16 @@ async function renderWith(override: RequestFixture) {
   return renderPage();
 }
 
+// 本体 #1068: 「依頼内容」枠の中に「相談内容」の見出しは出さず、本文だけを出す。判定は枠の中だけに絞る。
+function expectQuestionWithoutHeading(container: HTMLDivElement, body = "スタートの姿勢について") {
+  const section = container.querySelector('section[aria-label="依頼内容"], section[aria-label="Your request"]')!;
+  expect(section).not.toBeNull();
+  const headings = [...section.querySelectorAll("h1, h2, h3, h4, h5, h6")].map((h) => h.textContent);
+  expect(headings).not.toContain("相談内容");
+  expect(headings).not.toContain("Your question");
+  expect([...section.querySelectorAll("p")].some((p) => p.textContent === body)).toBe(true);
+}
+
 function dlTerms(container: HTMLDivElement) {
   return Array.from(container.querySelectorAll("dl dt")).map((dt) => dt.textContent);
 }
@@ -701,6 +711,7 @@ it("返却前の依頼詳細は「誰に見てもらうか」と種目を出さ�
     expect(container.textContent).not.toContain("誰に見てもらうか");
     expect(container.textContent).not.toContain("100m");
     expect(dlTerms(container)).toEqual([]);
+    expectQuestionWithoutHeading(container);
   } finally {
     await teardown(root, container);
   }
@@ -719,6 +730,7 @@ it("動画ありの依頼は現行のプレイヤーを出し、相談内容も�
     expect(videos[0].hasAttribute("controls")).toBe(true);
     expect(container.textContent).toContain("スタートの姿勢について");
     expect(container.textContent).not.toContain("誰に見てもらうか");
+    expectQuestionWithoutHeading(container);
   } finally {
     await teardown(root, container);
   }
@@ -730,6 +742,7 @@ it("動画なし（悩みのみ）の依頼は動画も保存期間の注記も�
     expect(container.querySelector("video")).toBeNull();
     expect(container.textContent).not.toContain(reviewVideosPurgedNote());
     expect(dlTerms(container)).toEqual([]);
+    expectQuestionWithoutHeading(container);
   } finally {
     await teardown(root, container);
   }
@@ -741,6 +754,7 @@ it("動画が削除済みの依頼は保存期間の注記と相談内容を出�
     expect(container.querySelector("video")).toBeNull();
     expect(container.textContent).toContain(reviewVideosPurgedNote());
     expect(container.textContent).toContain("スタートの姿勢について");
+    expectQuestionWithoutHeading(container);
   } finally {
     await teardown(root, container);
   }
@@ -756,8 +770,23 @@ it("返却後は相談内容を残しコーチの名前と種目は出さない"
     const outside = container.textContent!.replace(container.querySelector("article")?.textContent ?? "", "");
     expect(outside).not.toContain("テストコーチ");
     expect(container.textContent).not.toContain("100m");
+    expectQuestionWithoutHeading(container);
   } finally {
     await teardown(root, container);
+  }
+});
+
+it("英語表示でも「依頼内容」枠に Your question の見出しを出さず、相談文は出す（本体 #1068）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  let rendered: Awaited<ReturnType<typeof renderWith>> | undefined;
+  try {
+    rendered = await renderWith({ response: null, extra: { status: "in_review", due_at: new Date().toISOString() } });
+    expect(rendered.container.querySelector('section[aria-label="Your request"]')).not.toBeNull();
+    expectQuestionWithoutHeading(rendered.container);
+  } finally {
+    setActiveLocale("ja");
+    if (rendered) await teardown(rendered.root, rendered.container);
   }
 });
 

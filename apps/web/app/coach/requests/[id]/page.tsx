@@ -268,7 +268,6 @@ export default function CoachReviewRequestPage() {
           />
         ) : null}
         <div className="space-y-1">
-          <h3 className="text-xs font-semibold text-slate-300">{L("相談内容")}</h3>
           <p className="whitespace-pre-wrap break-words text-sm">{question ? question.text : reviewQuestionText(request)}</p>
           {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
           <p className="text-xs text-slate-300"><time dateTime={request.created_at}>{formatDateTime(request.created_at)}</time></p>
