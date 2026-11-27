@@ -15,7 +15,7 @@ import (
 )
 
 func documentVersions() map[string]string {
-	return map[string]string{"terms": "terms-2026-11-26", "guidelines": "guidelines-2026-11-25", "privacy": "privacy-2026-11-26"}
+	return map[string]string{"terms": "terms-2026-11-26b", "guidelines": "guidelines-2026-11-25", "privacy": "privacy-2026-11-26"}
 }
 
 func TestDocumentConsentHistoryAndGate(t *testing.T) {

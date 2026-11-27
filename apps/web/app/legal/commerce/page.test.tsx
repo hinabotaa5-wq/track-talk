@@ -23,11 +23,15 @@ it("コーチングのフラグが閉じていても表示し、住所・電話�
 it("公開文面に開発中の注記や販売を終えた追加相談を表示しない", () => {
   const html = renderToStaticMarkup(<CommercePage />);
   expect(html).not.toMatch(/たたき台|下書き|未確定|要確認|TODO|確定していません|確定後|追加相談/);
-  expect(html).toContain("スタンダード 1回 1,000円（税込）");
+  // T3：価格はコーチごとに異なり、表示場所を示す。固定額・一律の断言は載せない（#1058）。
+  expect(html).toContain("<p>スタンダードの価格（1回・税込）はコーチごとに異なります。各コーチのページと申込画面に表示します。</p>");
+  expect(html).not.toContain("スタンダード 1回 1,000円");
+  expect(html).not.toContain("どのコーチを選んでも同じ");
   // チケットは販売終了（本体 #1031）。価格は載せず、発行済みのチケットが有効期限まで使えることを書く。
   expect(html).not.toContain("スタンダードのチケット 6枚 5,000円（税込）");
   expect(html).toContain("スタンダードのチケットは販売を終了しました。発行済みのチケットは、購入時（特典チケットは付与時）の条件のとおり、有効期限まで利用できます。販売の終了前に購入したチケット（6枚）の有効期限は決済完了の日時から6か月");
-  expect(html).toContain("紹介特典の¥500クーポンを使う場合は、スタンダード1回の価格から500円を割り引いた額（1回 500円（税込））をお支払いいただきます。");
+  expect(html).toContain("紹介特典の¥500クーポンを使う場合は、選んだコーチのスタンダード1回の価格（表示価格）から500円を割り引いた額をお支払いいただきます。");
+  expect(html).not.toContain("（1回 500円（税込））");
   // 追加質問は販売終了（本体 #984）。販売終了前に購入した分の価格・支払時期・提供時期・返金だけを残す。
   expect(html).toContain("スタンダードの追加質問は販売を終了しました。");
   expect(html).not.toContain("スタンダードの追加質問 1回 500円（税込）");
@@ -58,7 +62,9 @@ it("公開文面に開発中の注記や販売を終えた追加相談を表示�
   expect(html).toContain("（4）運営者またはコーチの都合により有効期限内にスタンダードを受けられなかったチケットは、失効後であっても");
   // 計算式は（1）の提供終了にだけかかり、（3）（4）の運営・コーチ都合は1,000円（利用規約第6条第5項。本体 #715）。
   expect(html).toContain("終了の時点で未使用のチケット（有効期限にかかわらず）について、購入金額を6で割った額に未使用の枚数を掛けた額（1円未満の端数は四捨五入します）を払い戻します");
-  expect(html).toContain("スタンダードの1回分の価格（1,000円）に相当する額を返金します");
+  // T4：チケット払戻しの1,000円は不変（言い方だけ「チケット1枚分の額」に。#1058）。
+  expect(html).toContain("チケット1枚分の額（1,000円）に相当する額を返金します");
+  expect(html).not.toContain("スタンダードの1回分の価格（1,000円）");
   expect(html).toContain("購入金額を6で割って計算するのは（1）の場合だけで、（3）と（4）の返金はこの計算によらず、受けられなかったスタンダード1回（チケット1枚）につき1,000円です");
   expect(html).toContain("返金は購入時の支払方法への返金を原則としますが、返金の合計額が購入時の決済額を超えるときは、その決済で返金できる額までを購入時の支払方法で返金し、超える分は運営者が別途指定する方法（銀行振込など）で支払います（お問い合わせで案内します）。");
   expect(html).not.toContain("払戻しの額は購入金額を6で割った額");
@@ -120,17 +126,19 @@ it("海外コーチ スタンダード（パイロット）の分を表示する
   expect(single).not.toContain("PayPay");
 });
 
-// 別言語の API 料金定数とのずれを検出する。チケットは販売終了のため価格を載せない（本体 #1031）。
-it("掲載料金を API の決済用定数とクーポンの額面に一致させる", () => {
+// 別言語の API 定数とのずれを検出する。スタンダードはコーチごとの価格なので固定額を載せず（本体 #1058）、
+// クーポンの額面だけ API と突き合わせる。チケットは販売終了のため価格を載せない（本体 #1031）。
+it("クーポンの額面を API に一致させ、スタンダードの固定額は載せない", () => {
   const api = path.resolve(process.cwd(), "../api");
   const review = readFileSync(path.join(api, "internal/httpx/review_payment.go"), "utf8");
   const coupon = readFileSync(path.join(api, "internal/httpx/coaching_coupon.go"), "utf8");
   const html = renderToStaticMarkup(<CommercePage />);
   const price = review.match(/const reviewPriceYen int32 = (\d+)/);
   expect(price).not.toBeNull();
-  expect(html).toContain(`スタンダード 1回 ${Number(price![1]).toLocaleString("ja-JP")}円（税込）`);
+  expect(html).not.toContain(`スタンダード 1回 ${Number(price![1]).toLocaleString("ja-JP")}円`);
   const amount = coupon.match(/const referralCouponYen int32 = (\d+)/);
   expect(amount).not.toBeNull();
-  expect(html).toContain(`（1回 ${(Number(price![1]) - Number(amount![1])).toLocaleString("ja-JP")}円（税込））`);
+  expect(html).toContain(`価格（表示価格）から${Number(amount![1]).toLocaleString("ja-JP")}円を割り引いた額をお支払いいただきます。`);
+  expect(html).not.toContain(`（1回 ${(Number(price![1]) - Number(amount![1])).toLocaleString("ja-JP")}円（税込））`);
   expect(html).not.toMatch(/チケット\s*6枚\s*[\d,]+円/);
 });
