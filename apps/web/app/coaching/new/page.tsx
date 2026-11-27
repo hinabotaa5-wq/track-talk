@@ -28,7 +28,7 @@ import {
   videoDuration,
 } from "@/lib/review";
 import { couponCashPrice, couponCount, initialReviewPayment, parseReviewPayParam, ticketExpiryFor, ticketKindCounts, type TicketKind, type TicketSummary } from "@/lib/coaching-tickets";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { displayPriceAmount, formatDateTime, formatDisplayPrice } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { offerTitles } from "@/lib/coach-offer";
 import { reviewAthleteInfoKeys, reviewAthleteInfoLabel, reviewConfirmRows, type ReviewAthleteInfo, type ReviewAthleteInfoKey } from "@/lib/purchase-confirm";
@@ -46,6 +46,8 @@ import { PremiumRequestForm } from "./premium-form";
 // 確定を押してから動画を上げて、カードはそのまま支払い画面へ進む。支払いが済んだら選んだコーチに依頼が届く。
 // Stripe の鍵がない検証用の環境では、支払いなしのデモ版（招待コードを入れた人だけ）。
 
+// ¥500クーポンの額面（選択肢の名前に出す額。英語表示ではドルに換算して出す、本体 #1085 補足2）。
+const couponFaceYen = 500;
 const maxBytes = 100 * 1024 * 1024;
 // 先取りした動画の署名を使い回してよい時間。Cloudinary は発行から1時間で署名を断るので、余裕を見て50分にする（本体 #917）。
 const prefetchedSignatureMaxAgeMs = 50 * 60 * 1000;
@@ -538,11 +540,11 @@ function StandardRequestPage() {
               <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
               <div className="flex flex-wrap gap-2">
                 <button type="button" aria-pressed={method === "card"} onClick={() => setMethod("card")} className={chip(method === "card")}>
-                  {L("{v0}／回", { v0: formatYen(totalPrice) })}
+                  {L("{v0}／回", { v0: formatDisplayPrice(totalPrice) })}
                 </button>
                 {couponsUsable ? (
                   <button type="button" aria-pressed={method === "coupon"} onClick={() => setMethod("coupon")} className={chip(method === "coupon")}>
-                    {L("¥500クーポン（残り {n} 枚）", { n: couponsLeft })}
+                    {L("¥{v0}クーポン（残り {n} 枚）", { v0: displayPriceAmount(couponFaceYen), n: couponsLeft })}
                   </button>
                 ) : null}
                 {ticketsUsable ? (
@@ -556,7 +558,7 @@ function StandardRequestPage() {
               ) : null}
               {method === "coupon" && couponsUsable ? (
                 <div className="space-y-1 text-sm" aria-label={L("クーポンの内訳")}>
-                  <p>{L("価格 {price} − クーポン {coupon} ＝ お支払い {pay}", { price: formatYen(totalPrice), coupon: formatYen(couponYen), pay: formatYen(cashPrice) })}</p>
+                  <p>{L("価格 {price} − クーポン {coupon} ＝ お支払い {pay}", { price: formatDisplayPrice(totalPrice), coupon: formatDisplayPrice(couponYen), pay: formatDisplayPrice(cashPrice) })}</p>
                   {ticketSummary?.coupons?.next_expires_at ? <p className="text-xs text-slate-300">{L("使うクーポンの有効期限：{v0}", { v0: formatDateTime(ticketSummary.coupons.next_expires_at) })}</p> : null}
                   <p className="text-xs text-slate-300">{cashPrice > 0 ? reviewPayMethodLabels.card : L("クーポンで全額を払うので、このあとのお支払いはありません。")}</p>
                 </div>

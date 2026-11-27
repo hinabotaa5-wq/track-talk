@@ -18,7 +18,7 @@ import { coachEventLabels } from "@/lib/coach-recruit";
 import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, type CloudinaryUploadProgress } from "@/lib/cloudinary-upload";
 import { maxReviewSeconds, reviewEvents, reviewPayMethodLabels, tooLong, videoDuration } from "@/lib/review";
 import { couponCashPrice, couponCount, type TicketSummary } from "@/lib/coaching-tickets";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { formatDateTime, formatDisplayPrice } from "@/lib/format";
 import { maxPremiumVideos, premiumSlotLabels, premiumSlots, premiumVideoInputLimits } from "@/lib/premium";
 import { premiumConfirmRows } from "@/lib/premium-confirm";
 import type { CoachEvent, PremiumSlot, ReviewCoachOption, ReviewEstimate, ReviewRequest } from "@/lib/types";
@@ -427,7 +427,7 @@ export function PremiumRequestForm() {
             <legend className="text-sm font-semibold">{L("お支払い方法")}</legend>
             <div className="flex flex-wrap gap-2">
               <button type="button" aria-pressed={method === "card"} onClick={() => setMethod("card")} className={chip(method === "card")}>
-                {L("{v0}／回", { v0: formatYen(priceYen) })}
+                {L("{v0}／回", { v0: formatDisplayPrice(priceYen) })}
               </button>
               {couponsUsable ? (
                 <button type="button" aria-pressed={method === "coupon"} onClick={() => setMethod("coupon")} className={chip(method === "coupon")}>
@@ -437,7 +437,7 @@ export function PremiumRequestForm() {
             </div>
             {method === "card" ? <p className="text-xs text-slate-300">{reviewPayMethodLabels.card}</p> : (
               <div className="space-y-1 text-sm" aria-label={L("クーポンの内訳")}>
-                <p>{L("価格 {price} − クーポン {coupon} ＝ お支払い {pay}", { price: formatYen(priceYen), coupon: formatYen(couponYen), pay: formatYen(cashPrice) })}</p>
+                <p>{L("価格 {price} − クーポン {coupon} ＝ お支払い {pay}", { price: formatDisplayPrice(priceYen), coupon: formatDisplayPrice(couponYen), pay: formatDisplayPrice(cashPrice) })}</p>
                 {ticketSummary?.coupons?.next_expires_at ? <p className="text-xs text-slate-300">{L("使うクーポンの有効期限：{v0}", { v0: formatDateTime(ticketSummary.coupons.next_expires_at) })}</p> : null}
               </div>
             )}

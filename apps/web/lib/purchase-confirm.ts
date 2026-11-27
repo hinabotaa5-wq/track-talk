@@ -1,5 +1,5 @@
 import { L } from "@/lib/i18n";
-import { formatDateTime, formatYen } from "@/lib/format";
+import { formatDateTime, formatDisplayPrice } from "@/lib/format";
 import { reviewPayMethodLabels } from "@/lib/review";
 import type { TicketKind, TicketNextExpiry } from "@/lib/coaching-tickets";
 
@@ -94,9 +94,9 @@ export function reviewConfirmRows({ method, priceYen, couponYen = 0, hasVideo, q
   if (couponYen > 0) {
     const payYen = Math.max(priceYen - couponYen, 0);
     rows.push(
-      { label: L("価格"), value: L("{v0}（税込）", { v0: formatYen(priceYen) }) },
-      { label: L("クーポン"), value: L("−{v0}（¥500クーポン1枚）", { v0: formatYen(couponYen) }) },
-      { label: L("お支払い額"), value: L("{v0}（税込）", { v0: formatYen(payYen) }) },
+      { label: L("価格"), value: L("{v0}（税込）", { v0: formatDisplayPrice(priceYen) }) },
+      { label: L("クーポン"), value: L("−{v0}（¥500クーポン1枚）", { v0: formatDisplayPrice(couponYen) }) },
+      { label: L("お支払い額"), value: L("{v0}（税込）", { v0: formatDisplayPrice(payYen) }) },
     );
     const couponCancel = L("送信時にクーポン1枚を確保し、回答の返却時に使います。着手前のキャンセル、期限までに返らない場合、コーチが返却した場合はクーポンが戻ります（有効期限を過ぎた分は失効します。運営者またはコーチの都合で終了した場合は出し直します）。");
     if (payYen === 0) {
@@ -105,7 +105,7 @@ export function reviewConfirmRows({ method, priceYen, couponYen = 0, hasVideo, q
     }
     rows.push({ label: L("クーポンの戻り"), value: couponCancel });
   } else {
-    rows.push({ label: L("総額"), value: L("{v0}（税込）", { v0: formatYen(priceYen) }) });
+    rows.push({ label: L("総額"), value: L("{v0}（税込）", { v0: formatDisplayPrice(priceYen) }) });
   }
   rows.push({ label: L("お支払い方法"), value: reviewPayMethodLabels[method] });
   if (method === "card") {

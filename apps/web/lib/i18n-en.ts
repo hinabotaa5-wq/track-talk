@@ -3156,14 +3156,13 @@ export const en: Readonly<Record<string, string>> = {
   "受付が止まっているときはどうなりますか？": "What if requests are paused?",
   "受付停止中は依頼できません。受付が再開すると、このページの表示が「受付中」に変わります。": "You can't send a request while requests are paused. When they reopen, this page will show \"Accepting\".",
   "現在は受付を停止しています": "Requests are paused right now",
-  "このコーチに依頼する ¥{v0}": "Request this coach ¥{v0}",
   // 本体 #1054：特集ページの見出し文・プレミアムの流れ・2ボタンの固定 CTA。
   "フォームや練習内容を診断してもらおう！": "Get your form and training diagnosed!",
   "枠ごとに動画を送るだけ（最大10本まで）": "Just send videos for each slot (up to 10)",
   "コーチがまとめて見て診断": "The coach reviews them all and diagnoses",
   "24時間以内に総括で返却": "Summary returned within 24 hours",
-  "スタンダード ¥{v0}": "Standard ¥{v0}",
-  "プレミアム ¥{v0}": "Premium ¥{v0}",
+  "スタンダード ¥{v0}": "Standard ${v0}",
+  "プレミアム ¥{v0}": "Premium ${v0}",
   "チケットを買う": "Buy tickets",
   // 本体 #1031：紹介特典の ¥500 クーポンとチケット販売終了。
   "¥500クーポン": "¥500 coupon",
@@ -3173,6 +3172,9 @@ export const en: Readonly<Record<string, string>> = {
   "使えるクーポンがありません。別のお支払い方法を選んでください。": "You have no usable coupons. Choose another payment method.",
   "確定してクーポンで送る": "Confirm and send with a coupon",
   "¥500クーポン（残り {n} 枚）": "¥500 coupon ({n} left)",
+  // 本体 #1085 補足2：申込画面の支払い方法のクーポン選択肢だけ、英語表示は額面をドルで出す（¥160=$1）。
+  "¥{v0}クーポン（残り {n} 枚）": "${v0} coupon ({n} left)",
+  "¥{v0}クーポン": "${v0} coupon",
   "チケット（残り {n} 枚）": "Ticket ({n} left)",
   "クーポンの内訳": "Coupon breakdown",
   "価格 {price} − クーポン {coupon} ＝ お支払い {pay}": "Price {price} − coupon {coupon} = you pay {pay}",

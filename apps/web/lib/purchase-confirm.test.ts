@@ -137,6 +137,28 @@ describe("purchase-confirm", () => {
     expect(plain.find((r) => r.label === "総額")?.value).toBe("1,000円（税込）");
     expect(plain.find((r) => r.label === "クーポン")).toBeUndefined();
   });
+
+  // 本体 #1085 T4：英語表示では金額だけをドル（¥160=$1）にする。各金額は円から独立に換算し、差額から逆算しない。
+  // そのため ¥1,000 − ¥500 ＝ ¥500 は $6.25 − $3.13 ＝ $3.13 と1セント合わない表示になるが、仕様として許容する。
+  it("英語表示のクーポン適用は、価格・クーポン・お支払い額をそれぞれドルで出す（1セント差は仕様）", () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    try {
+      const base = { hasVideo: true, question: "相談", eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 1 };
+      const rows = reviewConfirmRows({ ...base, method: "card", priceYen: 1000, couponYen: 500 });
+      const value = (ja: string) => rows.find((r) => r.label === en[ja])?.value;
+      expect(value("価格")).toBe(en["{v0}（税込）"].replace("{v0}", "$6.25"));
+      expect(value("クーポン")).toBe(en["−{v0}（¥500クーポン1枚）"].replace("{v0}", "$3.13"));
+      expect(value("クーポン")).toContain("¥500");
+      expect(value("お支払い額")).toBe(en["{v0}（税込）"].replace("{v0}", "$3.13"));
+      const plain = reviewConfirmRows({ ...base, method: "card", priceYen: 1000 });
+      expect(plain.find((r) => r.label === en["総額"])?.value).toBe(en["{v0}（税込）"].replace("{v0}", "$6.25"));
+      const amounts = [...rows, ...plain].map((r) => r.value).filter((v) => v.includes("$"));
+      expect(amounts.every((v) => !v.includes("円"))).toBe(true);
+    } finally {
+      setActiveLocale("ja");
+    }
+  });
 });
 
 describe("reviewConfirmRows の申込内容の行（本体 #845）", () => {

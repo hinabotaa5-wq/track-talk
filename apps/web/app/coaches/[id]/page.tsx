@@ -8,7 +8,7 @@ import { CoachAvatar } from "@/components/coach-photo";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
 import { CoachDemoVideos, CoachOfferItems } from "@/components/coach-offer-view";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatYen } from "@/lib/format";
+import { displayPriceAmount, formatDisplayPrice } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
@@ -42,6 +42,8 @@ function CoachDetailRoute() {
   return <CoachDetail key={id} id={id} context={context} />;
 }
 
+// ¥500クーポンの額面（入口の名前に出す額。英語表示ではドルに換算して出す、本体 #1085 補足2）。
+const couponFaceYen = 500;
 const subscribeToPreview = () => () => {};
 const noServerPreview = () => undefined;
 
@@ -125,9 +127,9 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   const couponZero = coupons === 0;
   const ticketKind: TicketKind | null = counts ? (counts.reward >= 1 ? "reward" : counts.normal >= 1 ? "normal" : null) : null;
   const entries: ReviewEntry[] = [
-    { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(coach?.review_price_yen ?? reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
+    { key: "card", Icon: CreditCard, label: L("単発"), note: formatDisplayPrice(coach?.review_price_yen ?? reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
     {
-      key: "coupon", Icon: Gift, label: L("¥500クーポン"),
+      key: "coupon", Icon: Gift, label: L("¥{v0}クーポン", { v0: displayPriceAmount(couponFaceYen) }),
       note: coupons !== null ? L("残り {n} 枚", { n: coupons }) : undefined,
       // クーポンが0枚（枚数が取れている場合）なら紹介の手順ページ（/referral）へ。受付停止中のコーチでもこの場合だけは押せる。
       href: couponZero ? "/referral" : `${ctaHref}&pay=coupon`,

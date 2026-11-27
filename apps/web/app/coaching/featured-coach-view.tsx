@@ -8,6 +8,7 @@ import { PageLoading } from "@/components/page-loading";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachDisplayText } from "@/lib/coach-display";
+import { displayPriceAmount } from "@/lib/format";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { markLinkPending } from "@/lib/pending-link";
 import { premiumRequestHref } from "@/lib/premium";
@@ -98,11 +99,11 @@ function FeaturedContent({ result }: { result: Loaded }) {
 
   // 固定 CTA の価格は、表示中の特集コーチのいま有効な価格（API の応答。本体 #1052／#1054）。古い API でスタンダード価格が無いときは価格を出さない。
   const standardLabel = typeof coach.review_price_yen === "number"
-    ? L("スタンダード ¥{v0}", { v0: coach.review_price_yen.toLocaleString("ja-JP") })
+    ? L("スタンダード ¥{v0}", { v0: displayPriceAmount(coach.review_price_yen) })
     : L("スタンダード");
   // プレミアム価格がないコーチ（null・古い API で無い）はプレミアムボタンを出さず、スタンダードだけを全幅にする（本体 #1054）。
   const premiumLabel = typeof coach.premium_price_yen === "number"
-    ? L("プレミアム ¥{v0}", { v0: coach.premium_price_yen.toLocaleString("ja-JP") })
+    ? L("プレミアム ¥{v0}", { v0: displayPriceAmount(coach.premium_price_yen) })
     : null;
   const ctas = [
     { label: standardLabel, href: `/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card` },

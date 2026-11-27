@@ -1327,6 +1327,24 @@ it("クーポンを持っている人にはクーポンの選択肢を出し、�
   expect(breakdown?.textContent).toContain("カード・Apple Pay・Google Pay");
 });
 
+// 本体 #1085 T4：英語表示では単価と内訳の金額をドルだけ（¥160=$1）で出す。各金額は独立に換算するので1セント差が出るのは仕様。
+it("英語表示では単価・クーポンの選択肢・内訳をドルで出す（$6.25 − $3.13 ＝ $3.13、#1085 T4・T9）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  await renderCoupons("", 2);
+  const unit = [...container.querySelectorAll("button")].find((b) => b.textContent === "$6.25 / review");
+  expect(unit).toBeDefined();
+  // 補足2 T9：支払い方法のクーポン選択肢も、額面（¥500）をドルに換算して出す。残数は保持数のまま。
+  const couponChip = [...container.querySelectorAll("button")].find((b) => b.textContent === "$3.13 coupon (2 left)");
+  expect(couponChip?.getAttribute("aria-pressed")).toBe("true");
+  const payment = [...container.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent === "Payment method");
+  expect(payment?.querySelector(".flex")?.textContent).not.toContain("¥");
+  const breakdown = container.querySelector('[aria-label="Coupon breakdown"]');
+  expect(breakdown?.textContent).toContain("Price $6.25 − coupon $3.13 = you pay $3.13");
+  expect(breakdown?.textContent).not.toContain("円");
+  expect(container.textContent).not.toContain("1,000");
+});
+
 it("クーポンがなければクーポンの選択肢を出さない", async () => {
   await renderCoupons("", 0);
   expect(button("¥500クーポン")).toBeUndefined();
