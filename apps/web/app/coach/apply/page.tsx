@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachEventLabels, coachEvents, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
+import { coachPriceMinYen, parseYenInput } from "@/lib/coach-price";
 import { coachingEnabled } from "@/lib/features";
 import { formatDateTime } from "@/lib/format";
 import type { CoachApplication, CoachEvent, CoachTier } from "@/lib/types";
@@ -30,9 +31,13 @@ type Draft = {
   achievements: string;
   sns_urls: string;
   hitokoto: string;
+  // 希望価格（任意、円。本体 #1052）。運営が承認したものが初期価格になる。空欄なら送らない。
+  desired_standard_price: string;
+  desired_premium_price: string;
 };
 
-const emptyDraft: Draft = { name: "", tier: "coach", events: [], best_record: "", achievements: "", sns_urls: "", hitokoto: "" };
+const emptyDraft: Draft = { name: "", tier: "coach", events: [], best_record: "", achievements: "", sns_urls: "", hitokoto: "", desired_standard_price: "", desired_premium_price: "" };
+
 
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-sm transition active:scale-[0.98] ${
@@ -57,6 +62,8 @@ function draftFrom(a: CoachApplication): Draft {
     achievements: a.achievements,
     sns_urls: (a.sns_urls ?? []).join("\n"),
     hitokoto: a.hitokoto ?? "",
+    desired_standard_price: "",
+    desired_premium_price: "",
   };
 }
 
@@ -122,6 +129,10 @@ export default function CoachApplyPage() {
       if (!draft.achievements.trim()) missing.achievements = L("成績や指導経験を入力してください");
       if (sns_urls.length === 0) missing.sns_urls = L("SNS・ホームページを1件以上入力してください");
       if (!photo && !application?.photo_url) missing.photo = L("顔写真を選んでください");
+      const desiredStandard = parseYenInput(draft.desired_standard_price);
+      const desiredPremium = parseYenInput(draft.desired_premium_price);
+      if (desiredStandard !== null && !(desiredStandard >= coachPriceMinYen)) missing.desired_standard_price_yen = L("希望価格は500円以上の整数で入力してください");
+      if (desiredPremium !== null && !(desiredPremium >= coachPriceMinYen)) missing.desired_premium_price_yen = L("希望価格は500円以上の整数で入力してください");
       if (Object.keys(missing).length > 0) {
         setFieldErrors(missing);
         return;
@@ -129,7 +140,11 @@ export default function CoachApplyPage() {
       const d = await apiFetch<{ application: CoachApplication }>("/v1/coach/applications", {
         method: "POST",
         token,
-        body: JSON.stringify({ ...draft, sns_urls }),
+        body: JSON.stringify({
+          name: draft.name, tier: draft.tier, events: draft.events, best_record: draft.best_record,
+          achievements: draft.achievements, hitokoto: draft.hitokoto, sns_urls,
+          desired_standard_price_yen: desiredStandard, desired_premium_price_yen: desiredPremium,
+        }),
       });
       setApplication(d.application);
       setDraft(draftFrom(d.application));
@@ -273,6 +288,31 @@ export default function CoachApplyPage() {
             <span className="block text-xs text-slate-300">{L("選手へのひとことを入力できます（任意・100文字以内）。公開後はコーチの紹介に表示されます。")}</span>
             {fieldError("hitokoto")}
           </label>
+
+          {/* 希望価格（任意。本体 #1052）。運営が確認して承認した額が初期価格になる。 */}
+          <fieldset className="space-y-2 text-sm">
+            <legend className="font-semibold">{L("希望価格（任意）")}</legend>
+            <span className="block text-xs text-slate-300">{L("1回あたりの希望価格を円で入力できます（500円以上）。運営が確認して承認した額が、あなたの価格になります。空欄のままでも応募できます。")}</span>
+            <label className="block space-y-1">
+              <span>{L("スタンダードの希望価格（円）")}</span>
+              <Input
+                inputMode="numeric"
+                value={draft.desired_standard_price}
+                placeholder="1000"
+                onChange={(e) => setDraft((d) => ({ ...d, desired_standard_price: e.target.value }))}
+              />
+              {fieldError("desired_standard_price_yen")}
+            </label>
+            <label className="block space-y-1">
+              <span>{L("プレミアムの希望価格（円）")}</span>
+              <Input
+                inputMode="numeric"
+                value={draft.desired_premium_price}
+                onChange={(e) => setDraft((d) => ({ ...d, desired_premium_price: e.target.value }))}
+              />
+              {fieldError("desired_premium_price_yen")}
+            </label>
+          </fieldset>
 
           {!application?.photo_url ? (
             <label className="block space-y-1 text-sm">

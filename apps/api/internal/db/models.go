@@ -124,6 +124,29 @@ type CoachPayout struct {
 	PaidAt           *time.Time `json:"paid_at"`
 }
 
+type CoachPrice struct {
+	CoachID       uuid.UUID  `json:"coach_id"`
+	Plan          string     `json:"plan"`
+	PriceYen      int32      `json:"price_yen"`
+	ApplicationID *uuid.UUID `json:"application_id"`
+	EffectiveAt   time.Time  `json:"effective_at"`
+}
+
+type CoachPriceApplication struct {
+	ID          uuid.UUID  `json:"id"`
+	CoachID     uuid.UUID  `json:"coach_id"`
+	Plan        string     `json:"plan"`
+	PriceYen    int32      `json:"price_yen"`
+	Source      string     `json:"source"`
+	Status      string     `json:"status"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	ApprovedAt  *time.Time `json:"approved_at"`
+	ApprovedBy  *uuid.UUID `json:"approved_by"`
+	AppliedAt   *time.Time `json:"applied_at"`
+	WithdrawnAt *time.Time `json:"withdrawn_at"`
+}
+
 type CoachProfile struct {
 	ProfileID       uuid.UUID  `json:"profile_id"`
 	Tier            string     `json:"tier"`
@@ -1415,14 +1438,27 @@ type ReviewRequest struct {
 	WindSpeed           *string    `json:"wind_speed"`
 	BodyCondition       *string    `json:"body_condition"`
 	CouponDiscountYen   int32      `json:"coupon_discount_yen"`
+	Plan                string     `json:"plan"`
+}
+
+type ReviewRequestVideo struct {
+	RequestID       uuid.UUID `json:"request_id"`
+	Position        int16     `json:"position"`
+	Slot            string    `json:"slot"`
+	VideoPublicID   string    `json:"video_public_id"`
+	RaceTime        *string   `json:"race_time"`
+	WindSpeed       *string   `json:"wind_speed"`
+	BodyCondition   *string   `json:"body_condition"`
+	PracticePurpose *string   `json:"practice_purpose"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type ReviewResponse struct {
 	RequestID          uuid.UUID  `json:"request_id"`
 	CoachID            *uuid.UUID `json:"coach_id"`
-	GoodPoint          string     `json:"good_point"`
+	GoodPoint          *string    `json:"good_point"`
 	FixPoints          []string   `json:"fix_points"`
-	Drill              string     `json:"drill"`
+	Drill              *string    `json:"drill"`
 	DemoVideoPublicID  *string    `json:"demo_video_public_id"`
 	CreatedAt          time.Time  `json:"created_at"`
 	ClarifyReason      *string    `json:"clarify_reason"`
@@ -1436,6 +1472,12 @@ type ReviewResponse struct {
 	Cue                *string    `json:"cue"`
 	SuccessCriteria    *string    `json:"success_criteria"`
 	NextVideo          *string    `json:"next_video"`
+}
+
+type ReviewResponseSection struct {
+	RequestID uuid.UUID `json:"request_id"`
+	Slot      string    `json:"slot"`
+	Body      string    `json:"body"`
 }
 
 type ReviewTranslation struct {

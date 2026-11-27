@@ -6,7 +6,7 @@ import { installEnglish, setActiveLocale } from "@/lib/i18n";
 import { en } from "@/lib/i18n-en";
 
 // /coaching と /coaches で共有する一覧の切り替え。共通部品 ViewSwitch を使い、見出しと説明文は出さない。
-// 切り替えはスタンダード／プレミアムの2択（本体 #1026）。プレミアム側は「プレミアムは準備中です」だけで、取得もしない。
+// 切り替えはスタンダード／プレミアムの2択（本体 #1026）。プレミアム側は、プレミアム価格があるコーチだけの一覧（本体 #1053）。
 // 継続プランは休眠させたので（本体 #1007）、継続プランの選択肢と一覧は描画しない。
 const apiFetch = vi.fn();
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), tab: null as string | null, pathname: "/coaches" }));
@@ -55,6 +55,13 @@ const playerButton = () => [...container.querySelectorAll('a[href="/player"]')].
 
 const options = () => [...container.querySelectorAll('[role="group"] a')].map((a) => a.textContent);
 const premiumText = "プレミアムは準備中です";
+// プレミアムタブの一覧（本体 #1053）。価格のあるコーチだけを出す。
+const coach = (id: string, nickname: string, premium: number | null, onDuty = true) => ({
+  id, nickname, photo_url: "", tier: "coach", events: ["100m"], best_record: "", achievements: "", years: 1, sns_urls: [], hitokoto: "",
+  rating_count: 0, rating_average: 0, on_duty: onDuty, country_code: "JP", plans: [], service_types: [], premium_price_yen: premium,
+});
+const premiumCoaches = [coach("c-priced", "価格ありコーチ", 8000), coach("c-plain", "価格なしコーチ", null), coach("c-paused", "停止中コーチ", 12000, false)];
+const premiumList = () => container.querySelector('[data-testid="premium-coach-list"]');
 
 // T1
 it("既定はスタンダードの一覧で、切り替えはスタンダード／プレミアムの2択。見出しと説明文は出さない", async () => {
@@ -62,6 +69,7 @@ it("既定はスタンダードの一覧で、切り替えはスタンダード�
   expect(options()).toEqual(["スタンダード", "プレミアム"]);
   expect(switchLink("プレミアム")?.getAttribute("aria-current")).toBeNull();
   expect(container.textContent).not.toContain(premiumText);
+  expect(premiumList()).toBeNull();
   expect(panels()).toHaveLength(1);
   expect(fetchCount("/v1/coaches")).toBe(1);
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
@@ -73,25 +81,32 @@ it("既定はスタンダードの一覧で、切り替えはスタンダード�
   expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
 });
 
-// T2
-it("「プレミアム」を押すとその場で準備中の一文だけに切り替わり、URL を書き換えるだけで取得はしない", async () => {
+// T2（本体 #1053 で書き換え）：プレミアム側は、プレミアム価格があるコーチだけの一覧。価格は API の値を出し、受付中のコーチはプレミアムの申込みへ導く。
+it("「プレミアム」を押すとその場でプレミアムのコーチ一覧に切り替わり、価格のあるコーチだけを出す", async () => {
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/coaches") return { coaches: premiumCoaches };
+    throw new Error(`unexpected ${path}`);
+  });
   await render();
   await act(async () => switchLink("プレミアム")!.click());
-  expect(replaceState).toHaveBeenCalledTimes(1);
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaches?tab=premium");
   expect(navigation.replace).not.toHaveBeenCalled();
   expect(navigation.push).not.toHaveBeenCalled();
   expect(switchLink("プレミアム")?.getAttribute("aria-current")).toBe("page");
-  expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBeNull();
   const visible = panels().filter((panel) => !panel.hidden);
   expect(visible).toHaveLength(1);
-  expect(visible[0].textContent).toBe(premiumText);
-  // プレミアム側にリンク・ボタン・価格・案内は出さない（切り替えと円ボタンは tabpanel の外）。
-  expect(visible[0].querySelectorAll("a, button")).toHaveLength(0);
-  expect(visible[0].textContent).not.toMatch(/[¥$円]/);
-  expect(fetchCount("/v1/coaches")).toBe(1);
+  expect(visible[0].textContent).not.toContain(premiumText);
+  const list = premiumList()!;
+  expect(list.textContent).toContain("価格ありコーチ");
+  expect(list.textContent).toContain("8,000円");
+  expect(list.textContent).not.toContain("価格なしコーチ");
+  // 受付停止中のコーチは一覧に残すが、申込みの導線は出さない。
+  expect(list.textContent).toContain("停止中コーチ");
+  expect(list.textContent).toContain("受付停止中");
+  const links = [...list.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+  expect(links).toEqual(["/coaching/new?plan=premium&coach=c-priced&pay=card"]);
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
-  expect(apiFetch.mock.calls.filter(([path]) => path !== "/v1/me/coaching/action-counts")).toHaveLength(1);
 });
 
 // T3
@@ -105,27 +120,27 @@ it("プレミアムからスタンダードに戻すと URL が base に戻り�
   expect(visible).toHaveLength(1);
   expect(visible[0].textContent).not.toContain(premiumText);
   expect(container.querySelector(".page-loading-screen")).toBeNull();
-  expect(fetchCount("/v1/coaches")).toBe(1);
+  // スタンダードの一覧とプレミアムの一覧で1回ずつ。行き来しても取り直さない。
+  expect(fetchCount("/v1/coaches")).toBe(2);
 });
 
 // T4
-it("?tab=premium で開くとストップウォッチを挟まずプレミアム側から出し、スタンダードに切り替えて初めて一覧を取得する", async () => {
+it("?tab=premium で開くとプレミアム側から出し、スタンダードに切り替えて初めてスタンダードの一覧を取得する", async () => {
   navigation.tab = "premium";
   await render();
   expect(container.querySelector(".page-loading-screen")).toBeNull();
   expect(options()).toEqual(["スタンダード", "プレミアム"]);
   expect(switchLink("プレミアム")?.getAttribute("aria-current")).toBe("page");
   expect(panels()).toHaveLength(1);
-  expect(panels()[0].textContent).toBe(premiumText);
+  expect(panels()[0].textContent).not.toContain(premiumText);
   expect(coachButton()?.getAttribute("href")).toBe("/coach");
-  expect(fetchCount("/v1/coaches")).toBe(0);
+  expect(fetchCount("/v1/coaches")).toBe(1);
   await act(async () => switchLink("スタンダード")!.click());
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-  expect(fetchCount("/v1/coaches")).toBe(1);
+  expect(fetchCount("/v1/coaches")).toBe(2);
   expect(replaceState).toHaveBeenLastCalledWith(null, "", "/coaches");
   expect(switchLink("スタンダード")?.getAttribute("aria-current")).toBe("page");
   expect(panels()).toHaveLength(2);
-  expect(panels().filter((panel) => !panel.hidden)[0].textContent).not.toContain(premiumText);
 });
 
 // T5（本体 #1007 B1 を書き換え）：継続プランは休眠。?tab=support でもスタンダード側を出し、SupportPlanList は描画しない。
@@ -155,7 +170,11 @@ it("英語でも見出しを出さず、切り替えの選択肢は Standard／P
   expect(switchLink("Standard")?.getAttribute("href")).toBe("/coaches");
   expect(switchLink("Premium")?.getAttribute("href")).toBe("/coaches?tab=premium");
   await act(async () => switchLink("Premium")!.click());
-  expect(panels().filter((panel) => !panel.hidden)[0].textContent).toBe("Premium is in preparation");
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  const premiumPanel = panels().filter((panel) => !panel.hidden)[0].textContent ?? "";
+  expect(premiumPanel).toContain("Send up to 10 videos in total");
+  expect(premiumPanel).toContain("Race, Start, Second half, Practice, Other");
+  expect(premiumPanel).toMatch(/^[\x00-\x7F]*$/);
   expect(switchLink("Ongoing plan")).toBeUndefined();
   expect(container.textContent).not.toContain("Coaches");
   expect(container.textContent).not.toContain("Standard (form feedback or concerns about competing)");
@@ -175,7 +194,7 @@ for (const pathname of ["/coaching", "/coaches"]) {
     expect(replaceState).toHaveBeenLastCalledWith(null, "", `${pathname}?tab=premium`);
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(navigation.push).not.toHaveBeenCalled();
-    expect(fetchCount("/v1/coaches")).toBe(1);
+    expect(fetchCount("/v1/coaches")).toBe(2);
   });
 }
 

@@ -149,7 +149,10 @@ SELECT 'image'::text, cp.photo_public_id::text
 FROM coach_profiles cp WHERE cp.profile_id = $1 AND cp.photo_public_id IS NOT NULL
 UNION ALL
 SELECT 'coaching'::text, r.video_public_id
-FROM review_requests r WHERE r.requester_id = $1
+FROM review_requests r WHERE r.requester_id = $1 AND r.video_public_id IS NOT NULL
+UNION ALL
+SELECT 'coaching'::text, v.video_public_id
+FROM review_request_videos v JOIN review_requests r ON r.id = v.request_id WHERE r.requester_id = $1
 `
 
 type ListAccountMediaRow struct {
@@ -158,6 +161,7 @@ type ListAccountMediaRow struct {
 }
 
 // 退会で消える行が使っている Cloudinary の写真・動画。resource は image / video / coaching（非公開の添削動画）。
+// プレミアムの動画（本体 #1053）。依頼と一緒に消えるので、依頼の動画と同じく退会で消す。
 func (q *Queries) ListAccountMedia(ctx context.Context, userID uuid.UUID) ([]ListAccountMediaRow, error) {
 	rows, err := q.db.Query(ctx, listAccountMedia, userID)
 	if err != nil {

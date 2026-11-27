@@ -44,11 +44,32 @@ func (s *Server) listReviewNominees(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// プレミアム（本体 #1053）は、プレミアム価格があるコーチだけを、その価格と一緒に返す。
+	if r.URL.Query().Get("plan") == planPremium {
+		out, err := s.premiumNomineesJSON(r.Context(), rows)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{"coaches": out})
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, c := range rows {
+		ids = append(ids, c.ProfileID)
+	}
+	// 申込価格はコーチのいま有効なスタンダード価格（本体 #1052）。price_yen（全体）は未設定のコーチの価格。
+	prices, err := s.effectiveCoachPrices(r.Context(), s.q, ids)
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
 		// 選ぶ材料は種目・経験年数・記録・紹介文だけ。添削の件数・評価・売上などの人気の指標は出さない。
 		out = append(out, map[string]any{"id": c.ProfileID, "nickname": c.Nickname, "photo_url": s.coachPhotoURL(c.PhotoPublicID),
-			"events": c.Events, "years": c.Years, "best_record": c.BestRecord, "achievements": c.Achievements})
+			"events": c.Events, "years": c.Years, "best_record": c.BestRecord, "achievements": c.Achievements,
+			"price_yen": prices[c.ProfileID].Standard})
 	}
 	JSON(w, http.StatusOK, map[string]any{"coaches": out, "price_yen": reviewPriceYen})
 }

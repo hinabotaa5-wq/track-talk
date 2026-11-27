@@ -1,4 +1,6 @@
 "use client";
+import { PremiumBadge } from "@/components/premium-review";
+import { isPremium } from "@/lib/premium";
 import { L } from "@/lib/i18n";
 
 import { useAuth } from "@/components/auth-provider";
@@ -44,10 +46,11 @@ export default function CoachHistoryPage() {
         {rows?.map((request) => (
           <li key={request.id} className="space-y-3 rounded-xl border border-white/20 glass bg-white/10 p-3">
             <div className="space-y-0.5">
-              <p className="font-semibold text-white">
-                {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
+              <p className="flex flex-wrap items-center gap-2 font-semibold text-white">
+                <span>{coachEventLabels[request.event]} · {coachTierLabels[request.tier]}</span>
+                {isPremium(request) ? <PremiumBadge /> : null}
               </p>
-              <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{reviewQuestionText(request)}</p>
+              {isPremium(request) ? null : <p className="whitespace-pre-wrap break-words text-sm text-slate-200">{reviewQuestionText(request)}</p>}
               {request.returned_at ? (
                 <p className="text-xs text-slate-300">{L("返却 {date}", { date: formatDateTime(request.returned_at) })}</p>
               ) : null}

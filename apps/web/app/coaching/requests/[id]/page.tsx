@@ -13,6 +13,8 @@ import { ReviewWithdrawalNotice } from "@/components/review-withdraw";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 import { coachText } from "@/lib/coaching-display";
 import { ReviewResponseView } from "@/components/review-response";
+import { PremiumBadge, PremiumVideoGroups } from "@/components/premium-review";
+import { isPremium } from "@/lib/premium";
 import { MinorPurchaseDeclaration } from "@/components/minor-purchase-declaration";
 import { PushPermissionGuide } from "@/components/push-permission-guide";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -289,11 +291,16 @@ function ReviewRequestView() {
 
   return (
     <div className="mx-auto max-w-md space-y-5">
-      {completedPayment && request.payment?.amount_yen === reviewPriceYen ? <LoadedReferralCard token={token} variant="compact" /> : null}
+      {/* 紹介の案内は、クーポンを使わず定価（この依頼の価格。本体 #1052 でコーチごと）で払った申込みだけ。 */}
+      {completedPayment && request.payment?.amount_yen === (request.base_price_yen ?? reviewPriceYen) && !request.coupon_discount_yen ? <LoadedReferralCard token={token} variant="compact" /> : null}
       {offerPushGuide && token ? <ReviewCompletionPushGuide key={`${session.user.id}:${id}`} id={id} userId={session.user.id} token={token} /> : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold">{L("スタンダード")}</h1>
+          {isPremium(request) ? (
+            <h1 className="flex items-center gap-2 text-2xl font-bold">{L("プレミアム")}<PremiumBadge /></h1>
+          ) : (
+            <h1 className="text-2xl font-bold">{L("スタンダード")}</h1>
+          )}
           <p className="text-sm text-slate-300">{L("送った日時 {v0}", { v0: formatDateTime(request.created_at) })}</p>
           {request.status === "in_review" ? (
             <p className="text-sm text-slate-300">{L("返却期限: {v0}", { v0: formatDateTime(request.due_at) })}</p>
@@ -319,7 +326,13 @@ function ReviewRequestView() {
 
       <section aria-label={L("依頼内容")} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/5 p-4">
         <h2 className="text-sm font-semibold text-slate-300">{L("依頼内容")}</h2>
-        {request.video_url ? (
+        {/* プレミアム（本体 #1053）は、動画を枠ごとにまとめ、動画ごとの入力を併記する。相談内容の自由記述はない。 */}
+        {isPremium(request) ? (
+          <>
+            <PremiumAthleteInfo request={request} />
+            <PremiumVideoGroups groups={request.premium_videos ?? []} purgedNote={request.videos_purged ? reviewVideosPurgedNote() : null} />
+          </>
+        ) : request.video_url ? (
           <video
             src={request.video_url}
             poster={request.thumbnail_url || undefined}
@@ -331,9 +344,11 @@ function ReviewRequestView() {
         ) : request.videos_purged ? (
           <p className="text-sm text-slate-200">{reviewVideosPurgedNote()}</p>
         ) : null}
-        <div className="space-y-1">
-          <p className="whitespace-pre-wrap break-words text-sm">{reviewQuestionText(request)}</p>
-        </div>
+        {isPremium(request) ? null : (
+          <div className="space-y-1">
+            <p className="whitespace-pre-wrap break-words text-sm">{reviewQuestionText(request)}</p>
+          </div>
+        )}
       </section>
 
       {request.response ? (
@@ -349,6 +364,25 @@ function ReviewRequestView() {
 
       <Link href="/me/coaching/requests" className="block min-h-11 w-full rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-center text-sm font-semibold text-blue-300 transition active:scale-[0.98]">{L("依頼の一覧へ")}</Link>
     </div>
+  );
+}
+
+// プレミアムの申込全体の入力（PB・目標タイム）。値のある項目だけ出す。
+function PremiumAthleteInfo({ request }: { request: ReviewRequest }) {
+  const rows = [
+    { label: L("PB（自己ベスト）"), value: request.pb },
+    { label: L("目標タイム"), value: request.goal_time },
+  ].filter((row): row is { label: string; value: string } => Boolean(row.value));
+  if (rows.length === 0) return null;
+  return (
+    <dl aria-label={L("選手情報")} className="space-y-2">
+      {rows.map((row) => (
+        <div key={row.label} className="space-y-0.5">
+          <dt className="text-xs font-semibold text-slate-300">{row.label}</dt>
+          <dd className="whitespace-pre-wrap break-words text-sm">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

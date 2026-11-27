@@ -125,13 +125,12 @@ async function renderFresh() {
   await act(async () => root.render(<CoachDashboard />));
 }
 
-it("ランチャーは8タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない", async () => {
+it("ランチャーは7タイルの入口だけで（カレンダーは廃止）、中身のセクションを出さない（#1052 T9）", async () => {
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileHrefs()).toEqual([
     "/coach/reviewing",
-    "/coach/consultations",
-    "/coach/contracts",
+    "/coach/price",
     "/coach/payouts",
     "/coach/profile",
     "/me/push",
@@ -146,6 +145,12 @@ it("ランチャーは8タイルの入口だけで（カレンダーは廃止）
   expect(container.querySelector('a[href="/me/coaching"]')).toBeNull();
   // 本体 #1007 B5・B11：継続プランは休眠。届いた相談・継続プラン・特商法・身元のタイルは出さず、身元登録の状態も取りに行かない。
   for (const href of ["/coach/plans", "/coach/support-consults", "/coach/commerce"]) expect(container.querySelector(`a[href="${href}"]`)).toBeNull();
+  // 本体 #1052 T9：追加相談・契約・申込みのタイルは出さず、件数も取りに行かない（各ルートは残す）。
+  for (const href of ["/coach/consultations", "/coach/contracts"]) expect(container.querySelector(`a[href="${href}"]`)).toBeNull();
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/consultations" || path === "/v1/coach/contracts")).toBe(false);
+  // 価格タイルは価格の申請画面へ遷移する。
+  const price = tileLinks().find((a) => a.getAttribute("href") === "/coach/price");
+  expect(price?.getAttribute("aria-label")).toBe("価格");
   expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me/identity-status")).toBe(false);
   // ステータスバーは従来どおり操作できる。
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
@@ -169,8 +174,6 @@ it("バッジは実件数と一致し、口座未登録の点は条件の時だ�
   mockAll();
   await act(async () => root.render(<CoachDashboard />));
   expect(tileLabels()).toContain("対応中（1件）");
-  expect(tileLabels()).toContain("追加相談（1件）");
-  expect(tileLabels()).toContain("契約・申込み（1件）");
   expect(tileLabels()).toContain("報酬・口座（要確認）");
   // 特商法・身元のタイルは出さない（本体 #1007）。
   expect(tileLabels().some((label) => label?.startsWith("特商法・身元"))).toBe(false);
@@ -193,7 +196,7 @@ it("バッジは実件数と一致し、口座未登録の点は条件の時だ�
     return Promise.reject(new Error("down"));
   });
   await renderFresh();
-  expect(tileHrefs()).toHaveLength(8);
+  expect(tileHrefs()).toHaveLength(7);
 });
 
 it("未承認時はコーチ募集の文言を表示する", async () => {
@@ -237,7 +240,7 @@ it("タイルは横幅駆動で固定の大きさを持たず、ラベルは折�
   const grid = container.querySelector("nav.grid")!;
   expect(grid.getAttribute("style") ?? "").not.toContain("--coach-tile");
   const labels = [...container.querySelectorAll("nav.grid a > span.coach-tile-label")];
-  expect(labels).toHaveLength(8);
+  expect(labels).toHaveLength(7);
   for (const label of labels) expect(label.className).toContain("whitespace-nowrap");
 });
 
@@ -266,16 +269,15 @@ it("「履歴」タイルが最後尾にあり、/coach/history へ遷移し、�
   expect(tile.querySelector("span.coach-tile-label")?.textContent).toBe("履歴");
   expect(tile.querySelector("span.rounded-full")).toBeNull();
   // 既存のバッジ・点は従来どおり。
-  expect(tileLabels().slice(0, 7)).toEqual([
+  expect(tileLabels().slice(0, 6)).toEqual([
     "対応中（1件）",
-    "追加相談（1件）",
-    "契約・申込み（1件）",
+    "価格",
     "報酬・口座（要確認）",
     "プロフィール",
     "通知設定",
     "選手からの感想",
   ]);
-  expect(container.querySelectorAll("nav.grid a span.rounded-full")).toHaveLength(4);
+  expect(container.querySelectorAll("nav.grid a span.rounded-full")).toHaveLength(2);
 });
 
 it("英語では History と出す（#1014）", async () => {
@@ -318,10 +320,9 @@ it("応答に件数のキーが無いときは行を出さず、他は従来ど�
   // 受付状態・タイル・バッジ・フッターは従来どおり。
   expect(statusSection()?.textContent).toContain("受付中");
   expect(container.querySelector('[role="switch"][aria-label="受付中"]')?.getAttribute("aria-checked")).toBe("true");
-  expect(tileHrefs()).toHaveLength(8);
+  expect(tileHrefs()).toHaveLength(7);
   expect(tileLabels()).toContain("対応中（1件）");
-  expect(tileLabels()).toContain("追加相談（1件）");
-  expect(tileLabels()).toContain("契約・申込み（1件）");
+  expect(tileLabels()).toContain("価格");
   expect(container.textContent).toContain("未払い1,050円");
 });
 

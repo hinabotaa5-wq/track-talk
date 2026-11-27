@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { ConsultationTermsNote } from "@/components/coaching-consultations";
+import { documentConsentVersions } from "@/lib/document-consent";
 import TermsPage from "./page";
 vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a> }));
 
@@ -34,8 +35,15 @@ it("フォーム添削とチケットは運営者が提供者で、料金・返�
   expect(text).toContain("担当のコーチは、相談内容が分かりにくい場合に、1つの依頼につき1回だけ質問を付けて差し戻せます。");
   expect(text).toContain("スタンダードと同じ内容の指導を、本サービスを通さずに直接取引してはいけません。");
   expect(text).toContain("スタンダードのやりとりで、SNS・LINEなど本サービス外の連絡手段に誘ったり、SNSのアカウント、LINEのID、メールアドレス、電話番号などの外部連絡先を教えたり求めたりしてはいけません。");
-  // 料金は1本1,000円（#983）。チケットは6枚5,000円の先払いで、有効期限・失効・原則払戻し不可と例外・本人限定を定める（本体 #569）。
-  expect(text).toContain("スタンダードは1回1,000円（税込）");
+  // 料金はコーチごとに異なる（価格申請制 #1052、文言 #1058）。チケットは6枚5,000円の先払いで、有効期限・失効・原則払戻し不可と例外・本人限定を定める（本体 #569）。
+  expect(text).toContain("スタンダードの料金は、コーチごとに異なります。各コーチの料金は、コーチが申請し運営者が承認した額で、各コーチのページと申込画面に表示する額（税込）です。");
+  expect(text).toContain("申込みの後に料金が変わっても、その申込みの料金は申込みの時の額のままです。");
+  // T1：一律価格の断言を残さない。
+  expect(text).not.toContain("どのコーチを選んでも同じ");
+  expect(text).not.toContain("スタンダードは1回1,000円（税込）");
+  expect(text).not.toContain("一律1,000円");
+  expect(text).not.toContain("料金1,000円の場合は500円");
+  expect(text).toContain("選んだコーチの料金から500円を割り引いた額を支払います。");
   // 本体 #1031：チケットの販売は終了し、販売済みのチケットは購入時の条件のまま有効期限まで使える。
   expect(text).toContain("チケットの販売は終了しました。販売の終了前に6枚を1組として5,000円（税込）で販売し、6枚をまとめて先に支払っていただいたチケットは、購入時の条件のとおり、有効期限まで使えます。");
   expect(text).not.toContain("6枚を1組として5,000円（税込）で販売し、6枚をまとめて先に支払います");
@@ -46,7 +54,7 @@ it("フォーム添削とチケットは運営者が提供者で、料金・返�
   expect(text).toContain("1回の申込みに使えるクーポンは1枚までです。チケットと一緒には使えません。");
   expect(text).toContain("クーポン自体について現金への払戻しは行いません");
   expect(text).toContain("クーポンの割引分は運営者が負担します。");
-  expect(article(7)).toContain("利用者が紹介特典クーポンを使って申し込んだスタンダードも、割引前の料金をもとに1件につき700円です。");
+  expect(article(7)).toContain("利用者が紹介特典クーポンを使って申し込んだスタンダードは、割引前の料金をもとに、その70%です。");
   expect(text).toContain("チケット6枚商品の有効期限は、決済が完了した日時から6か月です。以前に購入した1枚商品・5枚商品のチケットには、購入時の条件が適用され、有効期限はありません");
   expect(text).toContain("有効期限は延長しません");
   expect(text).toContain("チケットは購入した本人だけが使えます");
@@ -64,7 +72,9 @@ it("フォーム添削とチケットは運営者が提供者で、料金・返�
   expect(text).toContain("この場合の契約の解除および損害賠償の請求は妨げられません");
   // 第5項：提供不能時（著しい遅れを追加、単発価格1,000円、解除・損賠請求の非妨害）。
   expect(text).toContain("または運営者の都合により提供が著しく遅れた場合");
-  expect(text).toContain("単発価格（1,000円）に相当する額を返金します");
+  // チケット1枚分の額（1,000円）は不変（#1058 で「単発価格」の言い方だけ改めた）。
+  expect(text).toContain("チケット1枚分の額（1,000円）に相当する額を返金します");
+  expect(text).not.toContain("単発価格（1,000円）");
   expect(text).toContain("返金は購入時の支払方法への返金を原則としますが、返金の合計額が購入時の決済額を超えるときは、その決済で返金できる額までを購入時の支払方法で返金し、超える分は運営者が別途指定する方法（銀行振込など）で支払います（支払方法はお問い合わせで案内します）。");
   // 変更条項：購入済みチケットに不利益な変更を及ぼさない。
   expect(text).toContain("購入済みのチケットについて、有効期限の短縮その他の不利益な変更を及ぼす規約の変更はしません");
@@ -91,8 +101,10 @@ it("コーチ向けの業務委託は、報酬・支払期日・返金時の扱�
   const text = article(7);
   for (const word of agencyWords) expect(text).not.toContain(word);
   expect(text).toContain("業務委託の報酬");
-  expect(text).toContain("料金1,000円の70%にあたる700円（税込）");
-  expect(text).toContain("利用者がチケットで申し込んだスタンダードも、1件につき700円です");
+  // T2：報酬はその依頼の料金（割引前）の70%。チケットの回は700円のまま（#1058）。
+  expect(text).toContain("報酬の額は、スタンダード1件につき、その依頼の料金（割引前）の70%（税込、1円未満は切り捨てます）です。");
+  expect(text).toContain("利用者がチケットで申し込んだスタンダードは、1件につき700円です");
+  expect(text).not.toContain("料金1,000円の70%にあたる700円");
   expect(text).toContain("スタンダードの追加質問への回答の報酬は、1件につき350円（税込、料金500円の70%）です");
   expect(text).not.toContain("1,050円");
   expect(text).not.toContain("420円");
@@ -274,11 +286,11 @@ it("第2条は「スタンダードの提供」で、継続プランの準備中
 
 it("第6条の料金と追加質問は国内コーチに適用し、海外単発は個別表示・追加質問なしとする（#764）", () => {
   const six = article(6);
-  expect(six).toContain("この条に定めるスタンダードの料金（第2項の一律1,000円）および追加質問（第10項）は、日本国内に住むコーチ（国内コーチ）が担当する場合についての定めです。");
+  expect(six).toContain("この条に定めるスタンダードの料金（第2項）および追加質問（第10項）は、日本国内に住むコーチ（国内コーチ）が担当する場合についての定めです。");
   expect(six).toContain("日本国外に住むコーチ（海外コーチ）によるスタンダードの単発の価格その他の条件は、購入画面および個別の表示で示し、追加質問は付きません。");
   expect(six).toContain("海外コーチによるスタンダードの単発には追加質問は付きません。");
-  // 従来の文が実質そのまま読めること
-  expect(six).toContain("スタンダードは1回1,000円（税込）");
+  // 料金はコーチごと（#1058）
+  expect(six).toContain("スタンダードの料金は、コーチごとに異なります。");
   expect(six).toContain("スタンダードの追加質問は、販売を終了しました。");
 });
 
@@ -309,8 +321,10 @@ it("第7条第7項：単発の返金時の報酬の扱いに、運営者の帰�
   expect(article(9)).toContain("<li>前7項の規定にかかわらず、返金が運営者の責めに帰すべき事由による場合、その事由に対応する部分については、コーチは第2項、第3項及び第6項の返還義務を負わず、第5項の控除の対象にもなりません。</li>");
 });
 
-it("最終更新日が実装日（2026年11月23日）に更新されている（#903・#983）", () => {
+it("最終更新日が版（terms-2026-11-26b）の日付に揃っている（#1058）", () => {
   const html = renderToStaticMarkup(<TermsPage />);
-  expect(html).toContain("最終更新日: 2026年11月23日");
+  expect(html).toContain("最終更新日: 2026年11月26日");
+  expect(documentConsentVersions.terms.startsWith("terms-2026-11-26")).toBe(true);
+  expect(html).not.toContain("2026年11月23日");
   expect(html).not.toContain("2026年11月17日");
 });

@@ -159,8 +159,11 @@ const listReviewVideoIDs = `-- name: ListReviewVideoIDs :many
 SELECT r.video_public_id::text FROM review_requests r WHERE r.id = $1 AND r.video_public_id IS NOT NULL
 UNION ALL
 SELECT rs.demo_video_public_id::text FROM review_responses rs WHERE rs.request_id = $1 AND rs.demo_video_public_id IS NOT NULL
+UNION ALL
+SELECT v.video_public_id::text FROM review_request_videos v WHERE v.request_id = $1
 `
 
+// プレミアムの動画（本体 #1053）も、依頼の動画と同じ期限で消す。
 func (q *Queries) ListReviewVideoIDs(ctx context.Context, id uuid.UUID) ([]string, error) {
 	rows, err := q.db.Query(ctx, listReviewVideoIDs, id)
 	if err != nil {
@@ -186,7 +189,8 @@ const listReviewVideosToPurge = `-- name: ListReviewVideosToPurge :many
 SELECT r.id FROM review_requests r
 LEFT JOIN review_responses rs ON rs.request_id = r.id
 WHERE r.videos_purged_at IS NULL AND r.retention_hold_at IS NULL
-  AND (r.video_public_id IS NOT NULL OR rs.demo_video_public_id IS NOT NULL)
+  AND (r.video_public_id IS NOT NULL OR rs.demo_video_public_id IS NOT NULL
+       OR EXISTS (SELECT 1 FROM review_request_videos v WHERE v.request_id = r.id))
   AND CASE
       WHEN r.status = 'returned' AND rs.clarify_requested_at IS NULL THEN r.returned_at + interval '7 days'
       WHEN r.status = 'returned' THEN rs.clarified_at

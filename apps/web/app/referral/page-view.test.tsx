@@ -27,7 +27,7 @@ const JA_TEXTS = [
   "友達が、購入の手続きで紹介IDを入力して購入を完了する",
   "「紹介ID」の欄に、受け取ったIDを入力します。入力しないと、紹介として数えられません。購入が完了すると、紹介してくれた方に「1人分」として数えられます。",
   "友達2人が購入すると、¥500クーポンをプレゼント",
-  "あと何人かは、マイページで確認できます。クーポンはスタンダードの申込みで使え、1,000円の申込みならお支払いは500円になります。",
+  "あと何人かは、マイページで確認できます。クーポンは申込みで使うと、お支払いの額から500円差し引かれます。",
   "注意点",
   "紹介IDを使って購入すると、この購入ではあなたの紹介IDは発行されません。",
   "紹介IDの入力は任意です。空欄でも購入できます。",
@@ -119,4 +119,32 @@ it("英語表示では固定の英訳が出て、新規文の日本語が残ら�
   expect(text).not.toContain("Good to know");
   expect(text).not.toContain("See your referral code and progress");
   for (const ja of JA_TEXTS.slice(1)) expect(text).not.toContain(ja);
+});
+
+it("ステップ5のクーポン説明は価格に依らない一般形で、旧例示とプラン限定の言い方が残らない（本体 #1060）", async () => {
+  setActiveLocale("ja");
+  await act(async () => root.render(<ReferralGuideView />));
+  const fifth = container.querySelectorAll("ol > li")[4]?.textContent ?? "";
+  expect(fifth).toContain("あと何人かは、マイページで確認できます。クーポンは申込みで使うと、お支払いの額から500円差し引かれます。");
+  expect(container.textContent).not.toContain("1,000円の申込みなら");
+  expect(fifth).not.toContain("スタンダードの申込みで使");
+  expect(fifth).not.toContain("プレミアム");
+
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  installEnglish(en);
+  setActiveLocale("en");
+  await act(async () => root.render(<ReferralGuideView />));
+  const fifthEn = container.querySelectorAll("ol > li")[4]?.textContent ?? "";
+  expect(fifthEn).toContain("You can check how many more are needed on My Page. When you use the coupon on a request, ¥500 is deducted from the amount you pay.");
+  expect(container.textContent).not.toContain("¥1,000 request");
+  expect(fifthEn).not.toMatch(/Standard request/);
+  expect(fifthEn).not.toMatch(/[ぁ-んァ-ン]/);
+});
+
+it("英訳辞書は新キーだけを持ち、旧キーは無い（本体 #1060）", () => {
+  expect(en["あと何人かは、マイページで確認できます。クーポンは申込みで使うと、お支払いの額から500円差し引かれます。"]).toBe(
+    "You can check how many more are needed on My Page. When you use the coupon on a request, ¥500 is deducted from the amount you pay.",
+  );
+  expect(Object.keys(en).some((k) => k.includes("1,000円の申込みなら"))).toBe(false);
 });

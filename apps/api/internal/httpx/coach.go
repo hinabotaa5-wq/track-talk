@@ -211,6 +211,9 @@ type coachApplicationReq struct {
 	Years        *int     `json:"years"`
 	SnsUrls      []string `json:"sns_urls"`
 	Hitokoto     string   `json:"hitokoto"`
+	// 希望価格（任意、円）。運営が承認したものが初期価格になる（本体 #1052）。
+	DesiredStandardPriceYen *int64 `json:"desired_standard_price_yen"`
+	DesiredPremiumPriceYen  *int64 `json:"desired_premium_price_yen"`
 }
 
 // normalizeCoachSnsEntries は、SNS・ホームページ欄の空行と重複を除く。
@@ -339,20 +342,33 @@ func (s *Server) submitCoachApplication(w http.ResponseWriter, r *http.Request) 
 	if *req.Years < 0 || *req.Years > 60 {
 		fields["years"] = "競技年数は0〜60年で入力してください"
 	}
+	wantedPrices := map[string]*int64{
+		coachPlanStandard: parseCoachApplicationPrice(fields, "desired_standard_price_yen", req.DesiredStandardPriceYen),
+		coachPlanPremium:  parseCoachApplicationPrice(fields, "desired_premium_price_yen", req.DesiredPremiumPriceYen),
+	}
 	if len(fields) > 0 {
 		FieldError(w, fields)
 		return
 	}
-	c, err := s.q.SubmitCoachApplication(r.Context(), db.SubmitCoachApplicationParams{
-		ProfileID:    p.ID,
-		Name:         name,
-		Tier:         req.Tier,
-		Events:       events,
-		BestRecord:   req.BestRecord,
-		Achievements: req.Achievements,
-		Years:        int16(*req.Years),
-		SnsUrls:      snsEntries,
-		Hitokoto:     hitokoto,
+	var c db.CoachProfile
+	err := s.tx(r.Context(), func(q *db.Queries) error {
+		var err error
+		c, err = q.SubmitCoachApplication(r.Context(), db.SubmitCoachApplicationParams{
+			ProfileID:    p.ID,
+			Name:         name,
+			Tier:         req.Tier,
+			Events:       events,
+			BestRecord:   req.BestRecord,
+			Achievements: req.Achievements,
+			Years:        int16(*req.Years),
+			SnsUrls:      snsEntries,
+			Hitokoto:     hitokoto,
+		})
+		if err != nil {
+			return err
+		}
+		// 希望価格は承認待ちの価格申請として残し、運営の価格申請の一覧で承認する。
+		return recordCoachApplicationPrices(r.Context(), q, p.ID, wantedPrices)
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		Error(w, http.StatusConflict, "conflict", "審査が済んでいるため、応募内容は変えられません")
@@ -509,10 +525,34 @@ func (s *Server) listCoachApplications(w http.ResponseWriter, r *http.Request) {
 		// 評価制度は廃止。除外は行わないため常に false（形状は後方互換のため維持）。
 		RatingPaused bool   `json:"rating_paused"`
 		PhotoURL     string `json:"photo_url"`
+		// 応募フォームの希望価格（本体 #1052）。未入力なら null。承認は価格申請の一覧で行う。
+		DesiredStandardPriceYen *int32 `json:"desired_standard_price_yen"`
+		DesiredPremiumPriceYen  *int32 `json:"desired_premium_price_yen"`
+	}
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ProfileID)
+	}
+	wanted, err := s.q.ListCoachApplyPrices(r.Context(), ids)
+	if err != nil {
+		MapDBError(w, err)
+		return
 	}
 	out := make([]application, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, application{row, false, s.coachPhotoURL(row.PhotoPublicID)})
+		a := application{ListCoachApplicationsRow: row, PhotoURL: s.coachPhotoURL(row.PhotoPublicID)}
+		for _, w := range wanted {
+			if w.CoachID != row.ProfileID {
+				continue
+			}
+			price := w.PriceYen
+			if w.Plan == coachPlanStandard {
+				a.DesiredStandardPriceYen = &price
+			} else {
+				a.DesiredPremiumPriceYen = &price
+			}
+		}
+		out = append(out, a)
 	}
 	JSON(w, http.StatusOK, map[string]any{"applications": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }
@@ -839,8 +879,20 @@ func (s *Server) publicCoaches(ctx context.Context, coachID *uuid.UUID) ([]map[s
 		slog.Warn("support consult entries unavailable")
 	}
 	translations := s.coachTranslationsFor(ctx, rows)
+	coachIDs := make([]uuid.UUID, 0, len(rows))
 	for _, c := range rows {
-		out = append(out, s.publicCoachJSON(c, plansByCoach[c.ProfileID], consults[c.ProfileID], translations))
+		coachIDs = append(coachIDs, c.ProfileID)
+	}
+	// 一覧・詳細・特集ページの価格は、コーチのいま有効な価格（本体 #1052）。
+	prices, err := s.effectiveCoachPrices(ctx, s.q, coachIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range rows {
+		item := s.publicCoachJSON(c, plansByCoach[c.ProfileID], consults[c.ProfileID], translations)
+		item["review_price_yen"] = prices[c.ProfileID].Standard
+		item["premium_price_yen"] = prices[c.ProfileID].Premium
+		out = append(out, item)
 	}
 	return out, nil
 }

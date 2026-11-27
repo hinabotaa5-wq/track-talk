@@ -11,9 +11,10 @@ vi.mock("next/link", () => ({ default: ({ href, children, className }: { href: s
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ token: "test", loading: false, session: { user: { id: "athlete" } } }) }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => mocks.api(...args) }));
 
-// 一覧の応答は6項目だけ（本体 #1072）。
+// 一覧の応答は6項目＋plan だけ（本体 #1072・#1053）。
 const oneRequest: MyReviewRequestListItem = {
   id: "req-1",
+  plan: "standard",
   event: "100m",
   status: "in_review",
   canceled_at: null,

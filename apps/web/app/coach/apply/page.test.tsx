@@ -80,3 +80,34 @@ it("SNSやホームページが空なら応募を送らず、入力を案内す�
   expect(container.textContent).toContain("SNS・ホームページを1件以上入力してください");
   expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
 });
+
+// 本体 #1052 T7：応募フォームに希望価格（スタンダード／プレミアム）の欄があり、入力した額を送る。未入力なら null で送り、応募できる。
+it("希望価格の欄があり、入力した額を送る。未入力でも応募でき、500円未満は送らない（#1052 T7）", async () => {
+  apiFetch.mockResolvedValue({ application });
+  await act(async () => root.render(<CoachApplyPage />));
+  expect(container.textContent).toContain("希望価格（任意）");
+  const inputs = [...container.querySelectorAll("fieldset input")] as HTMLInputElement[];
+  expect(inputs).toHaveLength(2);
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  const type = async (input: HTMLInputElement, value: string) => act(async () => { setter.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
+  const submit = () => act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+
+  // 未入力でも応募できる（null で送る）。
+  await submit();
+  let posted = apiFetch.mock.calls.filter(([, options]) => options?.method === "POST");
+  expect(JSON.parse(posted.at(-1)![1].body)).toMatchObject({ desired_standard_price_yen: null, desired_premium_price_yen: null });
+
+  // 500円未満は送らずに止める。
+  apiFetch.mockClear();
+  apiFetch.mockResolvedValue({ application });
+  await type(inputs[0], "499");
+  await submit();
+  expect(container.textContent).toContain("希望価格は500円以上の整数で入力してください");
+  expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+
+  await type(inputs[0], "1,500");
+  await type(inputs[1], "２００００");
+  await submit();
+  posted = apiFetch.mock.calls.filter(([, options]) => options?.method === "POST");
+  expect(JSON.parse(posted.at(-1)![1].body)).toMatchObject({ desired_standard_price_yen: 1500, desired_premium_price_yen: 20000 });
+});

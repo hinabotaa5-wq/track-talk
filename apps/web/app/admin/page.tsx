@@ -16,7 +16,7 @@ import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch } from "@/lib/api";
 import { useConfirm } from "@/components/confirm-dialog";
 import { fetchAllPages } from "@/lib/paging";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatYen } from "@/lib/format";
 import { coachEventLabels, coachStatusLabels, coachTierLabels } from "@/lib/coach-recruit";
 import { countryFlagEmoji } from "@/lib/coach-display";
 import { coachingEnabled } from "@/lib/features";
@@ -33,6 +33,7 @@ import type {
   Product,
 } from "@/lib/types";
 import { inquiryCategoryLabels } from "@/lib/validators";
+import { L } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -542,6 +543,16 @@ function CoachesAdmin({ token }: { token: string | null }) {
             {a.hitokoto ? (
               <p className="whitespace-pre-wrap">ひとこと: {a.hitokoto}</p>
             ) : null}
+            {/* 応募フォームの希望価格（本体 #1052）。承認は「コーチの価格申請」で行う。 */}
+            {a.desired_standard_price_yen != null || a.desired_premium_price_yen != null ? (
+              <p>
+                {L("希望価格: スタンダード {v0} ／ プレミアム {v1}", {
+                  v0: a.desired_standard_price_yen != null ? formatYen(a.desired_standard_price_yen) : L("未入力"),
+                  v1: a.desired_premium_price_yen != null ? formatYen(a.desired_premium_price_yen) : L("未入力"),
+                })}
+                {" "}<Link href="/admin/coaching/prices" className="text-blue-300 underline">{L("価格申請の一覧へ")}</Link>
+              </p>
+            ) : null}
             <CoachCountryForm key={a.country_code} application={a} onSubmit={(code) => setCountry(a, code)} />
             {a.status === "approved" ? (
               <p className="text-xs text-slate-200">
@@ -720,7 +731,7 @@ export default function AdminPage() {
         ))}
       </div>
       {tab === "products" ? <ProductsAdmin token={token} /> : null}
-      {tab === "coaches" ? <CoachesAdmin token={token} /> : null}
+      {tab === "coaches" ? <><Link href="/admin/coaching/prices" className="block text-sm text-blue-300 underline">{L("コーチの価格申請")}</Link><CoachesAdmin token={token} /></> : null}
       {tab === "personal" ? <><CoachingContractsAdmin token={token} />
               <Link href="/admin/coaching/reconciliation" className="block text-sm text-blue-300 underline">コーチングの会計照合</Link><Link href="/admin/coaching/tickets" className="block text-sm text-blue-300 underline">チケット購入・返金管理</Link><Link href="/admin/coaching/consultations" className="block text-sm text-blue-300 underline">追加相談・返金管理</Link><Link href="/admin/coaching/identity" className="block text-sm text-blue-300 underline">コーチの特商法の登録情報</Link></> : null}
       {tab === "payouts" ? <><Link href="/admin/coaching/payments" className="block text-sm text-blue-300 underline">スタンダード・追加質問の返金管理</Link><PayoutsAdmin token={token} /></> : null}

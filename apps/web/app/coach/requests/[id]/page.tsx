@@ -7,6 +7,9 @@ import { PageLoading } from "@/components/page-loading";
 import { useAuth } from "@/components/auth-provider";
 import { CoachInfoRequestForm, ReviewInfoHistory, SentBanner } from "@/components/review-info-request";
 import { ReviewResponseView } from "@/components/review-response";
+import { PremiumBadge, PremiumVideoGroups } from "@/components/premium-review";
+import { isPremium, maxPremiumSectionChars, premiumSlotLabels } from "@/lib/premium";
+import type { PremiumSlot } from "@/lib/types";
 import { CoachWithdrawForm } from "@/components/review-withdraw";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 import { Button } from "@/components/ui/button";
@@ -162,6 +165,104 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
   );
 }
 
+// プレミアムの総括（本体 #1053）：全体の一言診断（300字）＋動画がある枠ごとのブロック（各1000字）＋任意の見本動画。
+// 根拠は枠名で引用する（依頼内容の枠ごとのグループ表示がそのまま引用になる）。
+function PremiumResponseForm({ request, token, onSent, locale }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void; locale: Locale }) {
+  const slots = (request.premium_videos ?? []).map((group) => group.slot);
+  const guard = useSolicitationGuard();
+  const [hitokoto, setHitokoto] = useState("");
+  const [sections, setSections] = useState<Partial<Record<PremiumSlot, string>>>({});
+  const [file, setFile] = useState<File | null>(null);
+  const uploaded = useRef<{ file: File; id: string } | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [upload, setUpload] = useState<CloudinaryUploadProgress | null>(null);
+  const { pending, acquire, release } = useActionLock();
+
+  async function onPickFile(picked: File | null) {
+    setErrors({});
+    setFile(picked);
+    if (!picked) return;
+    if (picked.size > maxBytes) {
+      setErrors({ demo_video_public_id: t(locale, "coach.detail.demoTooBig") });
+      setFile(null);
+    } else if (tooLong(await videoDuration(picked))) {
+      setErrors({ demo_video_public_id: t(locale, "coach.detail.demoTooLong", { seconds: maxReviewSeconds }) });
+      setFile(null);
+    }
+  }
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!guard.allow([hitokoto, ...slots.map((slot) => sections[slot] ?? "")].join("\n"))) return;
+    if (!acquire()) return;
+    setErrors({});
+    try {
+      let demo = "";
+      if (file && uploaded.current?.file === file) {
+        demo = uploaded.current.id;
+      } else if (file) {
+        const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
+        setUpload({ loaded: 0, total: file.size, percent: 0 });
+        const payload = await uploadVideoToCloudinary(file, signed, token, setUpload);
+        if (payload.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
+        demo = payload.public_id;
+        uploaded.current = { file, id: demo };
+      }
+      const sent = await apiFetch<CoachReviewRequest>(`/v1/coaching/requests/${request.id}/response`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ hitokoto, sections: slots.map((slot) => ({ slot, body: sections[slot] ?? "" })), demo_video_public_id: demo }),
+      });
+      onSent(sent);
+    } catch (err) {
+      setErrors(fieldErrors(err, locale));
+    } finally {
+      setUpload(null);
+      release();
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4" data-testid="premium-response-form">
+      <h2 className="font-bold">{L("総括を書く")}</h2>
+      <p className="text-xs text-slate-300">{t(locale, "coach.detail.contactNote")}</p>
+      <p className="text-xs text-slate-300">{L("全体の一言診断のあと、動画がある枠ごとに書きます。根拠は枠名で示してください（例：「スタートの動画2で…」）。")}</p>
+      {guard.warning}
+      <Field label={L("一言診断")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} placeholder={L("全体の結論を1行で")} />
+      {slots.map((slot) => {
+        const value = sections[slot] ?? "";
+        const over = value.length > maxPremiumSectionChars;
+        const error = errors[`sections.${slot}`];
+        return (
+          <label key={slot} className="block space-y-1 text-sm">
+            <span className="font-semibold">{premiumSlotLabels[slot]}</span>
+            <Textarea rows={5} value={value} onChange={(e) => setSections((prev) => ({ ...prev, [slot]: e.target.value }))} aria-invalid={Boolean(error) || over} />
+            <span className={`block text-right text-xs ${over ? "text-red-400" : "text-slate-300"}`}>{value.length}/{maxPremiumSectionChars}</span>
+            {error ? <span className="block text-sm text-red-400">{error}</span> : null}
+          </label>
+        );
+      })}
+      <label className="block space-y-1 text-sm">
+        <span className="font-semibold">{t(locale, "coach.detail.demoVideo", { seconds: maxReviewSeconds })}</span>
+        <input
+          className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
+          type="file"
+          accept="video/mp4,video/quicktime,video/webm"
+          onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
+          disabled={pending}
+        />
+        {errors.demo_video_public_id ? <span className="block text-sm text-red-400">{errors.demo_video_public_id}</span> : null}
+      </label>
+      {upload && file ? <UploadProgress noun="動画" phase="upload" progress={upload} fileName={file.name} fileSize={file.size} /> : null}
+      {errors.sections ? <p className="text-sm text-red-400">{errors.sections}</p> : null}
+      {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? t(locale, "common.sending") : L("総括を送る")}
+      </Button>
+    </form>
+  );
+}
+
 // 申込で選手が任意で書いた選手情報（本体 #1013 補足）。値のある項目だけを、相談内容と並べて出す。
 function AthleteInfo({ request }: { request: CoachReviewRequest }) {
   const rows = [
@@ -238,8 +339,9 @@ export default function CoachReviewRequestPage() {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold">
-          {coachEventLabels[request.event]} · {coachTierLabels[request.tier]}
+        <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold">
+          <span>{coachEventLabels[request.event]} · {coachTierLabels[request.tier]}</span>
+          {isPremium(request) ? <PremiumBadge /> : null}
         </h1>
         {request.status === "in_review" ? (
           <p className="text-sm text-slate-300">{t(locale, "coach.detail.due", { date: formatDateTime(request.due_at) })}</p>
@@ -248,7 +350,15 @@ export default function CoachReviewRequestPage() {
 
       <section aria-label={L("依頼内容")} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/5 p-4">
         <h2 className="text-sm font-semibold text-slate-300">{L("依頼内容")}</h2>
-        {request.video_url ? (
+        {/* プレミアム（本体 #1053）は、動画を枠ごとにまとめ、レース全体にはタイム・風速・コンディション、練習には目的を併記する。 */}
+        {isPremium(request) ? (
+          <>
+            <AthleteInfo request={request} />
+            <PremiumVideoGroups groups={request.premium_videos ?? []} />
+            <p className="text-xs text-slate-300"><time dateTime={request.created_at}>{formatDateTime(request.created_at)}</time></p>
+          </>
+        ) : null}
+        {isPremium(request) ? null : request.video_url ? (
           <video
             src={request.video_url}
             poster={request.thumbnail_url || undefined}
@@ -258,12 +368,14 @@ export default function CoachReviewRequestPage() {
             className="mx-auto w-full max-w-[260px] max-h-[300px] rounded-xl bg-black"
           />
         ) : null}
+        {isPremium(request) ? null : (<>
         <div className="space-y-1">
           <p className="whitespace-pre-wrap break-words text-sm">{question ? question.text : reviewQuestionText(request)}</p>
           {question?.original != null ? <p lang="ja" className={originalTextClass}>{question.original}</p> : null}
           <p className="text-xs text-slate-300"><time dateTime={request.created_at}>{formatDateTime(request.created_at)}</time></p>
         </div>
         <AthleteInfo request={request} />
+        </>)}
       </section>
 
       {sent === "info" && request.info_request ? <SentBanner text={t(locale, "coach.detail.infoSent")} /> : null}
@@ -277,7 +389,11 @@ export default function CoachReviewRequestPage() {
         </div>
       ) : null}
 
-      {request.status === "in_review" && request.started_at ? <ResponseForm request={request} token={token} onSent={(r) => { setSent("response"); setRequest(r); }} locale={locale} /> : null}
+      {request.status === "in_review" && request.started_at ? (
+        isPremium(request)
+          ? <PremiumResponseForm request={request} token={token} onSent={(r) => { setSent("response"); setRequest(r); }} locale={locale} />
+          : <ResponseForm request={request} token={token} onSent={(r) => { setSent("response"); setRequest(r); }} locale={locale} />
+      ) : null}
 
       {request.status === "in_review" && !request.info_request && coachingMessagingEnabled ? (
         <CoachInfoRequestForm requestID={request.id} token={token} onSent={(r) => { setSent("info"); setRequest(r); }} />

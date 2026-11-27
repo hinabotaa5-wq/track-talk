@@ -250,6 +250,8 @@ type coachingTickResult struct {
 	GuardianNoticesSent int `json:"guardian_notices_sent"`
 	// 待ちに入れていた Push のうち、送り直して届いたもの（本体 #421 F04）。
 	PushResent int `json:"push_resent"`
+	// 承認の時点で対応中だった依頼が終わり、有効にしたコーチの価格（本体 #1052）。
+	CoachPricesApplied int `json:"coach_prices_applied"`
 }
 
 // runCoachingTick は、返却期限の処理・リマインド・決済の再試行を行う。
@@ -301,6 +303,10 @@ func (s *Server) runCoachingTick(ctx context.Context) (coachingTickResult, error
 		return out, err
 	}
 	if out.TicketsExpired, err = s.expireTickets(ctx); err != nil {
+		return out, err
+	}
+	// 承認済みの価格のうち、承認の時点で対応中だった依頼が終わったものを有効にする（本体 #1052）。
+	if out.CoachPricesApplied, err = s.applyDueCoachPrices(ctx); err != nil {
 		return out, err
 	}
 	if out.TicketExpiryReminders, err = s.remindTicketExpiry(ctx); err != nil {
@@ -426,10 +432,20 @@ func (s *Server) reviewEstimate(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// coach を付けたら、そのコーチのいま有効な価格を返す（本体 #1052）。付けなければ未設定のコーチの価格。
+	price := reviewPriceYen
+	if raw := r.URL.Query().Get("coach"); raw != "" {
+		if coach, err := uuid.Parse(raw); err == nil {
+			if price, err = s.coachStandardPriceYen(r.Context(), s.q, &coach); err != nil {
+				MapDBError(w, err)
+				return
+			}
+		}
+	}
 	JSON(w, http.StatusOK, map[string]any{
 		"due_at": due, "coaches_on_duty": onDuty,
 		// payments が false のあいだは支払いなしのデモ版。
-		"payments": s.stripe.Configured(), "price_yen": reviewPriceYen,
+		"payments": s.stripe.Configured(), "price_yen": price,
 	})
 }
 
@@ -438,6 +454,7 @@ func (s *Server) reviewEstimate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[string]any {
 	out := map[string]any{
 		"id":                 rr.ID,
+		"plan":               rr.Plan, // standard／premium（本体 #1053）
 		"tier":               rr.Tier,
 		"event":              rr.Event,
 		"focus":              rr.Focus,

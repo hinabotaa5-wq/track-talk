@@ -76,6 +76,7 @@ func newDemoCode() (string, error) {
 func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 	return map[string]any{
 		"id":       rr.ID,
+		"plan":     rr.Plan, // standard／premium（本体 #1053）
 		"tier":     rr.Tier,
 		"event":    rr.Event,
 		"focus":    rr.Focus,
@@ -295,6 +296,9 @@ type reviewRequestReq struct {
 	GoalTime      *string `json:"goal_time"`
 	WindSpeed     *string `json:"wind_speed"`
 	BodyCondition *string `json:"body_condition"`
+	// プラン（standard／premium。空はスタンダード）と、プレミアムの動画（本体 #1053）。スタンダードでは videos を使わない。
+	Plan   string            `json:"plan"`
+	Videos []premiumVideoReq `json:"videos"`
 	// 18歳未満が自分で払うときの、購入のたびの宣言（minor_purchase.go）。
 	minorDeclarationReq
 }
@@ -313,6 +317,15 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	var req reviewRequestReq
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
+		return
+	}
+	switch req.Plan {
+	case planPremium:
+		s.createPremiumReviewRequest(w, r, p, req)
+		return
+	case "", planStandard:
+	default:
+		FieldError(w, map[string]string{"plan": "プランを選び直してください"})
 		return
 	}
 	fields := map[string]string{}
@@ -381,15 +394,25 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		coachName = nominees[0].Nickname
 	}
-	// 料金は全コーチ共通。チケットで払うときは現金の支払いはない。
+	// 料金は指名したコーチのいま有効なスタンダード価格（本体 #1052。未設定のコーチは reviewPriceYen）。
+	// チケットで払うときは現金の支払いはなく、報酬の元になる額も従来どおり reviewPriceYen（チケットの扱いは変えない）。
 	// クーポンを使うときは価格から額面を引いた額を払う（0円になれば支払いはない。本体 #1031）。
+	basePrice := reviewPriceYen
+	if !useTickets && len(fields) == 0 {
+		price, err := s.coachStandardPriceYen(r.Context(), s.q, req.RequestedCoachID)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		basePrice = price
+	}
 	cashPrice := int32(0)
 	couponYen := int32(0)
 	if useCoupon {
-		couponYen = couponDiscount(reviewPriceYen, referralCouponYen)
+		couponYen = couponDiscount(basePrice, referralCouponYen)
 	}
 	if !useTickets {
-		cashPrice = couponCashPrice(reviewPriceYen, couponYen)
+		cashPrice = couponCashPrice(basePrice, couponYen)
 	}
 	payments := reviewNeedsPayment(s.stripe.Configured(), cashPrice)
 	if payments && !validReviewPayMethod(req.Method) {
@@ -467,12 +490,13 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		Focus:            focus,
 		Question:         question,
 		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
-		BasePriceYen: reviewPriceYen, UseTickets: useTickets, CouponDiscountYen: couponYen,
+		BasePriceYen: basePrice, UseTickets: useTickets, CouponDiscountYen: couponYen,
 		Pb: pb, GoalTime: goalTime, WindSpeed: windSpeed, BodyCondition: bodyCondition,
 		VideoPublicID: video,
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。
 		Status: map[bool]string{true: "awaiting_payment", false: "queued"}[payments],
+		Plan:   planStandard,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -506,6 +530,12 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	s.finishReviewRequestCreate(w, r, p, rr, payments, req)
+}
+
+// finishReviewRequestCreate は、作った依頼の支払い画面を作る（払うものがなければ通知と訳を済ませる）までを行い、応答を書く。
+// スタンダードとプレミアム（本体 #1053）の両方がここを通る。
+func (s *Server) finishReviewRequestCreate(w http.ResponseWriter, r *http.Request, p db.Profile, rr db.ReviewRequest, payments bool, req reviewRequestReq) {
 	if payments {
 		url, err := s.reviewCheckoutFor(r.Context(), rr, p, req.Method, req.ReferralCode, req.minorDeclarationReq)
 		if err != nil {
@@ -530,6 +560,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		out := s.reviewRequestJSON(rr)
 		out["checkout_url"] = url
+		if err := s.withPremium(r.Context(), s.q, out, rr, true); err != nil {
+			MapDBError(w, err)
+			return
+		}
 		JSON(w, http.StatusCreated, out)
 		return
 	}
@@ -540,6 +574,10 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	out := s.reviewRequestJSON(rr)
 	s.withReviewTranslations(r.Context(), out, rr)
+	if err := s.withPremium(r.Context(), s.q, out, rr, true); err != nil {
+		MapDBError(w, err)
+		return
+	}
 	JSON(w, http.StatusCreated, out)
 }
 
@@ -566,11 +604,12 @@ func (s *Server) listMyReviewRequests(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{"requests": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
 }
 
-// myReviewRequestListItemJSON は、選手の依頼一覧の1行。一覧ページが使う6項目だけを返す（本体 #1072）。
-// 詳細と作成の応答は reviewRequestJSON のまま全項目を返す。
+// myReviewRequestListItemJSON は、選手の依頼一覧の1行。一覧ページが使う項目だけを返す（本体 #1072）。
+// 6項目に、プレミアムの印に使う plan（本体 #1053）を加えた7項目。詳細と作成の応答は reviewRequestJSON のまま全項目を返す。
 func myReviewRequestListItemJSON(rr db.ReviewRequest) map[string]any {
 	return map[string]any{
 		"id":          rr.ID,
+		"plan":        rr.Plan,
 		"event":       rr.Event,
 		"status":      rr.Status,
 		"canceled_at": rr.CanceledAt,

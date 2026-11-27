@@ -2,35 +2,29 @@
 import { L } from "@/lib/i18n";
 
 import Link from "next/link";
-import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { MotionConfig } from "motion/react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { CoachAvatar } from "@/components/coach-photo";
 import { PageLoading } from "@/components/page-loading";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
-import { ViewSwitch } from "@/components/view-switch";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { coachDisplayText } from "@/lib/coach-display";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { markLinkPending } from "@/lib/pending-link";
-import { reviewPriceYen } from "@/lib/review-pricing";
+import { premiumRequestHref } from "@/lib/premium";
 import type { PublicCoach } from "@/lib/types";
 import { CoachSelfButton } from "../coaches/coach-self-button";
 import { ReferralBanner } from "../coaches/referral-banner";
 
 // コーチタブの特集ページ（本体 #985、表示の手直しは #991）。特集モード（NEXT_PUBLIC_COACHING_FEATURED_COACH_ID）の間、/coaching の一覧の代わりに出す。
 // 名前・写真・記録・種目・紹介文・実績・SNS はプロフィールデータから出し、コードに個人の固定文言を書かない。
-// 固定の文は流れ（3ステップ）・よくある質問だけ（すべて L() でキー化）。
-// 並び（#991）：紹介バナー → 切り替え＋選手・コーチのボタン → コーチについて → 3ステップ → よくある質問（＋下部固定 CTA）。
-// 切り替えは通常一覧（coach-tabs.tsx）と同じ「スタンダード」と「プレミアム」の2択（本体 #1026）。
-// プレミアム選択中は特集コンテンツと固定 CTA を出さず、「プレミアムは準備中です」の一文だけを出す（価格・説明・申込みの導線は出さない）。
-// 紹介バナーと切り替え＋選手・コーチのボタンの行はプレミアム選択中も出す。スタンダードに戻してもコーチ情報は取り直さない。
-// 継続プランは休眠させたので（本体 #1007）、継続プランの選択肢は出さない。?tab=support で開かれてもスタンダード側を出し、
-// 「継続プランは準備中です」は描画しない。
+// 固定の文は見出し文・流れ（スタンダード／プレミアムの各3ステップ）・固定 CTA だけ（すべて L() でキー化）。
+// 並び（本体 #1054）：紹介バナー → 見出し文＋選手・コーチのボタン → コーチについて → スタンダードの流れ → プレミアムの流れ（＋下部固定 CTA）。
+// 上部のスタンダード／プレミアムの切り替えは無くした（本体 #1054）。?tab=premium・?tab=support で開いても同じ内容を出す。
+// コーチ一覧（coach-tabs.tsx）の切り替えは別物で、そちらはそのまま。よくある質問も #1054 で削除した（辞書のキーは残す）。
 // 外すもの：コーチカードの2列一覧・種目チップの絞り込み。
 // 特集コーチは複数にできる（本体 #1063。NEXT_PUBLIC_COACHING_FEATURED_COACH_ID のカンマ区切りの並び）。
 // 2人以上表示できるときは、プロフィール（写真〜SNS）だけを横スライドで切り替え、写真の上にドットで現在位置を出す。
-// 3ステップ・よくある質問はページに1組だけ。固定 CTA は表示中のコーチに連動する。初期表示は常に先頭（前回の表示は覚えない）。
+// 流れの3ステップはページに1組だけ。固定 CTA（価格）は表示中のコーチに連動する。初期表示は常に先頭（前回の表示は覚えない）。
 // 公開されていない（404）コーチはスライドから外す。1人だけのときはスライドもドットも出さず、従来の表示と同じ。
 
 // 記録の欄は自由記入なので、区切り（改行・読点・スラッシュ・全角スラッシュ）でチップに分ける。
@@ -39,15 +33,6 @@ export function recordChips(text: string | null): string[] {
 }
 
 type Loaded = { coaches: PublicCoach[] } | { error: true };
-type Tab = "video" | "premium";
-
-export function FeaturedCoachView({ coachIDs }: { coachIDs: readonly string[] }) {
-  return (
-    <Suspense>
-      <FeaturedCoachTabs coachIDs={coachIDs} />
-    </Suspense>
-  );
-}
 
 // 1人分の取得。公開されていない（404）ときは null（スライドから外す）、それ以外の失敗はそのまま投げる。
 async function fetchFeaturedCoach(coachID: string): Promise<PublicCoach | null> {
@@ -59,12 +44,7 @@ async function fetchFeaturedCoach(coachID: string): Promise<PublicCoach | null> 
   }
 }
 
-function FeaturedCoachTabs({ coachIDs }: { coachIDs: readonly string[] }) {
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const base = pathname === "/coaches" ? "/coaches" : "/coaching";
-  // 直接リンク・共有 URL でプレミアム側から開けるよう、初回だけ URL を見る。以後はその場の状態が正本。
-  const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "premium" ? "premium" : "video"));
+export function FeaturedCoachView({ coachIDs }: { coachIDs: readonly string[] }) {
   const [result, setResult] = useState<Loaded>();
 
   const idsKey = coachIDs.join(",");
@@ -80,46 +60,17 @@ function FeaturedCoachTabs({ coachIDs }: { coachIDs: readonly string[] }) {
     return () => { cancelled = true; };
   }, [idsKey]);
 
-
   // 初回読み込み中は、通常一覧と同じくストップウォッチだけにする。
   if (!result) return <PageLoading screen label={L("読み込み中...")} />;
-
-  const views = [
-    { id: "video", label: L("スタンダード") },
-    { id: "premium", label: L("プレミアム") },
-  ] as const;
-  const hrefOf = (id: Tab) => (id === "premium" ? `${base}?tab=premium` : base);
-  // その場の状態で即座に切り替え、URL は書き換えるだけにする（router.replace は読み込みが挟まるので使わない）。
-  function select(next: Tab) {
-    if (next === tab) return;
-    setTab(next);
-    window.history.replaceState(null, "", hrefOf(next));
-  }
 
   return (
     <div className="mx-auto max-w-md space-y-6 pb-32">
       <ReferralBanner />
-      <MotionConfig reducedMotion="user">
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <ViewSwitch
-              label={L("コーチの一覧を切り替える")}
-              layoutId="coach-list-view-pill"
-              initialPillStatic
-              views={views}
-              current={tab}
-              onSelect={select}
-              href={hrefOf}
-            />
-          </div>
-          <CoachSelfButton />
-        </div>
-      </MotionConfig>
-      {tab === "premium" ? (
-        <p className="py-8 text-center text-sm text-slate-200">{L("プレミアムは準備中です")}</p>
-      ) : (
-        <FeaturedContent result={result} />
-      )}
+      <div className="flex items-center gap-2">
+        <p data-testid="featured-lead" className="min-w-0 flex-1 text-base font-bold">{L("フォームや練習内容を診断してもらおう！")}</p>
+        <CoachSelfButton />
+      </div>
+      <FeaturedContent result={result} />
     </div>
   );
 }
@@ -144,6 +95,19 @@ function FeaturedContent({ result }: { result: Loaded }) {
   if (!coaches.length) return <p className="text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p>;
   const current = Math.min(index, coaches.length - 1);
   const coach = coaches[current];
+
+  // 固定 CTA の価格は、表示中の特集コーチのいま有効な価格（API の応答。本体 #1052／#1054）。古い API でスタンダード価格が無いときは価格を出さない。
+  const standardLabel = typeof coach.review_price_yen === "number"
+    ? L("スタンダード ¥{v0}", { v0: coach.review_price_yen.toLocaleString("ja-JP") })
+    : L("スタンダード");
+  // プレミアム価格がないコーチ（null・古い API で無い）はプレミアムボタンを出さず、スタンダードだけを全幅にする（本体 #1054）。
+  const premiumLabel = typeof coach.premium_price_yen === "number"
+    ? L("プレミアム ¥{v0}", { v0: coach.premium_price_yen.toLocaleString("ja-JP") })
+    : null;
+  const ctas = [
+    { label: standardLabel, href: `/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card` },
+    ...(premiumLabel ? [{ label: premiumLabel, href: premiumRequestHref(coach.id) }] : []),
+  ];
   const open = coach.on_duty;
 
   return (
@@ -154,46 +118,52 @@ function FeaturedContent({ result }: { result: Loaded }) {
         <CoachSlides coaches={coaches} current={current} onChange={setIndex} />
       )}
 
-      <ol data-testid="featured-steps" className="grid grid-cols-3 gap-2 text-center text-xs">
-        {[L("動画を1本送るだけ"), L("コーチが動画を見て回答"), L("24時間以内に返却")].map((step, i) => (
+      <FeaturedSteps
+        testID="featured-steps"
+        heading={L("スタンダード")}
+        steps={[L("動画を1本送るだけ"), L("コーチが動画を見て回答"), L("24時間以内に返却")]}
+      />
+      <FeaturedSteps
+        testID="featured-premium-steps"
+        heading={L("プレミアム")}
+        steps={[L("枠ごとに動画を送るだけ（最大10本まで）"), L("コーチがまとめて見て診断"), L("24時間以内に総括で返却")]}
+      />
+
+      <div data-testid="featured-cta" className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-md flex-col gap-2">
+          {open ? null : <p className="text-center text-xs font-semibold text-red-400">{L("現在は受付を停止しています")}</p>}
+          <div className="flex gap-2">
+            {ctas.map((item) => open ? (
+              <FeaturedCtaLink key={item.href} href={item.href}>
+                {item.label}
+              </FeaturedCtaLink>
+            ) : (
+              <span key={item.href} aria-disabled="true" className="flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400">
+                {item.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// 流れの3ステップ（本体 #1054）。スタンダードとプレミアムで同じ3列の見た目にし、どちらの流れか小見出しで示す。
+function FeaturedSteps({ testID, heading, steps }: { testID: string; heading: string; steps: string[] }) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id} className="space-y-2">
+      <h2 id={id} className="text-sm font-bold text-slate-100">{heading}</h2>
+      <ol data-testid={testID} className="grid grid-cols-3 gap-2 text-center text-xs">
+        {steps.map((step, i) => (
           <li key={i} className="rounded-xl border border-white/15 bg-white/5 p-2">
             <span className="block text-base font-bold text-blue-300">{i + 1}</span>
             {step}
           </li>
         ))}
       </ol>
-
-      <section aria-labelledby="featured-faq" className="space-y-2 text-sm">
-        <h2 id="featured-faq" className="text-base font-bold">{L("よくある質問")}</h2>
-        {[
-          { q: L("返却までどのくらいかかりますか？"), a: L("申し込みが確定してから24時間以内に回答が届きます。") },
-          { q: L("どんな動画を送ればいいですか？"), a: L("走っている姿が横から映った動画を1本送ってください。スマートフォンで撮った動画で大丈夫です。") },
-          { q: L("受付が止まっているときはどうなりますか？"), a: L("受付停止中は依頼できません。受付が再開すると、このページの表示が「受付中」に変わります。") },
-        ].map((item) => (
-          <details key={item.q} className="rounded-xl border border-white/15 bg-white/5 p-3">
-            <summary className="cursor-pointer font-semibold">{item.q}</summary>
-            <p className="pt-2 text-slate-200">{item.a}</p>
-          </details>
-        ))}
-      </section>
-
-      <div data-testid="featured-cta" className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="mx-auto flex max-w-md flex-col gap-2">
-          {open ? null : <p className="text-center text-xs font-semibold text-red-400">{L("現在は受付を停止しています")}</p>}
-          <div className="flex gap-2">
-            {open ? (
-              <FeaturedCtaLink href={`/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`}>
-                {L("このコーチに依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
-              </FeaturedCtaLink>
-            ) : (
-              <span aria-disabled="true" className="flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400">
-                {L("このコーチに依頼する ¥{v0}", { v0: reviewPriceYen.toLocaleString("ja-JP") })}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
+    </section>
   );
 }
 

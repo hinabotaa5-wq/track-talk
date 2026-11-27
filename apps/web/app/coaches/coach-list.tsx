@@ -13,8 +13,10 @@ import type { PublicCoach } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-// 公開中の非・動画添削プランがないコーチの価格行は出さない（「プラン未公開」の文言も代替文言も置かない）。
+// スタンダードの一覧なので、価格はコーチのいま有効なスタンダード価格を出す（本体 #1052）。
+// 古い API（review_price_yen が無い）では従来どおり、公開中の非・動画添削プランの価格を出し、なければ価格行を出さない。
 function coachPrice(coach: PublicCoach): string | null {
+  if (typeof coach.review_price_yen === "number") return formatYen(coach.review_price_yen);
   const prices = (coach.plans ?? []).filter((plan) => plan.published && plan.service_type !== "video_review").map((plan) => plan.price_yen);
   if (prices.length === 0) return null;
   const minimum = Math.min(...prices);

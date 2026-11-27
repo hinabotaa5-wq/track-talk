@@ -202,7 +202,7 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), created.ID) {
 		t.Fatalf("list %d %s", rec.Code, rec.Body.String())
 	}
-	// 一覧の各行は、一覧ページが使う6項目だけ（本体 #1072）。meta は従来どおり。
+	// 一覧の各行は、一覧ページが使う項目だけ（本体 #1072 の6項目＋プレミアムの印の plan、本体 #1053）。meta は従来どおり。
 	var list struct {
 		Requests []map[string]json.RawMessage `json:"requests"`
 		Meta     struct {
@@ -218,7 +218,7 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 	if len(list.Requests) != 2 || list.Meta.Page != 1 || list.Meta.PerPage != 20 || list.Meta.Total != 2 {
 		t.Fatalf("list meta %s", rec.Body.String())
 	}
-	wantKeys := []string{"id", "event", "status", "canceled_at", "withdrawal", "created_at"}
+	wantKeys := []string{"id", "plan", "event", "status", "canceled_at", "withdrawal", "created_at"}
 	for _, it := range list.Requests {
 		if len(it) != len(wantKeys) {
 			t.Fatalf("list item keys %s", rec.Body.String())

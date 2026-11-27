@@ -9,8 +9,9 @@ import (
 // Update both API and Web versions whenever a document is revised, to require fresh consent.
 // terms-2026-11-25b: 本体 #1031（チケット販売終了・紹介特典クーポン）。同日の terms-2026-11-25 が公開済みのため、枝番で改める。
 // terms-2026-11-26・privacy-2026-11-26: 本体 #1045（生まれた年の取得、購入前チェックを未成年だけに表示）。
+// terms-2026-11-26b: 本体 #1058（価格申請制に合わせ、料金・報酬の一律価格の文言を改める）。同日の terms-2026-11-26 と区別するため枝番にする。
 const (
-	termsDocumentVersion      = "terms-2026-11-26"
+	termsDocumentVersion      = "terms-2026-11-26b"
 	guidelinesDocumentVersion = "guidelines-2026-11-25"
 	privacyDocumentVersion    = "privacy-2026-11-26"
 	// Provisional retention approved in #953; replace here after legal confirmation.
