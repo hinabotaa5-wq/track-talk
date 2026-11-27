@@ -397,3 +397,23 @@ it("動画のない相談では動画要素を表示しない", async () => {
  await render({ ...room, can_purchase: false, consultations: [{ ...draft, status: "answered", answer: "回答" }] });
  expect(container.querySelector("video")).toBeNull();
 });
+// 本体 #1085：英語表示では、動画添削のあとの追加質問の価格を選手側だけドル（¥160=$1）で出す。
+// 継続プランの追加相談（既存契約の実額）とコーチ側（報酬の基準）は円のまま。
+it("英語表示の追加質問の価格は、選手・保護者側はドル、コーチ側と継続プランの追加相談は円（#1085）", async () => {
+ installEnglish(en);
+ setActiveLocale("en");
+ try {
+  const answered = { ...draft, status: "answered" as const, answer: "回答", answered_at: "2026-11-14T02:00:00Z" };
+  await render({ ...room, can_purchase: false, consultations: [answered] });
+  expect(container.textContent).toContain("$3.13");
+  expect(container.textContent).not.toMatch(/¥|円/);
+  await render({ ...room, role: "guardian", can_purchase: false, consultations: [answered] }, "guardian-secret", "review");
+  expect(container.textContent).toContain("$3.13");
+  await render({ ...room, role: "coach", can_purchase: false, consultations: [answered] });
+  expect(container.textContent).toContain("¥500");
+  expect(container.textContent).not.toContain("$");
+  await render(room, undefined, "contract");
+  expect(container.textContent).toContain("Ask (¥500)");
+  expect(container.textContent).not.toContain("$3.13");
+ } finally { setActiveLocale("ja"); }
+});

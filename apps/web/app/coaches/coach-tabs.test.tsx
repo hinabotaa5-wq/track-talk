@@ -109,6 +109,23 @@ it("「プレミアム」を押すとその場でプレミアムのコーチ一�
   expect(fetchCount("/v1/coaches/support-plan")).toBe(0);
 });
 
+// 本体 #1085：英語表示ではプレミアム一覧の価格もドルだけ（¥160=$1）で出す。¥8,000 → $50.00、¥12,000 → $75.00。
+it("英語表示ではプレミアム一覧の価格をドルで出す（#1085）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/coaches") return { coaches: premiumCoaches };
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  await act(async () => switchLink("Premium")!.click());
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  const list = premiumList()!;
+  expect(list.textContent).toContain("$50.00");
+  expect(list.textContent).toContain("$75.00");
+  expect(list.textContent).not.toMatch(/¥|円/);
+});
+
 // T3
 it("プレミアムからスタンダードに戻すと URL が base に戻り、コーチ一覧は取り直さない", async () => {
   await render();

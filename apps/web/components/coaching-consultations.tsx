@@ -14,7 +14,7 @@ import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature } fr
 import { canClarify, consultationStatus, type Consultation, type ConsultationRoom } from "@/lib/coaching-consultations";
 import { athleteText, coachText, originalTextClass, type DisplayedText } from "@/lib/coaching-display";
 import { coachingConsultationEnabled, coachingMessagingEnabled, consultationClosedNote, messagingClosedNote } from "@/lib/features";
-import { formatChatDateTime, formatDateTime, formatYen } from "@/lib/format";
+import { formatChatDateTime, formatDateTime, formatDisplayPrice, formatYen } from "@/lib/format";
 import { purchaseNoticeShown, useMinorDeclaration } from "@/lib/minor-purchase";
 import { maxReviewSeconds, tooLong, videoDuration } from "@/lib/review";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -74,6 +74,12 @@ export function CoachingConsultations({ rootID, kind, token, guardianToken }: { 
   </section>;
 }
 
+// 動画添削のあとの追加質問（kind=review）の価格は、選手側では英語表示のときドルで見せる（本体 #1085）。
+// 継続プランの追加相談（kind=contract）は既存契約の実額、コーチ側は報酬の基準なので、どちらも円のまま。
+function consultationPrice(kind: "review" | "contract", role: ConsultationRoom["role"], yen: number) {
+  return kind === "review" && role !== "coach" ? formatDisplayPrice(yen) : formatYen(yen);
+}
+
 async function uploadVideo(file: File, token: string | null): Promise<string> {
   if (file.size > 100 * 1024 * 1024) throw new Error(L("動画は100MB以内にしてください"));
   if (tooLong(await videoDuration(file))) throw new Error(L("動画は{maxReviewSeconds}秒以内にしてください", { maxReviewSeconds }));
@@ -115,7 +121,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo,
     } finally { release(); }
   }
   return <div className="space-y-3">
-    <p className="text-sm font-semibold">{L("{v0} / 質問1件と回答1件", { v0: formatYen(price) })}</p>
+    <p className="text-sm font-semibold">{L("{v0} / 質問1件と回答1件", { v0: consultationPrice(kind, "requester", price) })}</p>
     <ConsultationTermsNote kind={kind} />
     <ContactNotice />
     {guard.warning}
@@ -125,7 +131,7 @@ function ConsultationDraft({ kind, draft, roomPath, token, price, requiresVideo,
     <p className="text-xs text-slate-300">{kind === "review" ? L("下書きは7日間保存します。送信後は変更できません。") : L("購入前に下書きを7日間保存します。送信後は内容を変更できません。{v0}", { v0: L("18歳未満の方のパーソナル指導の相談は、保護者が支払います。") })}</p>
     {kind === "review" ? <ReviewPayNotice /> : null}
     {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
-    <Button type="button" disabled={pending || !body.trim() && !file && !videoID || (needsDeclaration && !declared)} onClick={() => void submit()}>{pending ? L("保存・送信中…") : L("質問する（{v0}）", { v0: formatYen(price) })}</Button>
+    <Button type="button" disabled={pending || !body.trim() && !file && !videoID || (needsDeclaration && !declared)} onClick={() => void submit()}>{pending ? L("保存・送信中…") : L("質問する（{v0}）", { v0: consultationPrice(kind, "requester", price) })}</Button>
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
   </div>;
 }
@@ -203,7 +209,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
   const clarifyText = athleteText(c.clarify_body ?? "", c.clarify_body_en, { mine: role === "requester" });
   const clarificationText = coachText(c.clarification ?? "", c.clarification_ja, { mine: role === "coach" });
   return <article className="space-y-3 border-t border-white/20 pt-3">
-    <p className="text-sm font-semibold">{statusText} · {formatYen(c.price_yen)}</p>
+    <p className="text-sm font-semibold">{statusText} · {consultationPrice(kind, role, c.price_yen)}</p>
     {c.hidden || c.purged ? <p className="text-sm text-slate-300">{c.hidden ? L("運営が確認のため非表示にしています") : L("保存期間が終了しました")}</p> : <>
       <ChatBubble side={askerSide} at={c.created_at}>
         <Translated shown={question} lang="ja" />

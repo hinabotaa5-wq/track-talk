@@ -217,7 +217,8 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
     throw new Error(`unexpected ${path}`);
   });
   await render();
-  expect(entry("card")?.textContent).toBe("One-time¥1,000");
+  expect(entry("card")?.textContent).toBe("One-time$6.25");
+  // クーポンの名称（¥500 coupon）は商品名なので変えない（本体 #1085 §3）。
   expect(entry("coupon")?.textContent).toBe("¥500 coupon");
   expect(container.textContent).toContain("Not accepting requests right now");
   expectNotAcceptingBadge("Not accepting requests right now");

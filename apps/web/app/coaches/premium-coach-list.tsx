@@ -4,7 +4,7 @@ import { L } from "@/lib/i18n";
 import { PageLoading } from "@/components/page-loading";
 import { CoachAvatar } from "@/components/coach-photo";
 import { apiFetch } from "@/lib/api";
-import { formatYen } from "@/lib/format";
+import { formatDisplayPrice } from "@/lib/format";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { coachDisplayText, countryFlagEmoji } from "@/lib/coach-display";
 import { maxPremiumVideos, premiumRequestHref, premiumSlotLabels, premiumSlots } from "@/lib/premium";
@@ -64,7 +64,7 @@ export function PremiumCoachList({ onSettled }: { onSettled?: () => void }) {
                   </p>
                   <p className="text-xs text-slate-200">{c.events.map((e) => coachEventLabels[e]).join(L("、"))}</p>
                   <p className={`text-xs font-bold ${c.on_duty ? "text-blue-400" : "text-red-400"}`}>{c.on_duty ? L("受付中") : L("受付停止中")}</p>
-                  <p className="font-semibold text-blue-300">{formatYen(c.premium_price_yen ?? 0)}</p>
+                  <p className="font-semibold text-blue-300">{formatDisplayPrice(c.premium_price_yen ?? 0)}</p>
                 </div>
               </>
             );

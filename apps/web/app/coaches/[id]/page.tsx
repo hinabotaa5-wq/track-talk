@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { CoachAvatar } from "@/components/coach-photo";
 import { CoachSnsEntry } from "@/components/coach-sns-entry";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import { formatYen } from "@/lib/format";
+import { formatDisplayPrice } from "@/lib/format";
 import { getCoachDetailPreview } from "@/lib/coach-detail-preview";
 import { coachingServiceLabels } from "@/lib/coaching-plan";
 import { coachEventLabels } from "@/lib/coach-recruit";
@@ -124,7 +124,7 @@ function CoachDetail({ id, context }: { id: string; context: PlanContext }) {
   const couponZero = coupons === 0;
   const ticketKind: TicketKind | null = counts ? (counts.reward >= 1 ? "reward" : counts.normal >= 1 ? "normal" : null) : null;
   const entries: ReviewEntry[] = [
-    { key: "card", Icon: CreditCard, label: L("単発"), note: formatYen(coach?.review_price_yen ?? reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
+    { key: "card", Icon: CreditCard, label: L("単発"), note: formatDisplayPrice(coach?.review_price_yen ?? reviewPriceYen), href: `${ctaHref}&pay=card`, enabled: ctaEnabled },
     {
       key: "coupon", Icon: Gift, label: L("¥500クーポン"),
       note: coupons !== null ? L("残り {n} 枚", { n: coupons }) : undefined,
