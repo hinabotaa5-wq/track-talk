@@ -141,7 +141,13 @@ type completedItemView struct {
 // coachRequestsRaw は、GET /v1/coach/requests をキーごとに読む。
 func coachRequestsRaw(t *testing.T, h http.Handler, tc string) map[string]json.RawMessage {
 	t.Helper()
-	rec := doJSON(t, h, http.MethodGet, "/v1/coach/requests", tc, nil)
+	return coachRequestsRawPath(t, h, tc, "/v1/coach/requests")
+}
+
+// coachRequestsRawPath は coachRequestsRaw のクエリ付き版（本体 #1071 の scope）。
+func coachRequestsRawPath(t *testing.T, h http.Handler, tc, path string) map[string]json.RawMessage {
+	t.Helper()
+	rec := doJSON(t, h, http.MethodGet, path, tc, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("coach requests %d %s", rec.Code, rec.Body.String())
 	}
@@ -247,6 +253,114 @@ func TestCoachRequestsCompleted(t *testing.T) {
 			if _, ok := item[key]; ok {
 				t.Fatalf("completed has %s: %v", key, item)
 			}
+		}
+	}
+}
+
+// #1071：scope=reviewing は対応中だけ、scope=completed は履歴だけ。scope なし・未知の値は従来どおり両方。
+func TestCoachRequestsScope(t *testing.T) {
+	fakeCoachingCloudinary(t)
+	h := setup(t)
+	admin := adminToken(t, h)
+	coachID, coach := approvedReviewCoach(t, h, admin)
+	returned := seedHistoryReview(t, coachID, "returned", "1 hour")
+	clarifying := seedHistoryReview(t, coachID, "clarifying", "2 hours")
+	inReview := seedHistoryReview(t, coachID, "in_review", "")
+	needsInfo := seedHistoryReview(t, coachID, "needs_info", "")
+
+	ids := func(t *testing.T, raw json.RawMessage) []string {
+		t.Helper()
+		var items []map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &items); err != nil {
+			t.Fatal(err)
+		}
+		out := make([]string, 0, len(items))
+		for _, item := range items {
+			var id string
+			_ = json.Unmarshal(item["id"], &id)
+			out = append(out, id)
+		}
+		return out
+	}
+	sameSet := func(got []string, want ...string) bool {
+		if len(got) != len(want) {
+			return false
+		}
+		seen := map[string]bool{}
+		for _, id := range got {
+			seen[id] = true
+		}
+		for _, id := range want {
+			if !seen[id] {
+				return false
+			}
+		}
+		return true
+	}
+	keys := func(raw map[string]json.RawMessage) bool {
+		_, o := raw["offers"]
+		_, r := raw["reviewing"]
+		_, c := raw["completed"]
+		return len(raw) == 3 && o && r && c && string(raw["offers"]) == "[]"
+	}
+
+	// 基準：scope なし（従来どおり両方）。
+	base := coachRequestsRaw(t, h, coach)
+	if !keys(base) {
+		t.Fatalf("A3 keys = %v", base)
+	}
+	if got := ids(t, base["reviewing"]); !sameSet(got, inReview, needsInfo) {
+		t.Fatalf("A3 reviewing = %v", got)
+	}
+	if got := ids(t, base["completed"]); !sameSet(got, returned, clarifying) {
+		t.Fatalf("A3 completed = %v", got)
+	}
+
+	// A1：scope=reviewing。completed は空配列、reviewing は scope なしと同じ中身（動画・サムネイルURL付き）。
+	rev := coachRequestsRawPath(t, h, coach, "/v1/coach/requests?scope=reviewing")
+	if !keys(rev) || string(rev["completed"]) != "[]" {
+		t.Fatalf("A1 = %v", rev)
+	}
+	if string(rev["reviewing"]) != string(base["reviewing"]) {
+		t.Fatalf("A1 reviewing differs:\n%s\n%s", rev["reviewing"], base["reviewing"])
+	}
+	var revItems []map[string]json.RawMessage
+	if err := json.Unmarshal(rev["reviewing"], &revItems); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range revItems {
+		for _, key := range []string{"video_url", "thumbnail_url"} {
+			if v := string(item[key]); v == "" || v == "null" {
+				t.Fatalf("A1 reviewing %s = %q", key, v)
+			}
+		}
+	}
+
+	// A2：scope=completed。reviewing は空配列、completed は scope なしと同じ中身（動画なし）。
+	comp := coachRequestsRawPath(t, h, coach, "/v1/coach/requests?scope=completed")
+	if !keys(comp) || string(comp["reviewing"]) != "[]" {
+		t.Fatalf("A2 = %v", comp)
+	}
+	if string(comp["completed"]) != string(base["completed"]) {
+		t.Fatalf("A2 completed differs:\n%s\n%s", comp["completed"], base["completed"])
+	}
+	var compItems []map[string]json.RawMessage
+	if err := json.Unmarshal(comp["completed"], &compItems); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range compItems {
+		for _, key := range []string{"video_url", "thumbnail_url", "demo_video_url"} {
+			if _, ok := item[key]; ok {
+				t.Fatalf("A2 completed has %s", key)
+			}
+		}
+	}
+
+	// A3：未知の値・空の値は従来どおり両方。
+	for _, path := range []string{"/v1/coach/requests?scope=unknown", "/v1/coach/requests?scope=", "/v1/coach/requests?scope=REVIEWING"} {
+		raw := coachRequestsRawPath(t, h, coach, path)
+		if !keys(raw) || string(raw["reviewing"]) != string(base["reviewing"]) || string(raw["completed"]) != string(base["completed"]) {
+			t.Fatalf("A3 %s = %v", path, raw)
 		}
 	}
 }

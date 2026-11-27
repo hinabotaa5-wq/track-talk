@@ -67,3 +67,27 @@ it("英語では動画削除の注記を英語で出し、日本語を残さな�
   expect(container.textContent).toContain("The video was deleted because the retention period (7 days after the review ended) passed. The review text is still available.");
   expect(container.textContent).not.toContain("動画は保存期間");
 });
+
+// 本体 #1071 A4・A5：対応中だけを取り、一覧の動画は先読みしない（ポスター・操作は従来どおり）。
+it("対応中だけを scope=reviewing で取り、一覧の動画は preload=none で出す", async () => {
+  apiFetch.mockResolvedValue({
+    offers: [],
+    reviewing: [{
+      ...purged.reviewing[0],
+      videos_purged: false,
+      video_url: "https://video.example/r1.mp4",
+      thumbnail_url: "https://video.example/r1.jpg",
+    }],
+  } satisfies CoachRequests);
+  setActiveLocale("ja");
+  await act(async () => root.render(<CoachRequestsSection token="t" locale="ja" />));
+  expect(apiFetch).toHaveBeenCalledWith("/v1/coach/requests?scope=reviewing", { token: "t" });
+  expect(apiFetch.mock.calls.every(([path]) => path === "/v1/coach/requests?scope=reviewing")).toBe(true);
+  const video = container.querySelector("video");
+  expect(video).not.toBeNull();
+  expect(video?.getAttribute("preload")).toBe("none");
+  expect(video?.getAttribute("src")).toBe("https://video.example/r1.mp4");
+  expect(video?.getAttribute("poster")).toBe("https://video.example/r1.jpg");
+  expect(video?.hasAttribute("controls")).toBe(true);
+  expect(video?.hasAttribute("playsinline")).toBe(true);
+});

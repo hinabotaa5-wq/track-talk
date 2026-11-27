@@ -26,7 +26,7 @@ export function CoachRequestsSection({ token, locale }: { token: string | null; 
   const [data, setData] = useState<CoachRequests | null>(null);
   const [loadError, setLoadError] = useState("");
 
-  const fetchRequests = useCallback(() => apiFetch<CoachRequests>("/v1/coach/requests", { token }), [token]);
+  const fetchRequests = useCallback(() => apiFetch<CoachRequests>("/v1/coach/requests?scope=reviewing", { token }), [token]);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +71,7 @@ export function CoachRequestsSection({ token, locale }: { token: string | null; 
                 poster={request.thumbnail_url || undefined}
                 controls
                 playsInline
-                preload="metadata"
+                preload="none"
                 className="w-full rounded-lg bg-black"
               />
             ) : request.videos_purged ? (
