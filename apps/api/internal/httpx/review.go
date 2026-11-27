@@ -83,6 +83,8 @@ func (s *Server) reviewRequestJSON(rr db.ReviewRequest) map[string]any {
 		"question": rr.Question,
 		// 申込で選手が任意で書いた選手情報（本体 #1013 補足）。未入力は null。
 		"pb": rr.Pb, "goal_time": rr.GoalTime, "wind_speed": rr.WindSpeed, "body_condition": rr.BodyCondition,
+		// 申込で選手が任意で書いた「意識していること」（本体 #1093）。未入力は null。
+		"focus_note":         rr.FocusNote,
 		"started_at":         rr.StartedAt,
 		"canceled_at":        rr.CanceledAt,
 		"status":             rr.Status,
@@ -296,6 +298,8 @@ type reviewRequestReq struct {
 	GoalTime      *string `json:"goal_time"`
 	WindSpeed     *string `json:"wind_speed"`
 	BodyCondition *string `json:"body_condition"`
+	// いま意識して取り組んでいること（本体 #1093）。任意・300字まで。空白だけ・未入力は NULL。
+	FocusNote *string `json:"focus_note"`
 	// プラン（standard／premium。空はスタンダード）と、プレミアムの動画（本体 #1053）。スタンダードでは videos を使わない。
 	Plan   string            `json:"plan"`
 	Videos []premiumVideoReq `json:"videos"`
@@ -362,6 +366,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 	goalTime := optionalRequestText(fields, "goal_time", req.GoalTime, 100)
 	windSpeed := optionalRequestText(fields, "wind_speed", req.WindSpeed, 50)
 	bodyCondition := optionalRequestText(fields, "body_condition", req.BodyCondition, 300)
+	focusNote := optionalRequestText(fields, "focus_note", req.FocusNote, 300)
 	// 申込には動画が必須（#1036）。動画なしの依頼は新しく作れない（過去の動画なし依頼の閲覧・返答は変えない）。
 	if req.VideoPublicID == "" || !cloudinary.ValidCoachingPublicID(req.VideoPublicID) {
 		fields["video_public_id"] = "動画を選んでください"
@@ -492,6 +497,7 @@ func (s *Server) createReviewRequest(w http.ResponseWriter, r *http.Request) {
 		RequestedCoachID: req.RequestedCoachID, RequestedCoachName: coachName,
 		BasePriceYen: basePrice, UseTickets: useTickets, CouponDiscountYen: couponYen,
 		Pb: pb, GoalTime: goalTime, WindSpeed: windSpeed, BodyCondition: bodyCondition,
+		FocusNote:     focusNote,
 		VideoPublicID: video,
 		DueAt:         due,
 		// 支払いがあるときは、支払いが届いてから割り当てを始める。

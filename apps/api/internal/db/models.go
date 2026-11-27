@@ -1439,6 +1439,7 @@ type ReviewRequest struct {
 	BodyCondition       *string    `json:"body_condition"`
 	CouponDiscountYen   int32      `json:"coupon_discount_yen"`
 	Plan                string     `json:"plan"`
+	FocusNote           *string    `json:"focus_note"`
 }
 
 type ReviewRequestVideo struct {

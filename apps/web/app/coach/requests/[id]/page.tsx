@@ -266,6 +266,8 @@ function PremiumResponseForm({ request, token, onSent, locale }: { request: Coac
 // 申込で選手が任意で書いた選手情報（本体 #1013 補足）。値のある項目だけを、相談内容と並べて出す。
 function AthleteInfo({ request }: { request: CoachReviewRequest }) {
   const rows = [
+    // 意識していること（本体 #1093）。動画そのものに関する情報なので先頭に出す。
+    { label: L("意識していること"), value: request.focus_note },
     { label: L("PB（自己ベスト）"), value: request.pb },
     { label: L("目標タイム"), value: request.goal_time },
     { label: L("風速"), value: request.wind_speed },

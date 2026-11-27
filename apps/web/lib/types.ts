@@ -820,6 +820,8 @@ export type ReviewRequest = {
   goal_time?: string | null;
   wind_speed?: string | null;
   body_condition?: string | null;
+  // 申込で選手が任意で書いた「意識していること」（本体 #1093）。未入力は null。
+  focus_note?: string | null;
   status: ReviewStatus;
   due_at: string;
   created_at: string;

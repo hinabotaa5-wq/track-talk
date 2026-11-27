@@ -15,12 +15,16 @@ function formatVideoSize(bytes: number): string {
 }
 
 // 申込で選手が任意で書ける選手情報（本体 #1013 補足）。並びは申込フォームと確認画面の順。
-export const reviewAthleteInfoKeys = ["pb", "goal_time", "wind_speed", "body_condition"] as const;
+// 「意識していること」（focus_note、本体 #1093）は動画そのものに関する情報なので、相談内容の直下・PB の上に置く。
+export const reviewAthleteInfoKeys = ["focus_note", "pb", "goal_time", "wind_speed", "body_condition"] as const;
+// 複数行で書ける（確認画面でも改行を残す）項目。
+export const reviewAthleteInfoMultilineKeys: readonly ReviewAthleteInfoKey[] = ["focus_note", "body_condition"];
 export type ReviewAthleteInfoKey = (typeof reviewAthleteInfoKeys)[number];
 export type ReviewAthleteInfo = Partial<Record<ReviewAthleteInfoKey, string>>;
 
 export function reviewAthleteInfoLabel(key: ReviewAthleteInfoKey): string {
   switch (key) {
+    case "focus_note": return L("意識していること");
     case "pb": return L("PB（自己ベスト）");
     case "goal_time": return L("目標タイム");
     case "wind_speed": return L("風速");
@@ -60,7 +64,7 @@ export function reviewConfirmRows({ method, priceYen, couponYen = 0, hasVideo, q
     { label: L("相談内容"), value: question.trim(), multiline: true },
     ...reviewAthleteInfoKeys.flatMap((key) => {
       const value = athleteInfo?.[key]?.trim() ?? "";
-      return value ? [{ label: reviewAthleteInfoLabel(key), value, multiline: key === "body_condition" }] : [];
+      return value ? [{ label: reviewAthleteInfoLabel(key), value, multiline: reviewAthleteInfoMultilineKeys.includes(key) }] : [];
     }),
     {
       label: L("動画"),

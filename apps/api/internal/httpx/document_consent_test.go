@@ -138,7 +138,7 @@ func TestDocumentConsentMigrationRoundTrip(t *testing.T) {
 		t.Fatalf("FKs %d %v", fks, err)
 	}
 	src, err := os.ReadFile("../../../../deploy/cloud-run/payment-counts/counts.py")
-	if err != nil || !strings.Contains(string(src), "EXPECTED_MIGRATION = 196") {
+	if err != nil || !strings.Contains(string(src), "EXPECTED_MIGRATION = 197") {
 		t.Fatalf("expected migration: %v", err)
 	}
 }
