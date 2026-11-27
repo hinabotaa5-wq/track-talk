@@ -211,6 +211,73 @@ it("受付停止中は、スタンダード・プレミアムの両ボタンと�
   expect(cta()?.querySelector("[data-pending-link], [data-screen-loader]")).toBeNull();
 });
 
+// 本体 #1088：プレミアムの購入ボタンだけ黒×ゴールドの高級仕様。スタンダードは不変。
+const standardCtaClassName = "flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]";
+const premiumParts = (a: Element | undefined) => [...(a?.children ?? [])].map((el) => [el.textContent, el.className]);
+
+it("プレミアムボタンだけ黒グラデーション・金の枠・影にし、スタンダードは現行のままにする（本体 #1088 T1・T2・T4）", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, review_price_yen: 1200, premium_price_yen: 6000 }));
+  await render();
+  const [standard, premium] = [...(cta()?.querySelectorAll("a") ?? [])];
+  expect(standard.className).toBe(standardCtaClassName);
+  expect(standard.children).toHaveLength(0);
+  expect(premium.className).not.toContain("bg-[#EF442D]");
+  for (const cls of ["bg-[linear-gradient(135deg,#0D0D0D,#2B2B2B)]", "border", "border-[#C9A227]", "shadow-[inset_0_1px_0_rgba(255,215,120,0.45),0_2px_8px_rgba(0,0,0,0.35)]",
+    "min-h-11", "flex-1", "rounded-md", "px-3", "text-sm", "font-semibold", "active:scale-[0.98]"]) {
+    expect(premium.className.split(" ")).toContain(cls);
+  }
+  expect(premium.className).not.toMatch(/animate-/);
+  expect([standard.getAttribute("href"), premium.getAttribute("href")]).toEqual([ctaHref, premiumHref]);
+  for (const a of [standard, premium]) {
+    expect(a.hasAttribute("data-pending-link")).toBe(true);
+    expect(a.hasAttribute("data-screen-loader")).toBe(true);
+  }
+});
+
+it("プレミアムボタンは名称を金、価格を白の別要素で描き、全体の文字は従来どおり（本体 #1088 T3）", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, review_price_yen: 1200, premium_price_yen: 6000 }));
+  await render();
+  const premium = cta()?.querySelectorAll("a")[1];
+  expect(premium?.textContent).toBe("プレミアム ¥6,000");
+  expect(premiumParts(premium)).toEqual([["プレミアム", "tracking-[0.06em] text-[#E8C766]"], ["¥6,000", "text-pure-white"]]);
+});
+
+it("英語表示でもプレミアムボタンは名称 Premium を金、価格を白で描く（本体 #1088 T3）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockImplementation(async () => ({ ...coach, premium_price_yen: 6000 }));
+  await render();
+  const premium = cta()?.querySelectorAll("a")[1];
+  const parts = premiumParts(premium);
+  expect(parts).toHaveLength(2);
+  expect(parts[0]).toEqual(["Premium", "tracking-[0.06em] text-[#E8C766]"]);
+  expect(parts[1][1]).toBe("text-pure-white");
+  expect(premium?.textContent).toBe(`Premium ${parts[1][0]}`);
+});
+
+it("プレミアム価格がないコーチはスタンダード1つだけを全幅で、現行の見た目のまま出す（本体 #1088 T5）", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, premium_price_yen: null }));
+  await render();
+  const buttons = [...(cta()?.querySelectorAll("a") ?? [])];
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0].className).toBe(standardCtaClassName);
+  expect(cta()?.innerHTML).not.toContain("#C9A227");
+});
+
+it("受付停止中のプレミアムは黒系背景と薄い金の枠で区別し、文字は灰色のまま色分けしない（本体 #1088 T6）", async () => {
+  apiFetch.mockImplementation(async () => ({ ...coach, on_duty: false, premium_price_yen: 6000 }));
+  await render();
+  const [standard, premium] = [...(cta()?.querySelectorAll('[aria-disabled="true"]') ?? [])];
+  expect([standard.tagName, premium.tagName]).toEqual(["SPAN", "SPAN"]);
+  expect(standard.className).toBe("flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400");
+  expect(premium.textContent).toBe("プレミアム ¥6,000");
+  expect(premium.children).toHaveLength(0);
+  for (const cls of ["bg-[linear-gradient(135deg,#0D0D0D,#2B2B2B)]", "border", "border-[#C9A227]/40", "text-slate-400", "cursor-not-allowed"]) {
+    expect(premium.className.split(" ")).toContain(cls);
+  }
+  expect(premium.className).not.toContain("bg-white/10");
+});
+
 it("受付停止中は、CTA を停止表示にし、依頼へ進めない", async () => {
   apiFetch.mockImplementation(async () => ({ ...coach, on_duty: false }));
   await render();
