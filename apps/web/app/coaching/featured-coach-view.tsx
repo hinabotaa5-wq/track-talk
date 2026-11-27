@@ -92,15 +92,16 @@ function FeaturedCtaLink({ href, premium, children }: { href: string; premium: b
 }
 
 // プレミアムのラベルを最初のスペースで「名称」と「価格」に分け、名称を金、価格を白で描く（本体 #1088）。全体の文字列は従来どおり。
+// ボタンは flex なので、間のスペースが消えないよう1つのインライン要素で包む。
 function PremiumCtaLabel({ label }: { label: string }) {
   const at = label.indexOf(" ");
-  if (at < 0) return <span className="tracking-[0.06em] text-[#E8C766]">{label}</span>;
+  if (at < 0) return <span><span className="tracking-[0.06em] text-[#E8C766]">{label}</span></span>;
   return (
-    <>
+    <span>
       <span className="tracking-[0.06em] text-[#E8C766]">{label.slice(0, at)}</span>
       {" "}
       <span className="text-pure-white">{label.slice(at + 1)}</span>
-    </>
+    </span>
   );
 }
 

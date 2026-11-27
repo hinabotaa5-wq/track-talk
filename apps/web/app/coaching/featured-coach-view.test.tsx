@@ -213,7 +213,12 @@ it("受付停止中は、スタンダード・プレミアムの両ボタンと�
 
 // 本体 #1088：プレミアムの購入ボタンだけ黒×ゴールドの高級仕様。スタンダードは不変。
 const standardCtaClassName = "flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]";
-const premiumParts = (a: Element | undefined) => [...(a?.children ?? [])].map((el) => [el.textContent, el.className]);
+// ボタン直下は1つのインライン要素（flex で間のスペースが消えないように）。その中に名称と価格の2要素。
+const premiumParts = (a: Element | undefined) => {
+  expect(a?.children).toHaveLength(1);
+  expect(a?.firstElementChild?.tagName).toBe("SPAN");
+  return [...(a?.firstElementChild?.children ?? [])].map((el) => [el.textContent, el.className]);
+};
 
 it("プレミアムボタンだけ黒グラデーション・金の枠・影にし、スタンダードは現行のままにする（本体 #1088 T1・T2・T4）", async () => {
   apiFetch.mockImplementation(async () => ({ ...coach, review_price_yen: 1200, premium_price_yen: 6000 }));
