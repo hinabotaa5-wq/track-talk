@@ -112,6 +112,31 @@ type CoachLegalIdentity struct {
 	LastTransactionAt *time.Time `json:"last_transaction_at"`
 }
 
+type CoachOffer struct {
+	CoachID       uuid.UUID `json:"coach_id"`
+	ApplicationID uuid.UUID `json:"application_id"`
+	EffectiveAt   time.Time `json:"effective_at"`
+}
+
+type CoachOfferApplication struct {
+	ID          uuid.UUID  `json:"id"`
+	CoachID     uuid.UUID  `json:"coach_id"`
+	Items       []string   `json:"items"`
+	Status      string     `json:"status"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	ApprovedAt  *time.Time `json:"approved_at"`
+	ApprovedBy  *uuid.UUID `json:"approved_by"`
+	AppliedAt   *time.Time `json:"applied_at"`
+	WithdrawnAt *time.Time `json:"withdrawn_at"`
+}
+
+type CoachOfferApplicationVideo struct {
+	ApplicationID uuid.UUID `json:"application_id"`
+	Position      int16     `json:"position"`
+	VideoPublicID string    `json:"video_public_id"`
+}
+
 type CoachPayout struct {
 	ID               uuid.UUID  `json:"id"`
 	CoachID          *uuid.UUID `json:"coach_id"`
@@ -1439,6 +1464,7 @@ type ReviewRequest struct {
 	BodyCondition       *string    `json:"body_condition"`
 	CouponDiscountYen   int32      `json:"coupon_discount_yen"`
 	Plan                string     `json:"plan"`
+	OfferItems          []string   `json:"offer_items"`
 }
 
 type ReviewRequestVideo struct {
@@ -1472,6 +1498,13 @@ type ReviewResponse struct {
 	Cue                *string    `json:"cue"`
 	SuccessCriteria    *string    `json:"success_criteria"`
 	NextVideo          *string    `json:"next_video"`
+}
+
+type ReviewResponseItem struct {
+	RequestID uuid.UUID `json:"request_id"`
+	Position  int16     `json:"position"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
 }
 
 type ReviewResponseSection struct {

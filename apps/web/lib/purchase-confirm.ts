@@ -48,14 +48,18 @@ export type ReviewConfirmInput = {
   ticketKind?: TicketKind | null;
   // 選手情報（任意）。入力がある項目だけ、相談内容の下に行を足す。
   athleteInfo?: ReviewAthleteInfo;
+  // 「このコーチの添削で得られるもの」（本体 #1086）。固定4項目→追加項目のタイトル。スタンダードの申込だけが渡し、
+  // 渡したときだけ「得られるもの」の行を足す（プレミアムの確認には出さない）。
+  offerTitles?: readonly string[];
 };
 
-export function reviewConfirmRows({ method, priceYen, couponYen = 0, hasVideo, question, eventLabel, videoFileName, videoFileSizeBytes, coachName, nextExpiry, ticketKind, athleteInfo }: ReviewConfirmInput): ConfirmRow[] {
+export function reviewConfirmRows({ method, priceYen, couponYen = 0, hasVideo, question, eventLabel, videoFileName, videoFileSizeBytes, coachName, nextExpiry, ticketKind, athleteInfo, offerTitles }: ReviewConfirmInput): ConfirmRow[] {
   const content = hasVideo
     ? (coachName ? L("スタンダード（動画1本・担当 {coachName}）", { coachName }) : L("スタンダード（動画1本）"))
     : (coachName ? L("スタンダード（悩みのみ・担当 {coachName}）", { coachName }) : L("スタンダード（悩みのみ）"));
   const rows: ConfirmRow[] = [
     { label: L("内容"), value: content },
+    ...(offerTitles?.length ? [{ label: L("得られるもの"), value: offerTitles.join(L("、")) }] : []),
     { label: L("種目"), value: eventLabel },
     { label: L("相談内容"), value: question.trim(), multiline: true },
     ...reviewAthleteInfoKeys.flatMap((key) => {

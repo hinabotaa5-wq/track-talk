@@ -139,6 +139,8 @@ const storedMediaInUse = `SELECT
  OR EXISTS(SELECT 1 FROM review_responses WHERE demo_video_public_id=$1)
  OR EXISTS(SELECT 1 FROM coaching_messages WHERE video_public_id=$1)
  OR EXISTS(SELECT 1 FROM coaching_consultations WHERE video_public_id=$1 OR answer_video_public_id=$1)
+ OR EXISTS(SELECT 1 FROM coach_offer_application_videos v JOIN coach_offer_applications a ON a.id=v.application_id
+           WHERE v.video_public_id=$1 AND (a.status IN ('pending','approved') OR EXISTS(SELECT 1 FROM coach_offers o WHERE o.application_id=a.id)))
  OR EXISTS(SELECT 1 FROM products WHERE strpos(replace(image_url,'%2F','/'),$1)>0)
  OR EXISTS(SELECT 1 FROM major_hosts WHERE strpos(replace(image_url,'%2F','/'),$1)>0)`
 

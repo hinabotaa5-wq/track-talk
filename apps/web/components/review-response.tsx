@@ -86,6 +86,12 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
           <p className="whitespace-pre-wrap text-slate-100">{response.hitokoto}</p>
         </DocSection>
       ) : null}
+      {/* 追加項目（本体 #1086）。固定項目の後にタイトル付きで出す。タイトル・本文とも訳さず原文のまま。 */}
+      {(response.offer_items ?? []).map((item, i) => (
+        <DocSection key={`${i}-${item.title}`} title={item.title} tone="text-sky-300">
+          <p className="whitespace-pre-wrap text-slate-100">{item.body}</p>
+        </DocSection>
+      ))}
       </>)}
       {response.demo_video_url ? (
         <DocSection title={L("見本動画")} tone="text-slate-300">

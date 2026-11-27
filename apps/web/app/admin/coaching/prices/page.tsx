@@ -1,6 +1,7 @@
 "use client";
 import { L } from "@/lib/i18n";
 
+import { AdminCoachOffers } from "@/components/admin-coach-offers";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { apiErrorText, apiFetch } from "@/lib/api";
@@ -86,6 +87,8 @@ export default function CoachPricesAdmin() {
           </li>
         ))}
       </ul>
+      {/* 添削項目・見本動画の申請（本体 #1086）。価格とは別のレコードで、同じ流儀で承認する。 */}
+      <AdminCoachOffers token={token} />
       <Link href="/admin" className="text-blue-300 underline">{L("管理画面へ")}</Link>
     </div>
   );

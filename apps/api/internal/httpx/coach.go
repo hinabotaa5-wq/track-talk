@@ -821,6 +821,15 @@ func (s *Server) getPublicCoach(w http.ResponseWriter, r *http.Request) {
 		publicCoachNotFound(w)
 		return
 	}
+	// 「このコーチの添削で得られるもの」と見本動画（本体 #1086）。詳細だけに出す（一覧カードには出さない）。
+	// 固定の4項目は Web が訳つきで並べ、ここではコーチの追加項目（原文のまま）と見本動画だけを返す。
+	offers, err := s.effectiveCoachOffers(r.Context(), s.q, []uuid.UUID{id})
+	if err != nil {
+		MapDBError(w, err)
+		return
+	}
+	out[0]["offer_items"] = offers[id].Items
+	out[0]["demo_videos"] = s.demoVideosJSON(offers[id].Videos, false)
 	JSON(w, http.StatusOK, out[0])
 }
 
