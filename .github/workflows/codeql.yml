@@ -1,0 +1,57 @@
+name: CodeQL
+
+# GitHub の Code scanning に、CodeQL の解析結果を載せる（#1078）。
+# 管理画面の Default setup は使わず、この workflow で設定をコードとして管理する。
+# 対象は Go（apps/api）と JavaScript/TypeScript（apps/web）。本番には影響しない。
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # 毎週月曜 03:00 JST（日曜 18:00 UTC）
+    - cron: "0 18 * * 0"
+
+# リポジトリは読むだけ。解析結果の書き込みに要る権限だけを job 側で足す。
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: autobuild
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+      - if: matrix.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v5
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+      - if: matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          working-directory: apps/api
+      - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          category: "/language:${{ matrix.language }}"
