@@ -20,7 +20,8 @@ export function CoachAboutView() {
         <article className="space-y-3 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
           <h3 className="flex items-center gap-2 font-bold"><Shuffle className="size-5 text-blue-300" aria-hidden />{L("スタンダード")}</h3>
           <p className="text-sm leading-relaxed text-slate-200">{L("利用者は担当種目に合う受付中のコーチの中から1人を選び、種目と相談内容を送り、必要に応じて動画を添えます。運営がコーチを割り振ることはありません。料金はコーチごとに異なります（コーチが自分で申請し、運営の承認の後に切り替わります）。コーチの報酬は、その依頼の料金の70％です。利用者がチケットで申し込んだスタンダードの報酬は700円です。一覧は毎日並び順が入れ替わり、依頼の件数や評価は表示しません。")}</p>
-          <p className="text-sm leading-relaxed text-slate-200">{L("受付をオンにすると、申込みが対応中の一覧に届きます。届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください。")}</p>
+          <p className="text-sm leading-relaxed text-slate-200">{L("受付をオンにすると、申込みが対応中の一覧に届きます。届いてから24時間以内に、全コーチ共通の良い点・直す点・おすすめのドリル・コーチなら明日から何をするかと、申込みの時に決まった追加の項目のすべてに回答して返してください。")}</p>
+          <p className="text-sm leading-relaxed text-slate-200">{L("添削の追加の項目と、コーチのページに載せる見本動画は、コーチ画面から申請できます。運営の承認の後、料金と同じく対応中の依頼がすべて終わってから切り替わり、その後の新しい申込みから適用されます。")}</p>
         </article>
       </section>
 
