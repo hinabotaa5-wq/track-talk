@@ -257,6 +257,28 @@ it("英語表示では Accepting／Paused を出し、国旗はそのまま", as
   expect(container.textContent).not.toContain("受付停止中");
 });
 
+// 本体 #1085 T3：英語表示では一覧の価格と詳細の単発をドルだけで出す（¥160=$1、セントで四捨五入）。
+it("英語表示では一覧カードと詳細の単発の価格をドルで出し、¥ を残さない（#1085 T3）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockResolvedValue({ coaches: [{ ...coach, review_price_yen: 2500 }, { ...coach, id: "coach-2", nickname: "共通価格のコーチ", review_price_yen: 1000 }] });
+  await act(async () => root.render(<CoachList />));
+  const cards = [...container.querySelectorAll("li")];
+  expect(cards[0].textContent).toContain("$15.63");
+  expect(cards[1].textContent).toContain("$6.25");
+  expect(container.textContent).not.toMatch(/¥|円/);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  apiFetch.mockReset();
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === "/v1/coaches/coach-1") return { ...coach, review_price_yen: 2500 };
+    throw new Error(`unexpected ${path}`);
+  });
+  await act(async () => root.render(<CoachDetailPage />));
+  expect(container.textContent).toContain("$15.63");
+  expect(container.textContent).not.toContain("2,500");
+});
+
 // 本体 #1052 T10：一覧・詳細の価格はコーチのいま有効なスタンダード価格（API の review_price_yen）に追随する。
 it("一覧カードと詳細の単発の価格は、コーチの有効価格を出す（#1052 T10）", async () => {
   apiFetch.mockResolvedValue({ coaches: [{ ...coach, review_price_yen: 2500 }, { ...coach, id: "coach-2", nickname: "共通価格のコーチ", review_price_yen: 1000 }] });

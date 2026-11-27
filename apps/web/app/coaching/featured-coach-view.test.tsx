@@ -282,14 +282,27 @@ it("英語表示では固定文を英語で出す", async () => {
   setActiveLocale("en");
   apiFetch.mockImplementation(async () => ({ ...coach, premium_price_yen: 6000 }));
   await render();
-  expect(link("Standard ¥1,000")?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
-  expect(link("Premium ¥6,000")?.getAttribute("href")).toBe(premiumHref);
+  // 英語表示の価格は固定レート ¥160=$1 のドルだけ（本体 #1085 T2）。¥1,000 → $6.25、¥6,000 → $37.50。
+  expect(link("Standard $6.25")?.getAttribute("href")).toBe("/coaching/new?coach=2f6d0a8e-1111-4c2b-9a7e-3c332627b25f&pay=card");
+  expect(link("Premium $37.50")?.getAttribute("href")).toBe(premiumHref);
+  expect(cta()?.textContent).not.toContain("¥");
   expect(lead()?.textContent).toBe("Get your form and training diagnosed!");
   expect(container.textContent).toContain("Returned within 24 hours");
   expect(stepHeading(steps())).toBe("Standard");
   expect(stepHeading(premiumSteps())).toBe("Premium");
   expect(stepTexts(premiumSteps())).toEqual(["1Just send videos for each slot (up to 10)", "2The coach reviews them all and diagnoses", "3Summary returned within 24 hours"]);
   expect(container.textContent).not.toContain("FAQ");
+});
+
+it("英語表示の受付停止中も、固定 CTA の2つの span はドルで出し、リンクにしない（本体 #1085 T2）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  apiFetch.mockImplementation(async () => ({ ...coach, on_duty: false, premium_price_yen: 6000 }));
+  await render();
+  const disabled = [...(cta()?.querySelectorAll('[aria-disabled="true"]') ?? [])];
+  expect(disabled.map((el) => [el.tagName, el.textContent])).toEqual([["SPAN", "Standard $6.25"], ["SPAN", "Premium $37.50"]]);
+  expect(cta()?.querySelector("a")).toBeNull();
+  expect(cta()?.textContent).not.toContain("¥");
 });
 
 it("記録の欄を区切りでチップに分ける", () => {

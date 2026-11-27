@@ -81,3 +81,30 @@ export function todayInTokyo(now = new Date()) {
 export function formatYen(yen: number) {
   return L("{v0}円", { v0: yen.toLocaleString("ja-JP") });
 }
+
+// 英語表示のときだけ、選手向けの価格をドルで見せるための固定レート（本体 #1085、運営者決定 2026-11-27）。
+// 表示だけの換算で、請求・API・DB・Stripe・コーチ報酬は円のまま。レートの変更はこの定数の書き換え（PR）でのみ行う。
+export const displayYenPerUsd = 160;
+
+// 英語辞書を読み込み済みの英語表示のときだけドルにする（formatDateTime と同じ判定）。読み込み前は円のまま。
+function showsUsd() {
+  return currentLocale() === "en" && englishLoaded();
+}
+
+const usdAmount = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usdCurrency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+
+// 円をドルへ換算し、セント単位で四捨五入する。¥500 → 3.13。各金額は独立に換算する（差額から逆算しない）。
+export function yenToDisplayUsd(yen: number) {
+  return Math.round((yen * 100) / displayYenPerUsd) / 100;
+}
+
+// 選手向けの価格表示。英語表示は "$6.25"、日本語表示は formatYen と同じ "1,000円"。
+export function formatDisplayPrice(yen: number) {
+  return showsUsd() ? usdCurrency.format(yenToDisplayUsd(yen)) : formatYen(yen);
+}
+
+// 記号を文言側に持つ鍵（"スタンダード ¥{v0}" ↔ "Standard ${v0}"）に差し込む数字だけ。英語表示は "6.25"、日本語表示は "1,000"。
+export function displayPriceAmount(yen: number) {
+  return showsUsd() ? usdAmount.format(yenToDisplayUsd(yen)) : yen.toLocaleString("ja-JP");
+}

@@ -6,7 +6,7 @@ import { PageLoading } from "@/components/page-loading";
 import { CoachAvatar } from "@/components/coach-photo";
 import { apiFetch } from "@/lib/api";
 import { rememberCoachDetailPreview } from "@/lib/coach-detail-preview";
-import { formatYen } from "@/lib/format";
+import { formatDisplayPrice } from "@/lib/format";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { coachDisplayText, countryFlagEmoji } from "@/lib/coach-display";
 import type { PublicCoach } from "@/lib/types";
@@ -16,11 +16,11 @@ import { useEffect, useState } from "react";
 // スタンダードの一覧なので、価格はコーチのいま有効なスタンダード価格を出す（本体 #1052）。
 // 古い API（review_price_yen が無い）では従来どおり、公開中の非・動画添削プランの価格を出し、なければ価格行を出さない。
 function coachPrice(coach: PublicCoach): string | null {
-  if (typeof coach.review_price_yen === "number") return formatYen(coach.review_price_yen);
+  if (typeof coach.review_price_yen === "number") return formatDisplayPrice(coach.review_price_yen);
   const prices = (coach.plans ?? []).filter((plan) => plan.published && plan.service_type !== "video_review").map((plan) => plan.price_yen);
   if (prices.length === 0) return null;
   const minimum = Math.min(...prices);
-  return `${formatYen(minimum)}${prices.some((price) => price !== minimum) ? L("〜") : ""}`;
+  return `${formatDisplayPrice(minimum)}${prices.some((price) => price !== minimum) ? L("〜") : ""}`;
 }
 
 export function CoachList({ onSettled }: { onSettled?: () => void }) {
