@@ -3193,7 +3193,7 @@ export const en: Readonly<Record<string, string>> = {
   "対象はスタンダードの都度払いです。クーポンを使った申込みと追加質問は対象外です。": "Only pay-per-request Standard purchases count. Requests using a coupon and follow-up questions don't count.",
   "¥500クーポンは、プレゼントされてから6か月有効です。もらった本人だけが使えます。現金への払戻しはできません。": "The ¥500 coupon is valid for 6 months from when it is given. Only the person who receives it can use it. It cannot be exchanged for cash.",
   "1回の申込みに使えるクーポンは1枚までです。チケットとは一緒に使えません。": "You can use up to one coupon per request. Coupons can't be combined with tickets.",
-  "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に¥500クーポンがプレゼントされます。クーポンはスタンダードの申込みで使えます。有効期限は、プレゼントされてから6か月です。": "When you make a purchase, you get a referral code. When 2 friends buy with that code, the person who referred them gets a ¥500 coupon. The coupon can be used on a Standard request and is valid for 6 months from when it is given.",
+  "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に¥500クーポンがプレゼントされます。クーポンは申込みで使えます。有効期限は、プレゼントされてから6か月です。": "When you make a purchase, you get a referral code. When 2 friends buy with that code, the person who referred them gets a ¥500 coupon. The coupon can be used on a request and is valid for 6 months from when it is given.",
   "購入すると、紹介IDが発行されます。そのIDで友達2人が購入すると、紹介してくれた方に¥500クーポンがプレゼントされます。": "When you make a purchase, you get a referral code. When 2 friends buy with that code, the person who referred them gets a ¥500 coupon.",
   "¥500クーポン：付与日から6か月有効／付与された本人だけが使えます／現金への払戻しはできません／1回の申込に1枚まで": "¥500 coupon: valid for 6 months from the date given / only the recipient can use it / cannot be exchanged for cash / up to one per request",
   "紹介特典をプレゼントしました": "Referral reward given",
