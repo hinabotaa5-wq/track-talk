@@ -112,6 +112,20 @@ function expectNotAcceptingBadge(text: string) {
   }
 }
 
+// 本体 #1085 補足2 T9：英語表示のクーポンの入口は額面をドルで出し、残数（保持数）・リンク先は変えない。
+it("英語表示のクーポンの入口は $3.13 coupon と残り枚数を出し、¥ を含まない（#1085 T9）", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  try {
+    withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0), ...coupons(2) });
+    await render();
+    expect(entry("card")?.textContent).toBe("One-time$6.25");
+    expect(entry("coupon")?.textContent).toBe("$3.13 coupon2 left");
+    expect(entry("coupon")?.textContent).not.toContain("¥");
+    expect(entryLink("coupon")).toBe(reviewHref("coupon"));
+  } finally { setActiveLocale("ja"); }
+});
+
 it("ログイン済みで受付中なら、クーポンの残り枚数を出して申込画面へ進める", async () => {
   withTickets({ balance: { available: 0, reserved: 0 }, ...byKind(0, 0), ...coupons(1) });
   await render();
@@ -218,8 +232,8 @@ it("英語では依頼ボタンと注記を英語で出す", async () => {
   });
   await render();
   expect(entry("card")?.textContent).toBe("One-time$6.25");
-  // クーポンの名称（¥500 coupon）は商品名なので変えない（本体 #1085 §3）。
-  expect(entry("coupon")?.textContent).toBe("¥500 coupon");
+  // 補足2 T9（運営者決定 11/27）：クーポンの入口も、英語表示では額面（¥500）をドルに換算して出す。
+  expect(entry("coupon")?.textContent).toBe("$3.13 coupon");
   expect(container.textContent).toContain("Not accepting requests right now");
   expectNotAcceptingBadge("Not accepting requests right now");
   expect(container.textContent).toContain("Please select");
