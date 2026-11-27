@@ -2,7 +2,7 @@ import { L } from "@/lib/i18n";
 import { offerTitles, type CoachDemoVideo } from "@/lib/coach-offer";
 
 // コーチ詳細の「このコーチの添削で得られるもの」と「見本動画」（本体 #1086）。
-// 得られるものはタイトルだけ（説明文は付けない）。固定4項目→追加項目（登録順、英語表示でも原文のまま）の順。
+// 得られるものはタイトルだけ（説明文は付けない）。1項目ずつ枠で囲んで横に並べ、入りきらなければ折り返す。固定4項目→追加項目（登録順、英語表示でも原文のまま）の順。
 // 見本動画は別の節にし、0本なら節自体を出さない。
 // コーチ詳細では、得られるものを申込みの入口の前に、見本動画を入口の後に置く（入口を下に押しやらない）。
 export function CoachOfferSections({ items, videos }: { items?: readonly string[] | null; videos?: readonly CoachDemoVideo[] | null }) {
@@ -19,9 +19,9 @@ export function CoachOfferItems({ items }: { items?: readonly string[] | null })
   return (
     <section className="glass space-y-2 rounded-2xl border border-white/20 bg-white/10 p-4 text-sm" aria-labelledby="coach-offer-items">
       <h2 id="coach-offer-items" className="text-lg font-bold">{L("このコーチの添削で得られるもの")}</h2>
-      <ul className="space-y-1.5" data-testid="coach-offer-items">
+      <ul className="flex flex-wrap gap-2" data-testid="coach-offer-items">
         {titles.map((title, i) => (
-          <li key={`${i}-${title}`} className="border-l-2 border-blue-400/60 pl-2 break-words text-slate-100">{title}</li>
+          <li key={`${i}-${title}`} className="max-w-full break-words rounded-lg border border-white/30 bg-white/5 px-3 py-1.5 text-slate-100">{title}</li>
         ))}
       </ul>
     </section>
