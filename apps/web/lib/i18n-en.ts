@@ -3149,6 +3149,7 @@ export const en: Readonly<Record<string, string>> = {
   "必要なときは、コーチが動きの見本動画を添えます。": "When useful, the coach adds a video demonstrating the movement.",
   "{v0}コーチについて": "About Coach {v0}",
   "コーチについて": "About the coach",
+  "{v0}人目のコーチを表示": "Show coach {v0}",
   "よくある質問": "FAQ",
   "返却までどのくらいかかりますか？": "How long until I get a reply?",
   "申し込みが確定してから24時間以内に回答が届きます。": "You'll get a reply within 24 hours of your request being confirmed.",

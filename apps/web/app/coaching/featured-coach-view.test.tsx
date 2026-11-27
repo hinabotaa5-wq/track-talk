@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); setActiveLocale("ja"); });
 const render = async () => {
-  await act(async () => root.render(<FeaturedCoachView coachID="2f6d0a8e-1111-4c2b-9a7e-3c332627b25f" />));
+  await act(async () => root.render(<FeaturedCoachView coachIDs={["2f6d0a8e-1111-4c2b-9a7e-3c332627b25f"]} />));
   await act(async () => { await Promise.resolve(); });
 };
 const link = (text: string) => Array.from(container.querySelectorAll("a")).find((a) => a.textContent?.includes(text));
@@ -238,7 +238,7 @@ it("受付中の固定 CTA は、href・文言・色はそのままで、移動�
 });
 
 it("受付中の固定 CTA をタップすると画面を開いている幕を出し、解除で消える（本体 #1041 T2）", async () => {
-  await act(async () => root.render(<><FeaturedCoachView coachID="2f6d0a8e-1111-4c2b-9a7e-3c332627b25f" /><ScreenLoader /></>));
+  await act(async () => root.render(<><FeaturedCoachView coachIDs={["2f6d0a8e-1111-4c2b-9a7e-3c332627b25f"]} /><ScreenLoader /></>));
   await act(async () => { await Promise.resolve(); });
   const loader = () => container.querySelector(".screen-loader");
   expect(loader()?.className).toContain("hidden");
@@ -285,4 +285,141 @@ it("英語表示では固定文を英語で出す", async () => {
 it("記録の欄を区切りでチップに分ける", () => {
   expect(recordChips("100m 10.76、400m 47.54\n200m 21.9")).toEqual(["100m 10.76", "400m 47.54", "200m 21.9"]);
   expect(recordChips(null)).toEqual([]);
+});
+
+// 特集コーチの横スライド（本体 #1063）。プロフィールだけを切り替え、3ステップ・よくある質問は1組。固定 CTA は表示中のコーチに連動する。
+const second = {
+  ...coach, id: "7c1e9b20-2222-4d3a-8b6f-5e4433221100", nickname: "テスト次郎", photo_url: "https://img.example/d.jpg",
+  best_record: "200m 21.50", achievements: "大学の短距離コーチ", hitokoto: "一緒に走りましょう。", sns_urls: [], on_duty: false,
+};
+const twoIDs = [coach.id, second.id];
+const renderIDs = async (ids: string[]) => {
+  await act(async () => root.render(<FeaturedCoachView coachIDs={ids} />));
+  await act(async () => { await Promise.resolve(); });
+};
+const slides = () => [...container.querySelectorAll('[data-testid="featured-slide"]')];
+const dots = () => [...container.querySelectorAll<HTMLButtonElement>('[data-testid="featured-dots"] button')];
+const currentDot = () => dots().findIndex((dot) => dot.getAttribute("aria-current") === "true");
+const visibleName = () => slides().find((slide) => slide.getAttribute("aria-hidden") !== "true")?.querySelector("h2")?.textContent;
+const scroller = () => container.querySelector<HTMLDivElement>('[data-testid="featured-slides"] [role="region"]')!;
+const swipeTo = async (index: number) => {
+  const el = scroller();
+  Object.defineProperty(el, "clientWidth", { configurable: true, value: 360 });
+  el.scrollLeft = index * 360;
+  await act(async () => { el.dispatchEvent(new Event("scroll")); });
+};
+const mockTwo = (secondResult: () => unknown) => apiFetch.mockImplementation(async (path: string) => {
+  if (path === `/v1/coaches/${coach.id}`) return { ...coach };
+  if (path === `/v1/coaches/${second.id}`) return secondResult();
+  throw new Error(`unexpected ${path}`);
+});
+
+it("W1・W2・W6：特集2人では初期表示が1人目で、スワイプとドットで2人目に切り替わり、3ステップとよくある質問は1組だけ", async () => {
+  mockTwo(() => ({ ...second }));
+  await renderIDs(twoIDs);
+  expect(apiFetch.mock.calls.map(([path]) => path)).toEqual([`/v1/coaches/${coach.id}`, `/v1/coaches/${second.id}`]);
+  expect(slides()).toHaveLength(2);
+  expect(visibleName()).toBe("テスト太郎コーチについて");
+  expect(dots()).toHaveLength(2);
+  expect(dots().map((dot) => dot.getAttribute("aria-label"))).toEqual(["1人目のコーチを表示", "2人目のコーチを表示"]);
+  expect(currentDot()).toBe(0);
+  // 表示していないスライドは読み上げ・フォーカスから外す。
+  expect(slides()[1].getAttribute("aria-hidden")).toBe("true");
+  expect(slides()[1].hasAttribute("inert")).toBe(true);
+  // 3ステップ・よくある質問は1組だけで、スライドの外（下）にある。
+  expect(container.querySelectorAll('[data-testid="featured-steps"]')).toHaveLength(1);
+  expect(container.querySelectorAll('section[aria-labelledby="featured-faq"]')).toHaveLength(1);
+  expect(scroller().contains(steps())).toBe(false);
+  // ドットは写真（スライド）の上、3ステップはスライドの下。
+  expect(before(container.querySelector('[data-testid="featured-dots"]'), scroller())).toBe(true);
+  expect(before(container.querySelector('[data-testid="featured-dots"]'), slides()[0].querySelector('span.rounded-full, img'))).toBe(true);
+  expect(before(scroller(), steps())).toBe(true);
+  // スワイプ（スクロールスナップ）で2人目へ。
+  await swipeTo(1);
+  expect(visibleName()).toBe("テスト次郎コーチについて");
+  expect(currentDot()).toBe(1);
+  // ドットのタップで1人目へ戻る。
+  await act(async () => dots()[0].click());
+  expect(visibleName()).toBe("テスト太郎コーチについて");
+  expect(currentDot()).toBe(0);
+  await act(async () => dots()[1].click());
+  expect(currentDot()).toBe(1);
+  // スライドで取り直さない。
+  expect(apiFetch).toHaveBeenCalledTimes(2);
+});
+
+it("W3：固定 CTA の依頼リンクと受付状態は表示中のコーチに従う", async () => {
+  mockTwo(() => ({ ...second }));
+  await renderIDs(twoIDs);
+  expect(link("このコーチに依頼する ¥1,000")?.getAttribute("href")).toBe(`/coaching/new?coach=${coach.id}&pay=card`);
+  expect(container.textContent).not.toContain("現在は受付を停止しています");
+  await act(async () => dots()[1].click());
+  // 2人目は受付停止中。
+  expect(link("このコーチに依頼する")).toBeUndefined();
+  expect(cta()?.textContent).toContain("現在は受付を停止しています");
+  expect(cta()?.querySelector('[aria-disabled="true"]')?.textContent).toBe("このコーチに依頼する ¥1,000");
+  mockTwo(() => ({ ...second, on_duty: true }));
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await renderIDs(twoIDs);
+  await swipeTo(1);
+  expect(link("このコーチに依頼する ¥1,000")?.getAttribute("href")).toBe(`/coaching/new?coach=${second.id}&pay=card`);
+});
+
+it("W4：特集1人ではスライドもドットも出さない（従来の表示と同じ）", async () => {
+  await render();
+  expect(container.querySelector('[data-testid="featured-slides"]')).toBeNull();
+  expect(container.querySelector('[data-testid="featured-dots"]')).toBeNull();
+  expect(container.querySelector('[role="region"]')).toBeNull();
+  expect(about()?.querySelector("h2")?.textContent).toBe("テスト太郎コーチについて");
+});
+
+it("W5：2人目が非公開（404）ならスライドから外し、1人だけの表示にする（エラーにしない）", async () => {
+  const { ApiRequestError } = await import("@/lib/api");
+  mockTwo(() => { throw new ApiRequestError(404, { error: { code: "coach_not_public", message: "x" } }); });
+  await renderIDs(twoIDs);
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  expect(container.querySelector('[data-testid="featured-slides"]')).toBeNull();
+  expect(container.querySelector('[data-testid="featured-dots"]')).toBeNull();
+  expect(about()?.querySelector("h2")?.textContent).toBe("テスト太郎コーチについて");
+  expect(link("このコーチに依頼する ¥1,000")?.getAttribute("href")).toBe(`/coaching/new?coach=${coach.id}&pay=card`);
+});
+
+it("1人目が非公開なら、取得できた2人目を先頭にする。通信エラーは従来のエラー表示", async () => {
+  const { ApiRequestError } = await import("@/lib/api");
+  apiFetch.mockImplementation(async (path: string) => {
+    if (path === `/v1/coaches/${coach.id}`) throw new ApiRequestError(404, { error: { code: "coach_not_public", message: "x" } });
+    return { ...second };
+  });
+  await renderIDs(twoIDs);
+  expect(about()?.querySelector("h2")?.textContent).toBe("テスト次郎コーチについて");
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  mockTwo(() => { throw new Error("network"); });
+  await renderIDs(twoIDs);
+  expect(container.querySelector('[role="alert"]')?.textContent).toBe("読み込みに失敗しました");
+});
+
+it("W6：2人目を見たあとに開き直しても先頭から出し、表示位置を保存しない", async () => {
+  const setItem = vi.spyOn(Storage.prototype, "setItem");
+  mockTwo(() => ({ ...second }));
+  await renderIDs(twoIDs);
+  await act(async () => dots()[1].click());
+  expect(currentDot()).toBe(1);
+  await act(async () => root.unmount());
+  root = createRoot(container);
+  await renderIDs(twoIDs);
+  expect(currentDot()).toBe(0);
+  expect(visibleName()).toBe("テスト太郎コーチについて");
+  expect(setItem).not.toHaveBeenCalled();
+  setItem.mockRestore();
+});
+
+it("W8：スライドの文言は英語辞書にあり、英語表示で英語になる", async () => {
+  installEnglish(en);
+  setActiveLocale("en");
+  mockTwo(() => ({ ...second }));
+  await renderIDs(twoIDs);
+  expect(scroller().getAttribute("aria-label")).toBe(en["コーチのプロフィール"]);
+  expect(dots().map((dot) => dot.getAttribute("aria-label"))).toEqual(["Show coach 1", "Show coach 2"]);
 });

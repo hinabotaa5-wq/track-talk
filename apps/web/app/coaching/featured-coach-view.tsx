@@ -2,7 +2,7 @@
 import { L } from "@/lib/i18n";
 
 import Link from "next/link";
-import { Suspense, useEffect, useId, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { MotionConfig } from "motion/react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CoachAvatar } from "@/components/coach-photo";
@@ -28,24 +28,38 @@ import { ReferralBanner } from "../coaches/referral-banner";
 // 継続プランは休眠させたので（本体 #1007）、継続プランの選択肢は出さない。?tab=support で開かれてもスタンダード側を出し、
 // 「継続プランは準備中です」は描画しない。
 // 外すもの：コーチカードの2列一覧・種目チップの絞り込み。
+// 特集コーチは複数にできる（本体 #1063。NEXT_PUBLIC_COACHING_FEATURED_COACH_ID のカンマ区切りの並び）。
+// 2人以上表示できるときは、プロフィール（写真〜SNS）だけを横スライドで切り替え、写真の上にドットで現在位置を出す。
+// 3ステップ・よくある質問はページに1組だけ。固定 CTA は表示中のコーチに連動する。初期表示は常に先頭（前回の表示は覚えない）。
+// 公開されていない（404）コーチはスライドから外す。1人だけのときはスライドもドットも出さず、従来の表示と同じ。
 
 // 記録の欄は自由記入なので、区切り（改行・読点・スラッシュ・全角スラッシュ）でチップに分ける。
 export function recordChips(text: string | null): string[] {
   return (text ?? "").split(/[\n、,，/／|｜]+/).map((part) => part.trim()).filter(Boolean);
 }
 
-type Loaded = { coach: PublicCoach | null } | { error: true };
+type Loaded = { coaches: PublicCoach[] } | { error: true };
 type Tab = "video" | "premium";
 
-export function FeaturedCoachView({ coachID }: { coachID: string }) {
+export function FeaturedCoachView({ coachIDs }: { coachIDs: readonly string[] }) {
   return (
     <Suspense>
-      <FeaturedCoachTabs coachID={coachID} />
+      <FeaturedCoachTabs coachIDs={coachIDs} />
     </Suspense>
   );
 }
 
-function FeaturedCoachTabs({ coachID }: { coachID: string }) {
+// 1人分の取得。公開されていない（404）ときは null（スライドから外す）、それ以外の失敗はそのまま投げる。
+async function fetchFeaturedCoach(coachID: string): Promise<PublicCoach | null> {
+  try {
+    return await apiFetch<PublicCoach>(`/v1/coaches/${encodeURIComponent(coachID)}`);
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+function FeaturedCoachTabs({ coachIDs }: { coachIDs: readonly string[] }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const base = pathname === "/coaches" ? "/coaches" : "/coaching";
@@ -53,18 +67,18 @@ function FeaturedCoachTabs({ coachID }: { coachID: string }) {
   const [tab, setTab] = useState<Tab>(() => (params.get("tab") === "premium" ? "premium" : "video"));
   const [result, setResult] = useState<Loaded>();
 
+  const idsKey = coachIDs.join(",");
   useEffect(() => {
     let cancelled = false;
-    apiFetch<PublicCoach>(`/v1/coaches/${encodeURIComponent(coachID)}`)
-      .then((coach) => {
-        if (!cancelled) setResult({ coach });
+    Promise.all(idsKey.split(",").map(fetchFeaturedCoach))
+      .then((coaches) => {
+        if (!cancelled) setResult({ coaches: coaches.filter((coach): coach is PublicCoach => coach !== null) });
       })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setResult(error instanceof ApiRequestError && error.status === 404 ? { coach: null } : { error: true });
+      .catch(() => {
+        if (!cancelled) setResult({ error: true });
       });
     return () => { cancelled = true; };
-  }, [coachID]);
+  }, [idsKey]);
 
 
   // 初回読み込み中は、通常一覧と同じくストップウォッチだけにする。
@@ -123,42 +137,22 @@ function FeaturedCtaLink({ href, children }: { href: string; children: ReactNode
 }
 
 function FeaturedContent({ result }: { result: Loaded }) {
+  // 表示中のコーチ。初期表示は常に先頭（前回の表示は保存・復元しない）。
+  const [index, setIndex] = useState(0);
   if ("error" in result) return <p role="alert" className="text-sm text-red-400">{L("読み込みに失敗しました")}</p>;
-  const coach = result.coach;
-  if (!coach) return <p className="text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p>;
-
-  const name = coachDisplayText(coach.nickname, coach.nickname_en);
-  const records = recordChips(coachDisplayText(coach.best_record, coach.best_record_en));
-  const achievements = (coachDisplayText(coach.achievements, coach.achievements_en) ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
-  const hitokoto = coachDisplayText(coach.hitokoto, coach.hitokoto_en);
-  const events = coach.events.map((event) => coachEventLabels[event]).join(L("・"));
+  const coaches = result.coaches;
+  if (!coaches.length) return <p className="text-sm text-slate-200">{L("このコーチは現在公開されていません。")}</p>;
+  const current = Math.min(index, coaches.length - 1);
+  const coach = coaches[current];
   const open = coach.on_duty;
 
   return (
     <>
-      <section aria-labelledby="featured-about" className="space-y-3 text-sm">
-        <div className="flex flex-col items-center gap-3">
-          <CoachAvatar url={coach.photo_url} name={name} size={112} />
-          <ul className="flex flex-wrap justify-center gap-1.5" aria-label={L("記録と対応種目")}>
-            {records.map((record) => (
-              <li key={record} className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-200">{record}</li>
-            ))}
-            {events ? <li className="rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-200">{L("対応種目 {v0}", { v0: events })}</li> : null}
-          </ul>
-        </div>
-        <h2 id="featured-about" className="text-lg font-bold">{name ? L("{v0}コーチについて", { v0: name }) : L("コーチについて")}</h2>
-        {hitokoto ? <p className="whitespace-pre-wrap break-words text-slate-100">{hitokoto}</p> : null}
-        {achievements.length ? (
-          <ul className="space-y-1.5" aria-label={L("成績や指導経験")}>
-            {achievements.map((line, index) => <li key={index} className="border-l-2 border-blue-400/60 pl-2 break-words text-slate-100">{line}</li>)}
-          </ul>
-        ) : null}
-        {(coach.sns_urls ?? []).length ? (
-          <div className="flex flex-wrap gap-1.5">
-            {(coach.sns_urls ?? []).map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
-          </div>
-        ) : null}
-      </section>
+      {coaches.length === 1 ? (
+        <CoachProfile coach={coach} headingID="featured-about" />
+      ) : (
+        <CoachSlides coaches={coaches} current={current} onChange={setIndex} />
+      )}
 
       <ol data-testid="featured-steps" className="grid grid-cols-3 gap-2 text-center text-xs">
         {[L("動画を1本送るだけ"), L("コーチが動画を見て回答"), L("24時間以内に返却")].map((step, i) => (
@@ -200,5 +194,94 @@ function FeaturedContent({ result }: { result: Loaded }) {
         </div>
       </div>
     </>
+  );
+}
+
+// プロフィール（写真・記録チップ・対応種目・「◯◯コーチについて」・ひとこと・実績・SNS）。スライドではここだけが切り替わる。
+function CoachProfile({ coach, headingID }: { coach: PublicCoach; headingID: string }) {
+  const name = coachDisplayText(coach.nickname, coach.nickname_en);
+  const records = recordChips(coachDisplayText(coach.best_record, coach.best_record_en));
+  const achievements = (coachDisplayText(coach.achievements, coach.achievements_en) ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
+  const hitokoto = coachDisplayText(coach.hitokoto, coach.hitokoto_en);
+  const events = coach.events.map((event) => coachEventLabels[event]).join(L("・"));
+
+  return (
+    <section aria-labelledby={headingID} className="space-y-3 text-sm">
+      <div className="flex flex-col items-center gap-3">
+        <CoachAvatar url={coach.photo_url} name={name} size={112} />
+        <ul className="flex flex-wrap justify-center gap-1.5" aria-label={L("記録と対応種目")}>
+          {records.map((record) => (
+            <li key={record} className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-200">{record}</li>
+          ))}
+          {events ? <li className="rounded-full border border-blue-400/40 bg-blue-500/15 px-2.5 py-0.5 text-xs font-semibold text-blue-200">{L("対応種目 {v0}", { v0: events })}</li> : null}
+        </ul>
+      </div>
+      <h2 id={headingID} className="text-lg font-bold">{name ? L("{v0}コーチについて", { v0: name }) : L("コーチについて")}</h2>
+      {hitokoto ? <p className="whitespace-pre-wrap break-words text-slate-100">{hitokoto}</p> : null}
+      {achievements.length ? (
+        <ul className="space-y-1.5" aria-label={L("成績や指導経験")}>
+          {achievements.map((line, index) => <li key={index} className="border-l-2 border-blue-400/60 pl-2 break-words text-slate-100">{line}</li>)}
+        </ul>
+      ) : null}
+      {(coach.sns_urls ?? []).length ? (
+        <div className="flex flex-wrap gap-1.5">
+          {(coach.sns_urls ?? []).map((entry) => <CoachSnsEntry key={entry} value={entry} />)}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+// 2人以上のときのプロフィールの横スライド（本体 #1063）。横スワイプ（スクロールスナップ）とドットのタップで切り替える。
+// ドットはスライドの上（写真の上）に置く（運営者指示 2026-11-26）。
+// 横に動くのはこの領域の中だけ（ページ全体は横スクロールしない）。表示していないスライドは読み上げ・フォーカスの対象から外す。
+function CoachSlides({ coaches, current, onChange }: { coaches: PublicCoach[]; current: number; onChange: (index: number) => void }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const baseID = useId();
+
+  // スワイプでスナップした位置から、表示中のコーチを決める。
+  function handleScroll() {
+    const el = scroller.current;
+    if (!el || !el.clientWidth) return;
+    const next = Math.min(coaches.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth)));
+    if (next !== current) onChange(next);
+  }
+
+  function show(next: number) {
+    onChange(next);
+    const el = scroller.current;
+    if (el && typeof el.scrollTo === "function") el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
+  }
+
+  return (
+    <div data-testid="featured-slides" className="space-y-3">
+      <div className="flex justify-center gap-2" data-testid="featured-dots">
+        {coaches.map((coach, i) => (
+          <button
+            key={coach.id}
+            type="button"
+            onClick={() => show(i)}
+            aria-label={L("{v0}人目のコーチを表示", { v0: i + 1 })}
+            aria-current={i === current ? "true" : undefined}
+            className="flex size-6 items-center justify-center"
+          >
+            <span className={`block size-2 rounded-full transition-colors ${i === current ? "bg-[#1f9fff]" : "bg-slate-400/50"}`} />
+          </button>
+        ))}
+      </div>
+      <div
+        ref={scroller}
+        onScroll={handleScroll}
+        aria-label={L("コーチのプロフィール")}
+        role="region"
+        className="flex snap-x snap-mandatory items-start overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {coaches.map((coach, i) => (
+          <div key={coach.id} data-testid="featured-slide" aria-hidden={i !== current} inert={i !== current} className="w-full shrink-0 snap-start snap-always">
+            <CoachProfile coach={coach} headingID={i === 0 ? "featured-about" : `${baseID}-about-${i}`} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

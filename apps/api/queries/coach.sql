@@ -117,6 +117,8 @@ VALUES (sqlc.arg(coach_id), sqlc.arg(ended_by));
 
 -- name: ListPublicCoaches :many
 -- 依頼する前に見られるコーチ一覧。承認されたコーチだけ。★はこれまでの全部(添削とパーソナル指導)。
+-- payments が true(Stripe 設定済み)のときは、受け取り口座の手続きが済んだ(payouts_enabled)コーチだけ(本体 #1063)。
+-- 翻訳などの内部処理は false を渡して従来どおり承認済み全員を対象にする。
 SELECT
     c.profile_id,
     COALESCE(NULLIF(c.name, ''), p.nickname, '')::text AS nickname,
@@ -152,6 +154,7 @@ CROSS JOIN LATERAL (
     ) x
 ) r
 WHERE c.status = 'approved'
+  AND (NOT sqlc.arg(payments)::boolean OR c.payouts_enabled)
   AND (sqlc.narg(profile_id)::uuid IS NULL OR c.profile_id = sqlc.narg(profile_id))
 ORDER BY c.tier, c.reviewed_at, c.profile_id;
 

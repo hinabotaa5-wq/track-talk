@@ -66,7 +66,8 @@ type Config struct {
 	ReviewRandomAssign bool
 	// FeaturedCoachID が空でない間は「特集モード」（本体 #985）。公開面（コーチ一覧・詳細・継続プランの一覧・
 	// 指名候補・おまかせの割当て）をこのコーチ（プロフィール ID）だけに絞る。空に戻すと従来の一覧に戻る。
-	// ID として読めない値のときは、誰も出さない（他のコーチが出てしまう側には倒さない）。
+	// カンマ区切りで複数の ID を書ける（本体 #1063）。並び順が特集ページのスライドの順（先頭が初期表示）。
+	// ID として読めない要素が1つでもあれば、誰も出さない（他のコーチが出てしまう側には倒さない）。
 	FeaturedCoachID string
 	// IdentityReaderURL and IdentityReaderToken authorize only publication reads.
 	IdentityReaderURL   string
