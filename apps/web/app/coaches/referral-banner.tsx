@@ -19,7 +19,7 @@ export function ReferralBanner() {
     >
       <Gift className="size-6 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-center text-[13px] font-semibold min-[390px]:text-base">{headline}</span>
+        <span className="block truncate text-center text-base font-semibold min-[390px]:text-[18px]">{headline}</span>
       </span>
       <ChevronRight className="size-5 shrink-0" aria-hidden />
     </Link>
