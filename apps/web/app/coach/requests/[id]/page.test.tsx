@@ -285,6 +285,8 @@ it("B1: コーチ（en）には相談文が英語メイン＋日本語原文の�
   await renderPage();
   expect(container.textContent).toContain("My start is slow");
   expect(container.querySelector("p[lang='ja']")?.textContent).toBe("スタートが遅いです");
+  expect(questionHeadings()).not.toContain("Your question");
+  expect(questionHeadings()).not.toContain("相談内容");
 });
 it("B4: 英訳が null なら、en でも原文だけ", async () => {
   localeState.value = "en";
@@ -294,6 +296,13 @@ it("B4: 英訳が null なら、en でも原文だけ", async () => {
   expect(container.querySelector("p[lang='ja']")).toBeNull();
 });
 
+// 本体 #1068: 「依頼内容」枠の中に「相談内容」の見出しは出さない（本文・作成日時・選手情報は従来どおり）。
+function questionHeadings() {
+  const section = container.querySelector('section[aria-label="依頼内容"], section[aria-label="Your request"]')!;
+  expect(section).not.toBeNull();
+  return [...section.querySelectorAll("h1, h2, h3, h4, h5, h6")].map((h) => h.textContent);
+}
+
 it("依頼内容（動画→相談文）は吹き出しにせず上にまとめ、自分の回答は1枚のドキュメントで出し、末尾リンクを出さない（本体 #984）", async () => {
   apiFetch.mockImplementation(async (path: string) => path.includes("/consultations") ? emptyRoom : { ...responded, status: "returned", video_url: "https://example.com/run.mp4", thumbnail_url: "https://example.com/run.jpg" });
   await renderPage();
@@ -301,6 +310,7 @@ it("依頼内容（動画→相談文）は吹き出しにせず上にまとめ�
   const request = question.closest('section[aria-label="依頼内容"]')!;
   expect(request).not.toBeNull();
   expect(request.querySelector("time")?.getAttribute("datetime")).toBe(base.created_at);
+  expect(questionHeadings()).not.toContain("相談内容");
   expect(container.querySelector(".justify-start, .justify-end")).toBeNull();
   expect(container.querySelector("h1")?.parentElement?.textContent).not.toContain(base.question);
   const video = container.querySelector("video")!;
@@ -460,6 +470,7 @@ it("B5: 値のある選手情報だけが相談内容と並んで表示される
   expect([...info.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["PB（自己ベスト）", "風速"]);
   expect([...info.querySelectorAll("dd")].map((d) => d.textContent)).toEqual(["11秒20（2025年）", "+1.2"]);
   expect(request.textContent).toContain("スタートが遅いです");
+  expect(questionHeadings()).not.toContain("相談内容");
   expect(request.textContent).not.toContain("目標タイム");
   expect(request.textContent).not.toContain("その時の体のコンディション");
 });
