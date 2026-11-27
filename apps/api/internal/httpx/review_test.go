@@ -202,6 +202,47 @@ func TestReviewRequestNeedsDemoCode(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), created.ID) {
 		t.Fatalf("list %d %s", rec.Code, rec.Body.String())
 	}
+	// 一覧の各行は、一覧ページが使う6項目だけ（本体 #1072）。meta は従来どおり。
+	var list struct {
+		Requests []map[string]json.RawMessage `json:"requests"`
+		Meta     struct {
+			Page    int   `json:"page"`
+			PerPage int   `json:"per_page"`
+			Total   int64 `json:"total"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	// このテストでは上で2件作っている（デモコード付きの1件と created）。新しい順で created が先頭。
+	if len(list.Requests) != 2 || list.Meta.Page != 1 || list.Meta.PerPage != 20 || list.Meta.Total != 2 {
+		t.Fatalf("list meta %s", rec.Body.String())
+	}
+	wantKeys := []string{"id", "event", "status", "canceled_at", "withdrawal", "created_at"}
+	for _, it := range list.Requests {
+		if len(it) != len(wantKeys) {
+			t.Fatalf("list item keys %s", rec.Body.String())
+		}
+		for _, k := range wantKeys {
+			if _, ok := it[k]; !ok {
+				t.Fatalf("list item missing %s: %s", k, rec.Body.String())
+			}
+		}
+	}
+	item := list.Requests[0]
+	if string(item["id"]) != `"`+created.ID+`"` || string(item["status"]) != `"queued"` || string(item["canceled_at"]) != "null" || string(item["withdrawal"]) != "null" {
+		t.Fatalf("list item %s", rec.Body.String())
+	}
+	// 詳細は従来どおり全項目を返す。
+	rec = doJSON(t, h, http.MethodGet, "/v1/coaching/requests/"+created.ID, tu, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get %d %s", rec.Code, rec.Body.String())
+	}
+	for _, k := range []string{"tier", "focus", "question", "due_at", "video_url", "thumbnail_url", "cash_price_yen", "info_request", "videos_purged", "question_en"} {
+		if !strings.Contains(rec.Body.String(), `"`+k+`":`) {
+			t.Fatalf("detail missing %s: %s", k, rec.Body.String())
+		}
+	}
 }
 
 func TestCoachDuty(t *testing.T) {

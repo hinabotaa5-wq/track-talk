@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { formatDateTime } from "@/lib/format";
 import { reviewStatusLabels } from "@/lib/review";
-import type { Meta, ReviewRequest } from "@/lib/types";
+import type { Meta, MyReviewRequestListItem } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 export default function MyReviewRequestsPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
-  const [requests, setRequests] = useState<ReviewRequest[] | null>(null);
+  const [requests, setRequests] = useState<MyReviewRequestListItem[] | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function MyReviewRequestsPage() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    apiFetch<{ requests: ReviewRequest[]; meta: Meta }>("/v1/me/coaching/requests?per_page=50", { token })
+    apiFetch<{ requests: MyReviewRequestListItem[]; meta: Meta }>("/v1/me/coaching/requests?per_page=50", { token })
       .then((d) => {
         if (!cancelled) setRequests(d.requests ?? []);
       })

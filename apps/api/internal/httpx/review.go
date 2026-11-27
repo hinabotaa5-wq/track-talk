@@ -561,9 +561,22 @@ func (s *Server) listMyReviewRequests(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, rr := range rows {
-		out = append(out, s.reviewRequestJSON(rr))
+		out = append(out, myReviewRequestListItemJSON(rr))
 	}
 	JSON(w, http.StatusOK, map[string]any{"requests": out, "meta": meta{Page: int(page), PerPage: int(per), Total: total}})
+}
+
+// myReviewRequestListItemJSON は、選手の依頼一覧の1行。一覧ページが使う6項目だけを返す（本体 #1072）。
+// 詳細と作成の応答は reviewRequestJSON のまま全項目を返す。
+func myReviewRequestListItemJSON(rr db.ReviewRequest) map[string]any {
+	return map[string]any{
+		"id":          rr.ID,
+		"event":       rr.Event,
+		"status":      rr.Status,
+		"canceled_at": rr.CanceledAt,
+		"withdrawal":  withdrawalJSON(rr),
+		"created_at":  rr.CreatedAt,
+	}
 }
 
 // getReviewRequest は、依頼した本人にだけ依頼を見せる（他の人には無いものとして返す）。
