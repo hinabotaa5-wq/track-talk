@@ -44,6 +44,16 @@ func (s *Server) listReviewNominees(w http.ResponseWriter, r *http.Request) {
 		MapDBError(w, err)
 		return
 	}
+	// プレミアム（本体 #1053）は、プレミアム価格があるコーチだけを、その価格と一緒に返す。
+	if r.URL.Query().Get("plan") == planPremium {
+		out, err := s.premiumNomineesJSON(r.Context(), rows)
+		if err != nil {
+			MapDBError(w, err)
+			return
+		}
+		JSON(w, http.StatusOK, map[string]any{"coaches": out})
+		return
+	}
 	ids := make([]uuid.UUID, 0, len(rows))
 	for _, c := range rows {
 		ids = append(ids, c.ProfileID)

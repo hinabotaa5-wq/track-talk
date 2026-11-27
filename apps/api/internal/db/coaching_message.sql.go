@@ -13,6 +13,7 @@ import (
 
 const coachingVideoInUse = `-- name: CoachingVideoInUse :one
 SELECT (EXISTS (SELECT 1 FROM review_requests WHERE video_public_id = $1::text)
+     OR EXISTS (SELECT 1 FROM review_request_videos WHERE video_public_id = $1::text)
      OR EXISTS (SELECT 1 FROM review_responses WHERE demo_video_public_id = $1::text)
      OR EXISTS (SELECT 1 FROM coaching_messages WHERE video_public_id = $1::text)
      OR EXISTS (SELECT 1 FROM coaching_consultations WHERE video_public_id=$1::text OR answer_video_public_id=$1::text))::boolean AS in_use

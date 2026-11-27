@@ -1,4 +1,6 @@
 "use client";
+import { PremiumBadge } from "@/components/premium-review";
+import { isPremium } from "@/lib/premium";
 import { L } from "@/lib/i18n";
 
 import { PageLoading } from "@/components/page-loading";
@@ -58,7 +60,7 @@ export default function MyReviewRequestsPage() {
               className="flex items-center justify-between gap-3 rounded-xl border border-white/20 glass bg-white/10 p-3"
             >
               <span className="space-y-0.5">
-                <span className="block text-sm font-semibold text-white">{coachEventLabels[r.event]}</span>
+                <span className="flex items-center gap-2 text-sm font-semibold text-white">{coachEventLabels[r.event]}{isPremium(r) ? <PremiumBadge /> : null}</span>
                 <span className="block text-xs text-slate-300">{formatDateTime(r.created_at)}</span>
               </span>
               <span className="shrink-0 text-xs text-blue-300">{r.canceled_at ? L("依頼をキャンセルしました") : r.withdrawal ? L("コーチが依頼を返却しました") : reviewStatusLabels[r.status]}</span>

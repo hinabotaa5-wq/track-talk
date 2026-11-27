@@ -454,6 +454,7 @@ func (s *Server) reviewEstimate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) coachRequestJSON(rr db.ReviewRequest, withVideo bool) map[string]any {
 	out := map[string]any{
 		"id":                 rr.ID,
+		"plan":               rr.Plan, // standard／premium（本体 #1053）
 		"tier":               rr.Tier,
 		"event":              rr.Event,
 		"focus":              rr.Focus,

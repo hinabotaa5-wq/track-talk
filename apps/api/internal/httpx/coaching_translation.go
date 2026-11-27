@@ -400,12 +400,13 @@ func (s *Server) ensureReviewInfoTranslation(ctx context.Context, rr db.ReviewRe
 }
 
 func reviewResponseSourceHash(rs db.ReviewResponse) string {
-	return coachingSourceHash(rs.GoodPoint, strings.Join(rs.FixPoints, "\x00"), rs.Drill)
+	return coachingSourceHash(derefString(rs.GoodPoint), strings.Join(rs.FixPoints, "\x00"), derefString(rs.Drill))
 }
 
 // ensureReviewResponseTranslation はコーチの回答3点（良い点・直す点・ドリル）を1回の呼び出しで和訳する。
 func (s *Server) ensureReviewResponseTranslation(ctx context.Context, rs db.ReviewResponse, existing *db.ReviewTranslation) (translateOutcome, error) {
-	if rs.HiddenAt != nil {
+	// プレミアムの総括（本体 #1053）には回答3点がないので訳さない（総括の訳は対象外）。
+	if rs.HiddenAt != nil || rs.GoodPoint == nil {
 		return translateNone, nil
 	}
 	hash := reviewResponseSourceHash(rs)
@@ -416,7 +417,7 @@ func (s *Server) ensureReviewResponseTranslation(ctx context.Context, rs db.Revi
 	if fixes == nil {
 		fixes = []string{}
 	}
-	source, err := json.Marshal(map[string]any{"good_point": rs.GoodPoint, "fix_points": fixes, "drill": rs.Drill})
+	source, err := json.Marshal(map[string]any{"good_point": *rs.GoodPoint, "fix_points": fixes, "drill": derefString(rs.Drill)})
 	if err != nil {
 		return translateFailed, err
 	}

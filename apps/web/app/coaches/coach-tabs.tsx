@@ -5,12 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { motion, MotionConfig } from "motion/react";
 import { ViewSwitch } from "@/components/view-switch";
 import { CoachList } from "./coach-list";
+import { PremiumCoachList } from "./premium-coach-list";
 import { CoachSelfButton } from "./coach-self-button";
 import { usePathname, useSearchParams } from "next/navigation";
 
 // コーチ一覧の上部の切り替え。「スタンダード」と「プレミアム」の2択（本体 #1026）。
-// スタンダードは指名用のコーチ一覧。プレミアムは商品が未実装なので「プレミアムは準備中です」の一文だけを出し、
-// 価格・説明・申込みの導線は出さず、API も呼ばない。
+// スタンダードは指名用のコーチ一覧。プレミアムは、プレミアム価格があるコーチだけの一覧（本体 #1053）。
 // 継続プランは商品として休眠させたので（本体 #1007）、継続プランの選択肢と対応コーチの一覧（SupportPlanList）は描画しない。
 // ?tab=support の直接リンク・共有 URL で開かれても、スタンダード側を出す。
 // SupportPlanList の部品とフラグ（NEXT_PUBLIC_SUPPORT_PLAN_LIST_ENABLED）は休眠として残す。
@@ -29,13 +29,12 @@ export function CoachTabs({ onLoadingChange }: { onLoadingChange?: (loading: boo
   // 一度開いたパネルは消さずに隠しておき、行き来しても読み込み直さない（大会・ケガと同じ）。
   const [opened, setOpened] = useState<Set<Tab>>(() => new Set([initial]));
   // 初回読み込み中はページ中身をストップウォッチだけにする（本体 #804）。
-  // スタンダードの一覧は初回の取得1回だけを行い、終わったら（成功・失敗のどちらも）知らせる。行き来での再取得はない。
+  // どちらの一覧も初回の取得1回だけを行い、終わったら（成功・失敗のどちらも）知らせる。行き来での再取得はない。
   const [settled, setSettled] = useState<Set<Tab>>(() => new Set());
   const markSettled = useCallback((done: Tab) => {
     setSettled((prev) => (prev.has(done) ? prev : new Set(prev).add(done)));
   }, []);
-  // プレミアム側は取得せず準備中の一文だけなので、読み込みではない。
-  const loading = tab === "video" && !settled.has("video");
+  const loading = !settled.has(tab);
   useEffect(() => {
     onLoadingChange?.(loading);
   }, [loading, onLoadingChange]);
@@ -80,7 +79,7 @@ export function CoachTabs({ onLoadingChange }: { onLoadingChange?: (loading: boo
                 transition={{ duration: 0.22, ease: "easeOut" }}
               >
                 {item.id === "premium" ? (
-                  <p className="py-8 text-center text-sm text-slate-200">{L("プレミアムは準備中です")}</p>
+                  <PremiumCoachList onSettled={() => markSettled("premium")} />
                 ) : (
                   <CoachList onSettled={() => markSettled("video")} />
                 )}
