@@ -51,11 +51,16 @@ func responseBody() map[string]any {
 		"fix_points": []string{"踏切が近いので、半足ぶん手前で踏み切りましょう", " ", "抜き脚の膝を高く"},
 		"drill":      "ミニハードル5台を1.5m間隔で並べて、3セット",
 		"hitokoto":   "次は抜き脚だけ意識してみましょう",
-		// 回答の新しい型（本体 #1013）。キュー・成功の目安・次に撮る動画も必須。
-		"cue":              "地面を真下に押す",
-		"success_criteria": "接地の瞬間に膝が足首の真上にそろって見える",
-		"next_video":       "真横・5m離れて、1台目から3台目まで",
 	}
+}
+
+// legacyResponseBody は、2026-11-25 の型（本体 #1013）の旧 Web が送る形。キュー・成功の目安・次に撮る動画も入る。
+func legacyResponseBody() map[string]any {
+	body := responseBody()
+	body["cue"] = "地面を真下に押す"
+	body["success_criteria"] = "接地の瞬間に膝が足首の真上にそろって見える"
+	body["next_video"] = "真横・5m離れて、1台目から3台目まで"
+	return body
 }
 
 func TestReviewResponseFlow(t *testing.T) {
@@ -79,7 +84,7 @@ func TestReviewResponseFlow(t *testing.T) {
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("3 fixes %d", rec.Code)
 	}
-	// ひとことが無い・空・長すぎ・連絡先らしき内容だと止める。
+	// コーチなら明日から何をするか（hitokoto）が無い・空・長すぎ・連絡先らしき内容だと止める（本体 #1067）。
 	bad = responseBody()
 	delete(bad, "hitokoto")
 	if rec := doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"hitokoto"`) {
@@ -113,7 +118,7 @@ func TestReviewResponseFlow(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"returned"`) {
 		t.Fatalf("response %d %s", rec.Code, rec.Body.String())
 	}
-	// 直す点2つ（空の3つ目は捨てる）でも保存できる。
+	// 改善点2つ（空の3つ目は捨てる）でも保存できる。
 	var saved map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &saved); err != nil {
 		t.Fatalf("response json %v", err)
@@ -438,103 +443,172 @@ func TestReviewRevokedCoachAuthorization(t *testing.T) {
 	}
 }
 
-// TestReviewResponseFormV2 は、回答の新しい型（本体 #1013）の新規3欄（キュー・成功の目安・次に撮る動画）を確かめる。
-func TestReviewResponseFormV2(t *testing.T) {
+// TestReviewResponseFormV3 は、回答の型の4項目化（本体 #1067）を確かめる。
+// 必須は良い点・改善点・ドリル・コーチなら明日から何をするか（hitokoto）の4項目で、キュー・成功の目安・次に撮る動画は任意。
+func TestReviewResponseFormV3(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setup(t)
 	tadmin := adminToken(t, h)
 	_, tc := onDutyCoach(t, h, tadmin)
-	_, tu := demoRequester(t, h, tadmin)
-	id := acceptedReview(t, h, tadmin, tc, tu)
-	post := func(body map[string]any) *httptest.ResponseRecorder {
-		t.Helper()
-		return doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, body)
-	}
-	newFields := []string{"cue", "success_criteria", "next_video"}
-
-	// A2: 新規3欄のいずれかが欠ける・空だと、その欄の名前つきで validation_error。
-	for _, f := range newFields {
-		bad := responseBody()
-		delete(bad, f)
-		if rec := post(bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"validation_error"`) || !strings.Contains(rec.Body.String(), `"`+f+`"`) {
-			t.Fatalf("A2 missing %s: %d %s", f, rec.Code, rec.Body.String())
-		}
-		bad = responseBody()
-		bad[f] = "   "
-		if rec := post(bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"`+f+`"`) {
-			t.Fatalf("A2 empty %s: %d %s", f, rec.Code, rec.Body.String())
-		}
-	}
-	// A3: 301字・連絡先らしき文字列は validation_error。300字ちょうどは通る長さ。
-	for _, f := range newFields {
-		bad := responseBody()
-		bad[f] = strings.Repeat("あ", 301)
-		if rec := post(bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"`+f+`"`) {
-			t.Fatalf("A3 long %s: %d %s", f, rec.Code, rec.Body.String())
-		}
-		bad = responseBody()
-		bad[f] = "続きは coach@example.com に送ります"
-		if rec := post(bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"`+f+`"`) {
-			t.Fatalf("A3 contact %s: %d %s", f, rec.Code, rec.Body.String())
-		}
-	}
-
-	// A1: 新規3欄をすべて含む返答は保存され、選手・コーチの GET に3欄が入る。
-	full := responseBody()
-	full["next_video"] = strings.Repeat("い", 300)
-	rec := post(full)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"returned"`) {
-		t.Fatalf("A1 response %d %s", rec.Code, rec.Body.String())
-	}
 	type responseView struct {
 		Response struct {
+			Hitokoto        *string `json:"hitokoto"`
 			Cue             *string `json:"cue"`
 			SuccessCriteria *string `json:"success_criteria"`
 			NextVideo       *string `json:"next_video"`
 		} `json:"response"`
 	}
-	for _, path := range []struct{ url, tok string }{
-		{"/v1/coaching/requests/" + id, tu},
-		{"/v1/coach/requests/" + id, tc},
-	} {
-		rec := doJSON(t, h, http.MethodGet, path.url, path.tok, nil)
-		var got responseView
-		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != http.StatusOK {
-			t.Fatalf("A1 get %s %d %v %s", path.url, rec.Code, err, rec.Body.String())
-		}
-		r := got.Response
-		if r.Cue == nil || *r.Cue != "地面を真下に押す" || r.SuccessCriteria == nil || *r.SuccessCriteria != "接地の瞬間に膝が足首の真上にそろって見える" || r.NextVideo == nil || *r.NextVideo != strings.Repeat("い", 300) {
-			t.Fatalf("A1 get %s fields %s", path.url, rec.Body.String())
-		}
-		// 新規3欄には訳のフィールドを付けない。
-		for _, k := range []string{`"cue_ja"`, `"success_criteria_ja"`, `"next_video_ja"`} {
-			if strings.Contains(rec.Body.String(), k) {
-				t.Fatalf("A1 %s has %s: %s", path.url, k, rec.Body.String())
-			}
-		}
+	newRequest := func() (string, string) {
+		_, tu := demoRequester(t, h, tadmin)
+		return acceptedReview(t, h, tadmin, tc, tu), tu
 	}
-	// 運営の試用期間リストにも新規3欄が入る。
-	if body := doJSON(t, h, http.MethodGet, "/v1/admin/coaching/probation", tadmin, nil).Body.String(); !strings.Contains(body, `"cue":"地面を真下に押す"`) || !strings.Contains(body, `"success_criteria":"接地の瞬間に膝が足首の真上にそろって見える"`) || !strings.Contains(body, `"next_video":"`) {
-		t.Fatalf("A1 probation %s", body)
+	post := func(id string, body map[string]any) *httptest.ResponseRecorder {
+		t.Helper()
+		return doJSON(t, h, http.MethodPost, "/v1/coaching/requests/"+id+"/response", tc, body)
+	}
+	// views は、選手・コーチの GET で返る返答を読む。
+	views := func(id, tu string) []responseView {
+		t.Helper()
+		out := []responseView{}
+		for _, path := range []struct{ url, tok string }{
+			{"/v1/coaching/requests/" + id, tu},
+			{"/v1/coach/requests/" + id, tc},
+		} {
+			rec := doJSON(t, h, http.MethodGet, path.url, path.tok, nil)
+			var got responseView
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != http.StatusOK {
+				t.Fatalf("get %s %d %v %s", path.url, rec.Code, err, rec.Body.String())
+			}
+			out = append(out, got)
+		}
+		return out
 	}
 
-	// A4: 000191 適用前の形の過去の返答（新規3欄 NULL）は null で返り、エラーにならない。
-	_, tu2 := demoRequester(t, h, tadmin)
-	old := acceptedReview(t, h, tadmin, tc, tu2)
+	id, tu := newRequest()
+
+	// A2: 4項目のいずれかが欠ける・空だと、その項目の名前と新しいラベルつきで validation_error。
+	for _, c := range []struct{ field, label string }{
+		{"good_point", "良い点"},
+		{"fix_points", "改善点"},
+		{"drill", "ドリル"},
+		{"hitokoto", "コーチなら明日から何をするか"},
+	} {
+		bad := responseBody()
+		delete(bad, c.field)
+		rec := post(id, bad)
+		body := rec.Body.String()
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(body, `"validation_error"`) || !strings.Contains(body, `"`+c.field+`"`) || !strings.Contains(body, c.label+"を入力してください") {
+			t.Fatalf("A2 missing %s: %d %s", c.field, rec.Code, body)
+		}
+		if strings.Contains(body, "直す点") || strings.Contains(body, "ひとこと") {
+			t.Fatalf("A2 old label %s: %s", c.field, body)
+		}
+		bad = responseBody()
+		if c.field == "fix_points" {
+			bad[c.field] = []string{"   "}
+		} else {
+			bad[c.field] = "   "
+		}
+		if rec := post(id, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), c.label+"を入力してください") {
+			t.Fatalf("A2 empty %s: %d %s", c.field, rec.Code, rec.Body.String())
+		}
+	}
+	bad := responseBody()
+	bad["fix_points"] = []string{"a", "b", "c"}
+	if rec := post(id, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "改善点は2つまでです") {
+		t.Fatalf("A2 3 fixes %d %s", rec.Code, rec.Body.String())
+	}
+	bad = responseBody()
+	bad["fix_points"] = []string{strings.Repeat("あ", 301)}
+	if rec := post(id, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "改善点は300文字以内で入力してください") {
+		t.Fatalf("A2 long fix %d %s", rec.Code, rec.Body.String())
+	}
+
+	// A4: hitokoto が301字・連絡先らしき文字列だと従来どおり止める。
+	bad = responseBody()
+	bad["hitokoto"] = strings.Repeat("あ", 301)
+	if rec := post(id, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "コーチなら明日から何をするかは300文字以内で入力してください") {
+		t.Fatalf("A4 long hitokoto %d %s", rec.Code, rec.Body.String())
+	}
+	bad = responseBody()
+	bad["hitokoto"] = "続きは coach@example.com に送ります"
+	if rec := post(id, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"hitokoto"`) || !strings.Contains(rec.Body.String(), "連絡先") {
+		t.Fatalf("A4 hitokoto contact %d %s", rec.Code, rec.Body.String())
+	}
+	// 任意の3欄も、値があるときは従来どおり長さ・連絡先を確かめる。
+	for _, f := range []string{"cue", "success_criteria", "next_video"} {
+		bad := legacyResponseBody()
+		bad[f] = strings.Repeat("あ", 301)
+		if rec := post(id, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"`+f+`"`) {
+			t.Fatalf("A3 long %s: %d %s", f, rec.Code, rec.Body.String())
+		}
+		bad = legacyResponseBody()
+		bad[f] = "続きは coach@example.com に送ります"
+		if rec := post(id, bad); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `"`+f+`"`) {
+			t.Fatalf("A3 contact %s: %d %s", f, rec.Code, rec.Body.String())
+		}
+	}
+
+	// A1: 4項目だけで送れ、cue・success_criteria・next_video は null で返る。
+	rec := post(id, responseBody())
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"returned"`) || !strings.Contains(rec.Body.String(), `"cue":null`) || !strings.Contains(rec.Body.String(), `"success_criteria":null`) || !strings.Contains(rec.Body.String(), `"next_video":null`) {
+		t.Fatalf("A1 response %d %s", rec.Code, rec.Body.String())
+	}
+	for _, got := range views(id, tu) {
+		r := got.Response
+		if r.Cue != nil || r.SuccessCriteria != nil || r.NextVideo != nil || r.Hitokoto == nil || *r.Hitokoto != "次は抜き脚だけ意識してみましょう" {
+			t.Fatalf("A1 get %+v", r)
+		}
+	}
+	if n := scalar(t, `SELECT count(*) FROM review_responses WHERE request_id = $1 AND cue IS NULL AND success_criteria IS NULL AND next_video IS NULL`, id); n != 1 {
+		t.Fatalf("A1 stored null %d", n)
+	}
+
+	// A3: 旧 Web の形（3欄に値あり）は従来どおり保存・返却される。
+	id2, tu2 := newRequest()
+	full := legacyResponseBody()
+	full["next_video"] = strings.Repeat("い", 300)
+	if rec := post(id2, full); rec.Code != http.StatusOK {
+		t.Fatalf("A3 legacy %d %s", rec.Code, rec.Body.String())
+	}
+	for _, got := range views(id2, tu2) {
+		r := got.Response
+		if r.Cue == nil || *r.Cue != "地面を真下に押す" || r.SuccessCriteria == nil || *r.SuccessCriteria != "接地の瞬間に膝が足首の真上にそろって見える" || r.NextVideo == nil || *r.NextVideo != strings.Repeat("い", 300) {
+			t.Fatalf("A3 legacy get %+v", r)
+		}
+	}
+	// 運営の試用期間リストにも3欄が入る。
+	if body := doJSON(t, h, http.MethodGet, "/v1/admin/coaching/probation", tadmin, nil).Body.String(); !strings.Contains(body, `"cue":"地面を真下に押す"`) || !strings.Contains(body, `"success_criteria":"接地の瞬間に膝が足首の真上にそろって見える"`) || !strings.Contains(body, `"next_video":"`) {
+		t.Fatalf("A3 probation %s", body)
+	}
+
+	// A3: 3欄を空文字（空白だけを含む）で送ると、null として保存・返却される。
+	id3, tu3 := newRequest()
+	empty := responseBody()
+	empty["cue"], empty["success_criteria"], empty["next_video"] = "", "  ", ""
+	if rec := post(id3, empty); rec.Code != http.StatusOK {
+		t.Fatalf("A3 empty %d %s", rec.Code, rec.Body.String())
+	}
+	for _, got := range views(id3, tu3) {
+		r := got.Response
+		if r.Cue != nil || r.SuccessCriteria != nil || r.NextVideo != nil {
+			t.Fatalf("A3 empty get %+v", r)
+		}
+	}
+	if n := scalar(t, `SELECT count(*) FROM review_responses WHERE request_id = $1 AND cue IS NULL AND success_criteria IS NULL AND next_video IS NULL`, id3); n != 1 {
+		t.Fatalf("A3 stored null %d", n)
+	}
+
+	// 000191 適用前の形の過去の返答（3欄 NULL）も null で返り、エラーにならない。
+	_, tu4 := demoRequester(t, h, tadmin)
+	old := acceptedReview(t, h, tadmin, tc, tu4)
 	execSQLArgs(t, `UPDATE review_requests SET status = 'returned', returned_at = now() WHERE id = $1`, old)
 	execSQLArgs(t, `INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, hitokoto)
 		SELECT id, coach_id, '良い点', ARRAY['直す点'], 'ドリル', 'ひとこと' FROM review_requests WHERE id = $1`, old)
-	for _, path := range []struct{ url, tok string }{
-		{"/v1/coaching/requests/" + old, tu2},
-		{"/v1/coach/requests/" + old, tc},
-	} {
-		rec := doJSON(t, h, http.MethodGet, path.url, path.tok, nil)
-		body := rec.Body.String()
-		if rec.Code != http.StatusOK || !strings.Contains(body, `"cue":null`) || !strings.Contains(body, `"success_criteria":null`) || !strings.Contains(body, `"next_video":null`) || !strings.Contains(body, `"hitokoto":"ひとこと"`) {
-			t.Fatalf("A4 %s %d %s", path.url, rec.Code, body)
+	for _, got := range views(old, tu4) {
+		r := got.Response
+		if r.Cue != nil || r.SuccessCriteria != nil || r.NextVideo != nil || r.Hitokoto == nil || *r.Hitokoto != "ひとこと" {
+			t.Fatalf("old get %+v", r)
 		}
-	}
-	if rec := doJSON(t, h, http.MethodGet, "/v1/admin/coaching/probation", tadmin, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"cue":null`) {
-		t.Fatalf("A4 probation %d %s", rec.Code, rec.Body.String())
 	}
 }

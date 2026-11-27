@@ -1828,6 +1828,11 @@ export const en: Readonly<Record<string, string>> = {
   "結論を1行で": "Your conclusion in one line",
   "残すべき所を1つ": "One thing to keep",
   "ボトルネック": "Main bottleneck",
+  // 回答の型の4項目化（本体 #1067）。
+  "改善点": "What to improve",
+  "改善点{v0}": "What to improve{v0}",
+  "コーチなら明日から何をするか": "What I would do starting tomorrow if I were you",
+  "自分なら明日から何をするか、具体的に書く": "Write specifically what you would do starting tomorrow if you were this athlete",
   "一番の課題を1つ。なぜ遅くなるかまで書く": "The one biggest issue, including why it slows the athlete down",
   "キュー": "Cue",
   "直し方の合言葉を1つ（例：地面を真下に押す）": "One cue for the fix (e.g. push the ground straight down)",

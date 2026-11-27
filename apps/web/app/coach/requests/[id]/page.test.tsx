@@ -190,22 +190,22 @@ it("差し戻すと上部オーバーレイが出て3秒で消え、履歴は残
   await expectBannerExpires("差し戻し中");
 });
 
-// 返答フォームは回答の型（本体 #1013）の7項目＋見本動画で、ボトルネック（直す点）は1欄だけ。
-it("返答フォームの項目名は5つで直す点は1欄だけ", async () => {
+// 返答フォームは回答の型（本体 #1067）の4項目＋見本動画で、改善点は1欄だけ。
+it("返答フォームの項目名は4つ＋見本動画で改善点は1欄だけ", async () => {
   apiFetch.mockImplementation(async (path: string) => (path.includes("/consultations") ? emptyRoom : base));
   await renderPage();
   const form = responseForm();
   const labels = [...form.querySelectorAll("label > span.font-semibold")].map((s) => s.textContent);
-  expect(labels).toEqual(["一言診断", "良い点", "ボトルネック", "キュー", "おすすめのドリル", "成功の目安", "次に撮る動画", "見本動画（任意、60秒まで）"]);
+  expect(labels).toEqual(["良い点", "改善点", "おすすめのドリル", "コーチなら明日から何をするか", "見本動画（任意、60秒まで）"]);
   const text = container.textContent!;
   for (const stale of ["（1つ）", "（1つ目）", "（2つ目", "なくてもよい"]) {
     expect(text).not.toContain(stale);
   }
-  expect(form.querySelectorAll("textarea")).toHaveLength(7);
+  expect(form.querySelectorAll("textarea")).toHaveLength(4);
 });
 
-// 送信内容は直す点1つ・ひとこと1つで、成功すると完了バナーが出る。
-it("返答の送信内容は直す点1つとひとことを含む", async () => {
+// 送信内容は改善点1つ・コーチなら明日から何をするか（hitokoto）1つで、成功すると完了バナーが出る。
+it("返答の送信内容は改善点1つとひとことを含む", async () => {
   let sentBody = "";
   apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
     if (!options?.method && path.includes("/consultations")) return emptyRoom;
@@ -217,14 +217,11 @@ it("返答の送信内容は直す点1つとひとことを含む", async () => 
   });
   await renderPage();
   const areas = [...responseForm().querySelectorAll("textarea")] as HTMLTextAreaElement[];
-  expect(areas).toHaveLength(7);
-  await fillTextarea(areas[0], "次は抜き脚だけ意識してみましょう");
-  await fillTextarea(areas[1], "腕振りが良い");
-  await fillTextarea(areas[2], "接地を直す");
-  await fillTextarea(areas[3], "地面を真下に押す");
-  await fillTextarea(areas[4], "もも上げ");
-  await fillTextarea(areas[5], "膝が足首の真上にそろって見える");
-  await fillTextarea(areas[6], "真横・5m離れて");
+  expect(areas).toHaveLength(4);
+  await fillTextarea(areas[0], "腕振りが良い");
+  await fillTextarea(areas[1], "接地を直す");
+  await fillTextarea(areas[2], "もも上げ");
+  await fillTextarea(areas[3], "次は抜き脚だけ意識してみましょう");
   await act(async () => submitButton("返答を送る").click());
   const payload = JSON.parse(sentBody);
   expect(payload.good_point).toBe("腕振りが良い");
@@ -234,8 +231,8 @@ it("返答の送信内容は直す点1つとひとことを含む", async () => 
   expect(document.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
 });
 
-// ひとことが空だと送れず、項目の指摘が出る（サーバーが 422 を返した想定）。
-it("ひとことが空だと送信できず項目の指摘が出る", async () => {
+// 本体 #1067 W2: コーチなら明日から何をするか（hitokoto）が空だと送れず、その欄の下に指摘が出る（サーバーが 422 を返した想定）。
+it("W2: コーチなら明日から何をするかが空だと送信できず、その欄に指摘が出る", async () => {
   let sentBody = "";
   apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
     if (!options?.method && path.includes("/consultations")) return emptyRoom;
@@ -244,7 +241,7 @@ it("ひとことが空だと送信できず項目の指摘が出る", async () =
       sentBody = JSON.stringify(payload);
       if (!payload.hitokoto) {
         throw new ApiRequestError(422, {
-          error: { code: "validation_error", message: "入力を確認してください", fields: { hitokoto: "ひとことを入力してください" } },
+          error: { code: "validation_error", message: "入力を確認してください", fields: { hitokoto: "コーチなら明日から何をするかを入力してください" } },
         });
       }
       return responded;
@@ -253,17 +250,17 @@ it("ひとことが空だと送信できず項目の指摘が出る", async () =
   });
   await renderPage();
   const areas = [...responseForm().querySelectorAll("textarea")] as HTMLTextAreaElement[];
-  await fillTextarea(areas[1], "腕振りが良い");
-  await fillTextarea(areas[2], "接地を直す");
-  await fillTextarea(areas[3], "地面を真下に押す");
-  await fillTextarea(areas[4], "もも上げ");
-  await fillTextarea(areas[5], "膝が足首の真上にそろって見える");
-  await fillTextarea(areas[6], "真横・5m離れて");
-  // ひとこと（一言診断）は空のまま送る。
+  await fillTextarea(areas[0], "腕振りが良い");
+  await fillTextarea(areas[1], "接地を直す");
+  await fillTextarea(areas[2], "もも上げ");
+  // コーチなら明日から何をするか（hitokoto）は空のまま送る。
   await act(async () => submitButton("返答を送る").click());
   expect(JSON.parse(sentBody).hitokoto).toBe("");
   expect(document.querySelector('[role="status"]')).toBeNull();
-  expect(container.textContent).toContain("ひとことを入力してください");
+  // 指摘は「コーチなら明日から何をするか」の欄（同じ label の中）に出る。
+  const label = areas[3].closest("label")!;
+  expect(label.querySelector("span.font-semibold")?.textContent).toBe("コーチなら明日から何をするか");
+  expect(label.textContent).toContain("コーチなら明日から何をするかを入力してください");
 });
 
 it("添削をはじめると入力欄を表示する", async () => {
@@ -379,8 +376,8 @@ it("差し戻しの送信に失敗したらバナーは出ない", async () => {
   expect(scroll).not.toHaveBeenCalled();
 });
 
-// 本体 #1013 B1: 7欄が 一言診断→良い点→ボトルネック→キュー→ドリル→成功の目安→次に撮る動画 の順で出て、全欄入力で新規3欄が送られる。
-it("B1: 回答の型の7欄が順に出て、送信内容に新規3欄が入る", async () => {
+// 本体 #1067 W1: 4欄が 良い点→改善点→おすすめのドリル→コーチなら明日から何をするか の順で出て、キュー等の欄は無く、送信に cue 等のキーを含めない。
+it("W1: 回答の型の4欄が順に出て、送信内容に cue・success_criteria・next_video が入らない", async () => {
   let sentBody = "";
   apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
     if (!options?.method && path.includes("/consultations")) return emptyRoom;
@@ -393,61 +390,33 @@ it("B1: 回答の型の7欄が順に出て、送信内容に新規3欄が入る"
   await renderPage();
   const form = responseForm();
   const fields = [...form.querySelectorAll("label")].filter((l) => l.querySelector("textarea"));
-  expect(fields.map((l) => l.querySelector("span.font-semibold")?.textContent)).toEqual(["一言診断", "良い点", "ボトルネック", "キュー", "おすすめのドリル", "成功の目安", "次に撮る動画"]);
-  // 各欄に短い入力補助がある。
-  for (const area of form.querySelectorAll("textarea")) {
-    expect(area.getAttribute("placeholder")).toBeTruthy();
+  expect(fields.map((l) => l.querySelector("span.font-semibold")?.textContent)).toEqual(["良い点", "改善点", "おすすめのドリル", "コーチなら明日から何をするか"]);
+  for (const stale of ["キュー", "成功の目安", "次に撮る動画", "一言診断", "ボトルネック"]) {
+    expect(form.textContent).not.toContain(stale);
   }
-  expect(form.querySelectorAll("textarea")[2].getAttribute("placeholder")).toContain("なぜ遅くなるか");
-  expect(form.querySelectorAll("textarea")[4].getAttribute("placeholder")).toContain("ドリル名と回数");
-  const values = ["結論", "良い", "課題", "合言葉", "ドリル 10秒×3本", "こう見える", "真横・5m"];
+  // 各欄の入力補助（プレースホルダー）は固定の文言。
+  expect([...form.querySelectorAll("textarea")].map((a) => a.getAttribute("placeholder"))).toEqual([
+    "残すべき所を1つ",
+    "一番の課題を1つ。なぜ遅くなるかまで書く",
+    "ドリル名と回数（例：壁押しドリル 10秒×3本）",
+    "自分なら明日から何をするか、具体的に書く",
+  ]);
+  const values = ["良い", "課題", "ドリル 10秒×3本", "明日からこうする"];
   const areas = [...form.querySelectorAll("textarea")] as HTMLTextAreaElement[];
   for (const [i, v] of values.entries()) await fillTextarea(areas[i], v);
   await act(async () => submitButton("返答を送る").click());
   const payload = JSON.parse(sentBody);
-  expect(payload).toMatchObject({
-    hitokoto: "結論",
+  expect(payload).toEqual({
     good_point: "良い",
     fix_points: ["課題"],
-    cue: "合言葉",
     drill: "ドリル 10秒×3本",
-    success_criteria: "こう見える",
-    next_video: "真横・5m",
+    hitokoto: "明日からこうする",
+    demo_video_public_id: "",
   });
-  expect(document.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
-});
-
-// 本体 #1013 B2: 新規3欄のいずれかが空だと送れず、その欄に指摘が出る（サーバーが 422 を返した想定）。
-it.each([
-  [3, "cue", "キューを入力してください"],
-  [5, "success_criteria", "成功の目安を入力してください"],
-  [6, "next_video", "次に撮る動画を入力してください"],
-] as const)("B2: 新規の欄（%s 番目）が空だと送信できず、その欄に指摘が出る", async (index, key, message) => {
-  let sentBody = "";
-  apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
-    if (!options?.method && path.includes("/consultations")) return emptyRoom;
-    if (options?.method === "POST") {
-      const payload = JSON.parse(options.body ?? "{}");
-      sentBody = JSON.stringify(payload);
-      if (!payload[key]) {
-        throw new ApiRequestError(422, { error: { code: "validation_error", message: "入力を確認してください", fields: { [key]: message } } });
-      }
-      return responded;
-    }
-    return base;
-  });
-  await renderPage();
-  const areas = [...responseForm().querySelectorAll("textarea")] as HTMLTextAreaElement[];
-  for (const [i, area] of areas.entries()) {
-    if (i !== index) await fillTextarea(area, `入力${i}`);
+  for (const key of ["cue", "success_criteria", "next_video"]) {
+    expect(key in payload).toBe(false);
   }
-  await act(async () => submitButton("返答を送る").click());
-  expect(JSON.parse(sentBody)[key]).toBe("");
-  expect(document.querySelector('[role="status"]')).toBeNull();
-  // 指摘はその欄（同じ label の中）に出る。
-  const label = areas[index].closest("label")!;
-  expect(label.textContent).toContain(message);
-  expect(responseForm()).toBeTruthy();
+  expect(document.querySelector('[role="status"]')?.textContent).toContain("返答を送りました");
 });
 
 // 本体 #1013 補足 B5: 申込の選手情報は、値のある項目だけが相談内容と並んで出る。
