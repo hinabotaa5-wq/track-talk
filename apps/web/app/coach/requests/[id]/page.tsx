@@ -73,9 +73,6 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
   const [fix1, setFix1] = useState("");
   const [drill, setDrill] = useState("");
   const [hitokoto, setHitokoto] = useState("");
-  const [cue, setCue] = useState("");
-  const [success, setSuccess] = useState("");
-  const [nextVideo, setNextVideo] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const uploaded = useRef<{ file: File; id: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -97,7 +94,7 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!guard.allow([hitokoto, good, fix1, cue, drill, success, nextVideo].join("\n"))) return;
+    if (!guard.allow([good, fix1, drill, hitokoto].join("\n"))) return;
     if (!acquire()) return;
     setErrors({});
     try {
@@ -117,13 +114,10 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
         method: "POST",
         token,
         body: JSON.stringify({
-          hitokoto,
           good_point: good,
           fix_points: [fix1],
-          cue,
           drill,
-          success_criteria: success,
-          next_video: nextVideo,
+          hitokoto,
           demo_video_public_id: demo,
         }),
       });
@@ -143,14 +137,11 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
         {t(locale, "coach.detail.contactNote")}
       </p>
       {guard.warning}
-      {/* 回答の型（本体 #1013）：一言診断→良い点→ボトルネック→キュー→ドリル→成功の目安→次に撮る動画。長く書かせず、型で濃くする。 */}
-      <Field label={L("一言診断")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} placeholder={L("結論を1行で")} />
+      {/* 回答の型（本体 #1067）：良い点→改善点→おすすめのドリル→コーチなら明日から何をするか（hitokoto 列を流用）。長く書かせず、型で濃くする。 */}
       <Field label={t(locale, "coach.detail.good")} value={good} onChange={setGood} error={errors.good_point} placeholder={L("残すべき所を1つ")} />
-      <Field label={L("ボトルネック")} value={fix1} onChange={setFix1} error={errors.fix_points} placeholder={L("一番の課題を1つ。なぜ遅くなるかまで書く")} />
-      <Field label={L("キュー")} value={cue} onChange={setCue} error={errors.cue} placeholder={L("直し方の合言葉を1つ（例：地面を真下に押す）")} />
+      <Field label={L("改善点")} value={fix1} onChange={setFix1} error={errors.fix_points} placeholder={L("一番の課題を1つ。なぜ遅くなるかまで書く")} />
       <Field label={t(locale, "coach.detail.drill")} value={drill} onChange={setDrill} error={errors.drill} placeholder={L("ドリル名と回数（例：壁押しドリル 10秒×3本）")} />
-      <Field label={L("成功の目安")} value={success} onChange={setSuccess} error={errors.success_criteria} placeholder={L("できたら動画でこう見える、を書く")} />
-      <Field label={L("次に撮る動画")} value={nextVideo} onChange={setNextVideo} error={errors.next_video} placeholder={L("角度・距離を指定する（例：真横・5m離れて）")} />
+      <Field label={L("コーチなら明日から何をするか")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} placeholder={L("自分なら明日から何をするか、具体的に書く")} />
       <label className="block space-y-1 text-sm">
         <span className="font-semibold">{t(locale, "coach.detail.demoVideo", { seconds: maxReviewSeconds })}</span>
         <input

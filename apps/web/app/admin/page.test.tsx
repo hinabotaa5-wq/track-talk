@@ -172,3 +172,43 @@ it("コーチタブで国を表示し、「国を設定」で API を呼んで�
   expect(rows().map((li) => li.querySelector('[data-testid="coach-country"]')?.textContent)).toEqual(["国: US 🇺🇸", "国: JP 🇯🇵"]);
   expect(container.textContent).toContain("国を設定しました");
 });
+
+// 本体 #1067 W6: 試用期間の返答は 良い点→改善点→キュー→おすすめのドリル→成功の目安→次に撮る動画→コーチなら明日から何をするか→補足 の順で出る。
+it("W6: 試用期間の返答に改善点・おすすめのドリル・コーチなら明日から何をするかが順に出る", async () => {
+  const response = (id: string, extra: Record<string, unknown>) => ({
+    request_id: id, coach_id: "coach-1", coach_nickname: "審査コーチ", nth: 1, tier: "coach", event: "100m",
+    good_point: "腕振りが良い", fix_points: ["接地を直す"], drill: "もも上げ", clarification: null,
+    created_at: "2026-11-27T00:00:00Z", hidden_at: null, hitokoto: null, cue: null, success_criteria: null, next_video: null, ...extra,
+  });
+  mocks.api.mockImplementation((path: string) =>
+    Promise.resolve(
+      path.startsWith("/v1/admin/coaching/probation")
+        ? {
+            responses: [
+              response("r-new", { hitokoto: "明日から壁押しを毎日やる", clarification: "補足です" }),
+              response("r-v2", { hitokoto: "結論", cue: "地面を押す", success_criteria: "膝がそろう", next_video: "真横から" }),
+              response("r-none", {}),
+            ],
+          }
+        : path.startsWith("/v1/admin/coach-applications")
+          ? { applications: [], meta: { page: 1, per_page: 50, total: 0 } }
+          : path.startsWith("/v1/admin/reports") ? emptyList("reports") : emptyList("inquiries"),
+    ),
+  );
+  await act(async () => {
+    root.render(<ConfirmProvider><Page /></ConfirmProvider>);
+  });
+  await act(async () => {});
+  const coachTab = Array.from(container.querySelectorAll('[role="tab"]')).find((b) => b.textContent === "コーチ")!;
+  await act(async () => {
+    coachTab.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await act(async () => {});
+  const items = [...container.querySelectorAll("li")].filter((li) => li.textContent?.includes("審査コーチ"));
+  expect(items).toHaveLength(3);
+  const lines = (li: Element) => [...li.querySelectorAll("p.whitespace-pre-wrap")].map((p) => p.textContent);
+  expect(lines(items[0])).toEqual(["良い点: 腕振りが良い", "改善点: 接地を直す", "おすすめのドリル: もも上げ", "コーチなら明日から何をするか: 明日から壁押しを毎日やる", "補足: 補足です"]);
+  expect(lines(items[1])).toEqual(["良い点: 腕振りが良い", "改善点: 接地を直す", "キュー: 地面を押す", "おすすめのドリル: もも上げ", "成功の目安: 膝がそろう", "次に撮る動画: 真横から", "コーチなら明日から何をするか: 結論"]);
+  expect(lines(items[2])).toEqual(["良い点: 腕振りが良い", "改善点: 接地を直す", "おすすめのドリル: もも上げ"]);
+  expect(container.textContent).not.toContain("直す点");
+});
