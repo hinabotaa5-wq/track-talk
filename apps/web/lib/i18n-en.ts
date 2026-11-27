@@ -3172,6 +3172,8 @@ export const en: Readonly<Record<string, string>> = {
   "使えるクーポンがありません。別のお支払い方法を選んでください。": "You have no usable coupons. Choose another payment method.",
   "確定してクーポンで送る": "Confirm and send with a coupon",
   "¥500クーポン（残り {n} 枚）": "¥500 coupon ({n} left)",
+  // 本体 #1085 補足2：申込画面の支払い方法のクーポン選択肢だけ、英語表示は額面をドルで出す（¥160=$1）。
+  "¥{v0}クーポン（残り {n} 枚）": "${v0} coupon ({n} left)",
   "チケット（残り {n} 枚）": "Ticket ({n} left)",
   "クーポンの内訳": "Coupon breakdown",
   "価格 {price} − クーポン {coupon} ＝ お支払い {pay}": "Price {price} − coupon {coupon} = you pay {pay}",
