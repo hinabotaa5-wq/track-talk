@@ -754,6 +754,16 @@ export type ReviewCoachOption = {
   id: string; nickname: string | null; photo_url: string; events: CoachEvent[]; years: number; best_record: string; achievements: string;
 };
 
+// 選手の依頼一覧（GET /v1/me/coaching/requests）の1行。一覧ページが使う6項目だけ（本体 #1072）。
+export type MyReviewRequestListItem = {
+  id: string;
+  event: CoachEvent;
+  status: ReviewStatus;
+  canceled_at: string | null;
+  withdrawal: ReviewWithdrawal | null;
+  created_at: string;
+};
+
 export type ReviewRequest = {
   started_at?: string | null;
   canceled_at?: string | null;
