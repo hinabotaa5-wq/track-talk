@@ -74,7 +74,7 @@ class CouponTest(unittest.TestCase):
 
     def test_coupon_status_and_migration(self):
         self.assertEqual(counts.STATUS_COLUMNS[("coaching_coupons", "status")], ("unused", "reserved", "used", "expired", "canceled"))
-        self.assertEqual(counts.EXPECTED_MIGRATION, 201)
+        self.assertEqual(counts.EXPECTED_MIGRATION, 202)
 
     def test_partially_refunded_is_a_regular_state(self):
         # 本体 #1097：部分返金は正規の状態。状態の列挙には入れ、異常（FLAGGED_STATES）には入れない。
