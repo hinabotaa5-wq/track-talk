@@ -523,10 +523,9 @@ func (s *Server) syncStripeRefund(ctx context.Context, remote stripe.Refund) (bo
 		}
 		operation, err := capturedRefundOperation(ctx, tx, source, id, remote)
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 記録の無い返金は、成功か処理中のものだけを新しい操作として記録する。
-			if remote.Status != "succeeded" && remote.Status != "pending" {
-				return nil
-			}
+			// 記録の無い返金は新しい操作として記録する。失敗・取り消しで届いたものも失敗の記録として残し、
+			// 後から順不同で届く成功の知らせで生き返らせない（終端）。
+			terminal := remote.Status == "failed" || remote.Status == "canceled"
 			// アプリの別の返金処理（期限切れの自動返金など）が作った返金は、その処理の記録が持つ。
 			if v := remote.Metadata["ticket_refund_id"]; v != "" && !strings.HasPrefix(v, "captured-") {
 				return nil
@@ -548,7 +547,7 @@ func (s *Server) syncStripeRefund(ctx context.Context, remote stripe.Refund) (bo
 			if status != "captured" && status != "paid" && status != "partially_refunded" && (status != "refund_pending" || pending == 0) {
 				return nil
 			}
-			if refunded+pending+remote.Amount > amount {
+			if !terminal && refunded+pending+remote.Amount > amount {
 				return nil
 			}
 			operation = uuid.New()
