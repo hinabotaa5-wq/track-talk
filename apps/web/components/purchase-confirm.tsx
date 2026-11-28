@@ -9,6 +9,7 @@ import type { ConfirmRow } from "@/lib/purchase-confirm";
 // PurchaseConfirm は、支払い画面へ進む前の最終確認（本体 #569）。確定ボタンを押すまで、何も送らず・何も確保しない。
 // 確定を押してから画面が移るまで（pending のあいだ）は、画面全体を覆ってストップウォッチを回し、pendingLabel の文言を出す（本体 #917）。
 // pendingLabel を渡さないときは「処理しています」。待ちが見えるよう、遅らせずに pending になった最初の描画から出す。
+// pending のあいだは、この部品のオーバーレイ以外の部分を inert にして背面を不活性化する（操作できなくなる保証を、フォーカスの所在だけに依存させない）。
 export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending, confirmDisabled, pendingLabel, children }: {
   rows: ConfirmRow[];
   confirmLabel: string;
@@ -20,15 +21,29 @@ export function PurchaseConfirm({ rows, confirmLabel, onConfirm, onBack, pending
   children?: React.ReactNode;
 }) {
   const overlay = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!pending) return;
     const previous = document.activeElement;
     overlay.current?.focus({ preventScroll: true });
-    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true }); };
+    const inerted: HTMLElement[] = [];
+    const section = sectionRef.current;
+    if (section) {
+      for (const child of section.children) {
+        if (child instanceof HTMLElement && child !== overlay.current) {
+          child.inert = true;
+          inerted.push(child);
+        }
+      }
+    }
+    return () => {
+      for (const element of inerted) element.inert = false;
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    };
   }, [pending]);
 
   return (
-    <section aria-labelledby="purchase-confirm-heading" className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-sm">
+    <section ref={sectionRef} aria-labelledby="purchase-confirm-heading" className="space-y-3 rounded-xl border border-blue-400/40 bg-blue-500/10 p-4 text-sm">
       <h2 id="purchase-confirm-heading" className="font-bold">{L("お申込み内容の確認")}</h2>
       <dl className="space-y-2">
         {rows.map((row) => (
