@@ -26,7 +26,7 @@ function CouponBalance({ coupons }: { coupons: CouponSummary }) {
       {coupons.available > 0 && coupons.next_expires_at ? (
         <p className="text-xs text-slate-200">{L("いちばん早い有効期限：{v0}。過ぎると使えなくなります。", { v0: formatDateTime(coupons.next_expires_at) })}</p>
       ) : null}
-      <p className="text-xs text-slate-300">{L("スタンダードの申込みで1回に1枚使えます。チケットとは一緒に使えません。")}</p>
+      <p className="text-xs text-slate-300">{L("申込みで1回に1枚使えます。チケットとは一緒に使えません。")}</p>
       {coupons.available > 0 ? (
         <Link href="/coaching" className="inline-block text-xs text-blue-300 underline">{L("コーチを選んでクーポンを使う")}</Link>
       ) : (

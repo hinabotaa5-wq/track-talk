@@ -111,3 +111,15 @@ it("希望価格の欄があり、入力した額を送る。未入力でも応�
   posted = apiFetch.mock.calls.filter(([, options]) => options?.method === "POST");
   expect(JSON.parse(posted.at(-1)![1].body)).toMatchObject({ desired_standard_price_yen: 1500, desired_premium_price_yen: 20000 });
 });
+
+// 本体 #1109 T2：希望価格の小数は、送信前に止まる。
+it("希望価格に小数（1500.5）を入れると送らずに止める（本体 #1109 T2）", async () => {
+  apiFetch.mockResolvedValue({ application });
+  await act(async () => root.render(<CoachApplyPage />));
+  const inputs = [...container.querySelectorAll("fieldset input")] as HTMLInputElement[];
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  await act(async () => { setter.call(inputs[0], "1500.5"); inputs[0].dispatchEvent(new Event("input", { bubbles: true })); });
+  await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(container.textContent).toContain("希望価格は500円以上の整数で入力してください");
+  expect(apiFetch.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+});

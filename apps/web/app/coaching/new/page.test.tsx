@@ -1409,3 +1409,20 @@ it("選んだコーチの有効価格を料金に出す（#1052 T10）", async (
   const choices = [...(paymentFieldset()?.querySelectorAll("button") ?? [])].map((b) => b.textContent);
   expect(choices).toEqual(["2,500円／回"]);
 });
+
+// 本体 #1109 T3：動画でないファイルは、種別チェックで早期に知らせて先へ進ませない。
+it("動画でないファイルを選ぶと「動画ファイルを選んでください」が出て、動画を選べば従来どおり進める（本体 #1109 T3）", async () => {
+  await renderCoupons("", 0, 0);
+  await pickVideo(new File(["x"], "memo.txt", { type: "text/plain" }));
+  expect(container.textContent).toContain("動画ファイルを選んでください");
+  const textarea = container.querySelector("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "後半に失速します。");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => container.querySelector("form")!.requestSubmit());
+  await act(async () => {});
+  expect(confirmSection()).toBeNull();
+  await pickVideo(new File(["x"], "run.mp4", { type: "video/mp4" }));
+  expect(container.textContent).not.toContain("動画ファイルを選んでください");
+});

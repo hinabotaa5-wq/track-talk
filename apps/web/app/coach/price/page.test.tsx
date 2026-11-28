@@ -14,6 +14,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, push: vi.fn() }
 const auth = vi.hoisted(() => ({ session: { user: { id: "coach" } } as unknown, token: "token" as string | null, loading: false }));
 vi.mock("@/components/auth-provider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/features", async (original) => ({ ...await original<typeof import("@/lib/features")>(), coachingEnabled: true }));
+// 見本動画の長さ読みは jsdom では実物が動かないため、プレミアム申込のテストと同じく差し替える（本体 #1109 T3）。
+vi.mock("@/lib/review", async (original) => ({ ...await original<typeof import("@/lib/review")>(), videoDuration: async () => 10 }));
 const apiFetch = vi.fn();
 // 添削項目・見本動画の節（本体 #1086）の呼び出しは offersFetch に分け、価格のテストの呼び出し回数を変えない。
 const offersFetch = vi.fn();
@@ -202,4 +204,31 @@ it("W1: 固定項目と同じタイトル・31文字は送らずに止める", a
   await submit(offerSection().querySelector("form")!);
   expect(offerSection().textContent).toContain("30文字以内");
   expect(offersFetch).toHaveBeenCalledTimes(1);
+});
+
+it("小数（1500.5）は送信前に「金額を整数で入力してください」で止まる（本体 #1109 T2）", async () => {
+  apiFetch.mockResolvedValue(prices());
+  await act(async () => root.render(<CoachPricePage />));
+  await typeInto(section("スタンダード").querySelector("input")!, "1500.5");
+  await submit(section("スタンダード").querySelector("form")!);
+  expect(section("スタンダード").textContent).toContain("金額を整数で入力してください");
+  expect(apiFetch).toHaveBeenCalledTimes(1);
+});
+
+it("見本動画に動画でないファイルを選ぶと「動画ファイルを選んでください」が出て取り込まれない（本体 #1109 T3）", async () => {
+  apiFetch.mockResolvedValue(prices());
+  offersFetch.mockResolvedValue(offers());
+  await act(async () => root.render(<CoachPricePage />));
+  const input = offerSection().querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, "files", { value: [new File(["x"], "demo.png", { type: "image/png" })], configurable: true });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  await act(async () => { await Promise.resolve(); });
+  expect(offerSection().textContent).toContain("動画ファイルを選んでください");
+  expect(offerSection().textContent).not.toContain("demo.png");
+  Object.defineProperty(input, "files", { value: [new File(["x"], "demo.mp4", { type: "video/mp4" })], configurable: true });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  // 動画の長さ読み（メタデータの成否イベント）は非同期なので、数回ゆだねてから確かめる。
+  for (let i = 0; i < 5; i++) await act(async () => { await Promise.resolve(); });
+  expect(offerSection().textContent).not.toContain("動画ファイルを選んでください");
+  expect(offerSection().textContent).toContain("demo.mp4");
 });
