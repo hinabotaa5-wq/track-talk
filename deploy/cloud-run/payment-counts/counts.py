@@ -7,12 +7,12 @@ import subprocess
 import sys
 import urllib.parse
 
-# Status enumerations as the code and migrations define them (checked through 000199).
+# Status enumerations as the code and migrations define them (checked through 000201).
 STATUS_COLUMNS = {
     ("review_payments", "status"): ("pending", "authorized", "captured", "canceled", "refund_pending", "partially_refunded", "refunded"),
     ("coaching_payments", "status"): ("pending", "paid", "refunded", "partially_refunded"),
     ("coaching_ticket_purchases", "status"): ("pending", "paid", "partially_refunded", "refunded"),
-    # partially_refunded（000199、本体 #1097）は Stripe ダッシュボードの部分返金を同期した正規の状態。FLAGGED_STATES には入れない。
+    # partially_refunded（000201、本体 #1097）は Stripe ダッシュボードの部分返金を同期した正規の状態。FLAGGED_STATES には入れない。
     ("coaching_consultations", "payment_state"): ("unpaid", "paid", "refund_pending", "partially_refunded", "refunded"),
     ("coaching_contracts", "fulfillment_state"): ("open", "refund_pending", "refund_failed", "settled"),
     ("captured_payment_refunds", "status"): ("pending", "succeeded", "failed"),
@@ -91,7 +91,7 @@ REQUIRED_COLUMNS = sorted({*STATUS_COLUMNS, ("review_payments", "request_id"), (
                            ("coaching_ticket_purchases", "owner_id"), ("coaching_ticket_purchases", "session_expires_at"),
                            ("coaching_ticket_reservations", "request_id"), ("captured_payment_refunds", "source"),
                            ("captured_payment_refunds", "payment_id")} | {(t, "earning_id" if t in ("review_payment_earning_links", "captured_refund_earnings") else "id") for t in ROW_COUNT_TABLES})
-EXPECTED_MIGRATION = 199
+EXPECTED_MIGRATION = 201
 
 # row_security=off makes RLS raise an error instead of silently hiding rows from the count.
 BEGIN = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL row_security = off;\n"

@@ -121,7 +121,7 @@ func setCapturedPayment(ctx context.Context, tx pgx.Tx, f capturedRefund) error 
 }
 
 // rebalanceCapturedRefundEarnings は、部分返金の累計に合わせてコーチ報酬の減額（相殺台帳）を差分だけ足す。
-// 丸めは floor(報酬額 × 返金累計 ÷ 支払額)。実体は migration 000199 の DB 関数（報酬を後から記録したときのトリガーと共通）。
+// 丸めは floor(報酬額 × 返金累計 ÷ 支払額)。実体は migration 000201 の DB 関数（報酬を後から記録したときのトリガーと共通）。
 func rebalanceCapturedRefundEarnings(ctx context.Context, tx pgx.Tx, source string, id uuid.UUID, anchor *uuid.UUID) error {
 	_, err := tx.Exec(ctx, `SELECT rebalance_captured_refund_earnings($1,$2,$3)`, source, id, anchor)
 	return err
