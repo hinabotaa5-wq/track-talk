@@ -15,7 +15,7 @@ import (
 const createReviewResponse = `-- name: CreateReviewResponse :one
 INSERT INTO review_responses (request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, hitokoto, cue, success_criteria, next_video)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video, summary
 `
 
 type CreateReviewResponseParams struct {
@@ -64,6 +64,7 @@ func (q *Queries) CreateReviewResponse(ctx context.Context, arg CreateReviewResp
 		&i.Cue,
 		&i.SuccessCriteria,
 		&i.NextVideo,
+		&i.Summary,
 	)
 	return i, err
 }
@@ -208,7 +209,7 @@ func (q *Queries) GetReviewRating(ctx context.Context, requestID uuid.UUID) (Rev
 }
 
 const getReviewResponse = `-- name: GetReviewResponse :one
-SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video FROM review_responses
+SELECT request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video, summary FROM review_responses
 WHERE request_id = $1
 `
 
@@ -234,6 +235,7 @@ func (q *Queries) GetReviewResponse(ctx context.Context, requestID uuid.UUID) (R
 		&i.Cue,
 		&i.SuccessCriteria,
 		&i.NextVideo,
+		&i.Summary,
 	)
 	return i, err
 }
@@ -598,7 +600,7 @@ SET clarify_body = $1::text,
 WHERE request_id = $3
   AND clarify_requested_at IS NULL
   AND hidden_at IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video, summary
 `
 
 type RequestReviewClarificationParams struct {
@@ -630,6 +632,7 @@ func (q *Queries) RequestReviewClarification(ctx context.Context, arg RequestRev
 		&i.Cue,
 		&i.SuccessCriteria,
 		&i.NextVideo,
+		&i.Summary,
 	)
 	return i, err
 }
@@ -664,7 +667,7 @@ SET clarification = $1::text,
 WHERE request_id = $2
   AND clarify_requested_at IS NOT NULL
   AND clarification IS NULL
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video, summary
 `
 
 type SaveReviewClarificationParams struct {
@@ -694,6 +697,7 @@ func (q *Queries) SaveReviewClarification(ctx context.Context, arg SaveReviewCla
 		&i.Cue,
 		&i.SuccessCriteria,
 		&i.NextVideo,
+		&i.Summary,
 	)
 	return i, err
 }

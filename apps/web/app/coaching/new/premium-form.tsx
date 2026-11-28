@@ -19,19 +19,20 @@ import { eagerVideoQuery, uploadVideoToCloudinary, type CloudinarySignature, typ
 import { maxReviewSeconds, reviewEvents, reviewPayMethodLabels, tooLong, videoDuration } from "@/lib/review";
 import { couponCashPrice, couponCount, type TicketSummary } from "@/lib/coaching-tickets";
 import { formatDateTime, formatDisplayPrice } from "@/lib/format";
-import { maxPremiumVideos, premiumSlotLabels, premiumSlots, premiumVideoInputLimits } from "@/lib/premium";
+import { defaultGroupTitle, maxPremiumVideos, premiumGroupInputLimits, premiumKindLabels, premiumKinds, premiumVideoInputLimits } from "@/lib/premium";
 import { premiumConfirmRows } from "@/lib/premium-confirm";
-import type { CoachEvent, PremiumSlot, ReviewCoachOption, ReviewEstimate, ReviewRequest } from "@/lib/types";
+import type { CoachEvent, PremiumKind, ReviewCoachOption, ReviewEstimate, ReviewRequest } from "@/lib/types";
 import { looksLikeContact } from "@/lib/solicitation";
 import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-// プレミアムの申込（本体 #1053）。/coaching/new?plan=premium&coach=… で開く（コーチ一覧のプレミアムタブから）。
-// 決まった5枠（レース全体／スタート／後半／練習／その他）に、合わせて1〜10本の動画を追加し、動画ごとに枠を選ぶ。
-// 入力はすべて任意：PB・目標タイムは申込全体に1回、レース全体の動画ごとに「この時のタイム・風速・その時の体のコンディション」、
-// 練習の動画ごとに「その練習をした目的」。相談内容の自由記述は置かない（枠と入力が代わり）。
+// プレミアムの申込（本体 #1053、補足 7231984993・補足2 7231991592）。/coaching/new?plan=premium&coach=… で開く（コーチ一覧のプレミアムタブから）。
+// 動画をテーマごとのグループに分けて、合わせて1〜6本を送る。グループはテンプレ（レース全体／スタート／後半／練習／その他）から作り、
+// テーマ名は変えられる。グループ数・グループごとの本数に制限はない（練習の動画だけ・1グループに6本でもよい）。
+// 入力はすべて任意：PB・目標タイムは申込全体に1回、グループごとに「何を意識して取り組んでいるか・何が目的か」、
+// レース全体のグループの動画ごとに「この時のタイム・風速・その時の体のコンディション」。相談内容の自由記述は置かない。
 // 価格はコーチのプレミアム価格（API の有効価格）。支払いはカード（クーポン併用可）。チケットは使えない。
 // 未成年の宣言・紹介ID・最終確認・カードの仮押さえはスタンダードと同じ流れ。
 
@@ -45,35 +46,41 @@ const chip = (on: boolean) =>
 type DraftVideo = {
   key: number;
   file: File;
-  slot: PremiumSlot;
   race_time: string;
   wind_speed: string;
   body_condition: string;
-  practice_purpose: string;
 };
 
-type VideoTextKey = "race_time" | "wind_speed" | "body_condition" | "practice_purpose";
+type DraftGroup = {
+  key: number;
+  kind: PremiumKind;
+  title: string;
+  focus_note: string;
+  videos: DraftVideo[];
+};
 
-function videoInputs(slot: PremiumSlot): { key: VideoTextKey; label: string; placeholder: string; multiline?: boolean }[] {
-  if (slot === "race") {
-    return [
-      { key: "race_time", label: L("この時のタイム"), placeholder: L("例：11秒02") },
-      { key: "wind_speed", label: L("風速"), placeholder: L("例：+1.2、向かい風で強い") },
-      { key: "body_condition", label: L("その時の体のコンディション"), placeholder: L("例：前日に脚が張っていた"), multiline: true },
-    ];
-  }
-  if (slot === "practice") return [{ key: "practice_purpose", label: L("その練習をした目的"), placeholder: L("例：加速局面の前傾を保つため"), multiline: true }];
-  return [];
+type VideoTextKey = "race_time" | "wind_speed" | "body_condition";
+
+// レース全体のグループの動画にだけ出す入力。
+function raceInputs(): { key: VideoTextKey; label: string; placeholder: string; multiline?: boolean }[] {
+  return [
+    { key: "race_time", label: L("この時のタイム"), placeholder: L("例：11秒02") },
+    { key: "wind_speed", label: L("風速"), placeholder: L("例：+1.2、向かい風で強い") },
+    { key: "body_condition", label: L("その時の体のコンディション"), placeholder: L("例：前日に脚が張っていた"), multiline: true },
+  ];
 }
 
-// 送る形：枠に合う入力だけを送り、空白だけ・未入力は null（サーバーも NULL で保存する）。
-function videoBody(video: DraftVideo, publicID: string) {
+// 送る形：グループの意識・目的と、レース全体のグループの動画の入力だけを送る。空白だけ・未入力は null（サーバーも NULL で保存する）。
+function groupBody(group: DraftGroup, publicIDs: string[]) {
   const text = (v: string) => v.trim() || null;
   return {
-    slot: video.slot,
-    video_public_id: publicID,
-    ...(video.slot === "race" ? { race_time: text(video.race_time), wind_speed: text(video.wind_speed), body_condition: text(video.body_condition) } : {}),
-    ...(video.slot === "practice" ? { practice_purpose: text(video.practice_purpose) } : {}),
+    kind: group.kind,
+    title: group.title.trim() || null,
+    focus_note: text(group.focus_note),
+    videos: group.videos.map((video, i) => ({
+      video_public_id: publicIDs[i],
+      ...(group.kind === "race" ? { race_time: text(video.race_time), wind_speed: text(video.wind_speed), body_condition: text(video.body_condition) } : {}),
+    })),
   };
 }
 
@@ -89,8 +96,9 @@ export function PremiumRequestForm() {
   const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
   const [pb, setPb] = useState("");
   const [goalTime, setGoalTime] = useState("");
-  const [videos, setVideos] = useState<DraftVideo[]>([]);
+  const [groups, setGroups] = useState<DraftGroup[]>([]);
   const nextKey = useRef(1);
+  const videos = groups.flatMap((group) => group.videos);
   const [method, setMethod] = useState<"card" | "coupon">("card");
   const [referralCode, setReferralCode] = useState("");
   const [referralWarning, setReferralWarning] = useState<ReferralWarning>(false);
@@ -183,7 +191,30 @@ export function PremiumRequestForm() {
     return () => { cancelled = true; };
   }, [token]);
 
-  async function addVideo(picked: File | null) {
+  function addGroup(kind: PremiumKind) {
+    setError("");
+    const key = nextKey.current++;
+    setGroups((prev) => [...prev, { key, kind, title: defaultGroupTitle(kind, prev.map((g) => g.title.trim())), focus_note: "", videos: [] }]);
+  }
+
+  function updateGroup(key: number, patch: Partial<DraftGroup>) {
+    setGroups((prev) => prev.map((g) => (g.key === key ? { ...g, ...patch } : g)));
+    setContactField(null);
+  }
+
+  // テンプレを変えたとき、テーマ名がまだ前のテンプレの既定のままなら、新しいテンプレの既定に合わせる。
+  function changeKind(group: DraftGroup, kind: PremiumKind) {
+    const others = groups.filter((g) => g.key !== group.key).map((g) => g.title.trim());
+    const untouched = group.title.trim() === "" || group.title.trim() === defaultGroupTitle(group.kind, others);
+    updateGroup(group.key, { kind, ...(untouched ? { title: defaultGroupTitle(kind, others) } : {}) });
+  }
+
+  function updateVideo(groupKey: number, videoKey: number, patch: Partial<DraftVideo>) {
+    setGroups((prev) => prev.map((g) => (g.key === groupKey ? { ...g, videos: g.videos.map((v) => (v.key === videoKey ? { ...v, ...patch } : v)) } : g)));
+    setContactField(null);
+  }
+
+  async function addVideo(groupKey: number, picked: File | null) {
     setError("");
     if (!picked) return;
     if (videos.length >= maxPremiumVideos) {
@@ -199,18 +230,18 @@ export function PremiumRequestForm() {
       return;
     }
     const key = nextKey.current++;
-    setVideos((prev) => prev.length >= maxPremiumVideos ? prev : [...prev, { key, file: picked, slot: "race", race_time: "", wind_speed: "", body_condition: "", practice_purpose: "" }]);
-  }
-
-  function updateVideo(key: number, patch: Partial<DraftVideo>) {
-    setVideos((prev) => prev.map((v) => (v.key === key ? { ...v, ...patch } : v)));
-    setContactField(null);
+    setGroups((prev) => prev.flatMap((g) => g.videos).length >= maxPremiumVideos ? prev
+      : prev.map((g) => (g.key === groupKey ? { ...g, videos: [...g.videos, { key, file: picked, race_time: "", wind_speed: "", body_condition: "" }] } : g)));
   }
 
   function texts(): { field: string; value: string }[] {
     const list = [{ field: "pb", value: pb }, { field: "goal_time", value: goalTime }];
-    for (const video of videos) {
-      for (const input of videoInputs(video.slot)) list.push({ field: `${video.key}.${input.key}`, value: video[input.key] });
+    for (const group of groups) {
+      list.push({ field: `${group.key}.title`, value: group.title }, { field: `${group.key}.focus_note`, value: group.focus_note });
+      if (group.kind !== "race") continue;
+      for (const video of group.videos) {
+        for (const input of raceInputs()) list.push({ field: `${group.key}.${video.key}.${input.key}`, value: video[input.key] });
+      }
     }
     return list;
   }
@@ -221,6 +252,9 @@ export function PremiumRequestForm() {
     if (!guard.allow(texts().map((t) => t.value).join("\n"))) return false;
     if (videos.length === 0) { setError(L("動画を1本以上追加してください")); return false; }
     if (videos.length > maxPremiumVideos) { setError(L("動画は全部で{max}本までです", { max: maxPremiumVideos })); return false; }
+    if (groups.some((g) => g.videos.length === 0)) { setError(L("動画が入っていないグループがあります。動画を入れるか、グループを外してください。")); return false; }
+    const titles = groups.map((g) => g.title.trim() || premiumKindLabels[g.kind]);
+    if (new Set(titles).size !== titles.length) { setError(L("同じテーマ名のグループがあります。テーマ名を変えてください")); return false; }
     if (method === "coupon" && !couponsUsable) { setError(L("使えるクーポンがありません。別のお支払い方法を選んでください。")); return false; }
     if (needsDeclaration && !declared) { setError(L("購入前の注意事項を確認して、チェックを入れてください。")); return false; }
     setError("");
@@ -249,22 +283,28 @@ export function PremiumRequestForm() {
         setReferralWarning(referralCheck);
         return;
       }
-      // 動画は追加した順に1本ずつ上げる。
-      const uploaded: ReturnType<typeof videoBody>[] = [];
+      // 動画はグループの順・グループ内の追加した順に1本ずつ上げる。
+      const uploaded: ReturnType<typeof groupBody>[] = [];
       setUploadPhase("upload");
-      for (const [index, video] of videos.entries()) {
-        const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
-        setUpload({ index, file: video.file, progress: { loaded: 0, total: video.file.size, percent: 0 } });
-        const payload = await uploadVideoToCloudinary(video.file, signed, token, (progress) => setUpload({ index, file: video.file, progress }));
-        if (payload.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
-        uploaded.push(videoBody(video, payload.public_id));
+      let index = 0;
+      for (const group of groups) {
+        const ids: string[] = [];
+        for (const video of group.videos) {
+          const at = index++;
+          const signed = await apiFetch<CloudinarySignature>(`/v1/uploads/coaching-video${eagerVideoQuery}`, { method: "POST", token });
+          setUpload({ index: at, file: video.file, progress: { loaded: 0, total: video.file.size, percent: 0 } });
+          const payload = await uploadVideoToCloudinary(video.file, signed, token, (progress) => setUpload({ index: at, file: video.file, progress }));
+          if (payload.public_id !== signed.public_id) throw new Error(L("アップロードに失敗しました"));
+          ids.push(payload.public_id);
+        }
+        uploaded.push(groupBody(group, ids));
       }
       setUploadPhase("saving");
       const created = await apiFetch<ReviewRequest>("/v1/coaching/requests", {
         method: "POST",
         token,
         body: JSON.stringify({
-          plan: "premium", tier, event, pb: pb.trim() || null, goal_time: goalTime.trim() || null, videos: uploaded,
+          plan: "premium", tier, event, pb: pb.trim() || null, goal_time: goalTime.trim() || null, groups: uploaded,
           method: "card", use_coupon: method === "coupon",
           referral_code: referralEligible ? referralCode : undefined, requested_coach_id: coach.id, ...declaration.body(needsDeclaration),
         }),
@@ -312,7 +352,7 @@ export function PremiumRequestForm() {
         <PurchaseConfirm
           rows={premiumConfirmRows({
             priceYen, couponYen, eventLabel: coachEventLabels[event], coachName: coach.nickname ?? undefined, pb, goalTime,
-            videos: videos.map((v) => ({ slot: v.slot, fileName: v.file.name, fileSizeBytes: v.file.size })),
+            groups: groups.map((g) => ({ title: g.title.trim() || premiumKindLabels[g.kind], count: g.videos.length })),
           })}
           confirmLabel={method === "coupon" && !cashPayment ? L("確定してクーポンで送る") : L("確定してお支払いへ")}
           onConfirm={() => void send()}
@@ -365,58 +405,98 @@ export function PremiumRequestForm() {
         <section aria-label={L("動画")} className="space-y-3 text-sm">
           <div className="space-y-1">
             <h2 className="font-semibold">{L("動画（{n}/{max}本・1本{seconds}秒まで）", { n: videos.length, max: maxPremiumVideos, seconds: maxReviewSeconds })}</h2>
-            <p className="text-xs text-slate-300">{L("動画ごとに枠を選んでください。同じ枠に何本でも入れられます。")}</p>
+            <p className="text-xs text-slate-300">{L("動画をテーマごとのグループに分けて送ります。グループはいくつ作っても、1つのグループに何本入れてもかまいません（練習の動画だけでも大丈夫です）。")}</p>
           </div>
-          <ol className="space-y-3" data-testid="premium-videos">
-            {videos.map((video, index) => (
-              <li key={video.key} data-testid="premium-video" className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate text-xs text-slate-300">{L("{n}本目：{name}", { n: index + 1, name: video.file.name })}</p>
-                  <button type="button" className="shrink-0 text-xs text-slate-300 underline" disabled={pending}
-                    onClick={() => setVideos((prev) => prev.filter((v) => v.key !== video.key))}>{L("外す")}</button>
-                </div>
-                <div className="flex flex-wrap gap-2" role="group" aria-label={L("枠")}>
-                  {premiumSlots.map((slot) => (
-                    <button key={slot} type="button" aria-pressed={video.slot === slot} disabled={pending} onClick={() => updateVideo(video.key, { slot })} className={chip(video.slot === slot)}>
-                      {premiumSlotLabels[slot]}
-                    </button>
-                  ))}
-                </div>
-                {videoInputs(video.slot).map((input) => {
-                  const field = `${video.key}.${input.key}`;
-                  const common = {
-                    name: input.key,
-                    value: video[input.key],
-                    placeholder: input.placeholder,
-                    maxLength: premiumVideoInputLimits[input.key],
-                    "aria-invalid": contactField === field || undefined,
-                    disabled: pending,
-                  };
-                  return (
-                    <label key={input.key} className="block space-y-1">
-                      <span className="block text-xs font-semibold text-slate-300">{L("{label}（任意）", { label: input.label })}</span>
-                      {input.multiline
-                        ? <Textarea rows={2} {...common} onChange={(e) => updateVideo(video.key, { [input.key]: e.target.value })} />
-                        : <Input {...common} onChange={(e) => updateVideo(video.key, { [input.key]: e.target.value })} />}
-                      {contactField === field ? contactError : null}
+          <ol className="space-y-3" data-testid="premium-groups">
+            {groups.map((group, groupIndex) => {
+              const titleField = `${group.key}.title`;
+              const noteField = `${group.key}.focus_note`;
+              return (
+                <li key={group.key} data-testid="premium-group" className="space-y-3 rounded-xl border border-white/20 bg-white/5 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-slate-300">{L("グループ{n}", { n: groupIndex + 1 })}</p>
+                    <button type="button" className="shrink-0 text-xs text-slate-300 underline" disabled={pending}
+                      onClick={() => setGroups((prev) => prev.filter((g) => g.key !== group.key))}>{L("グループを外す")}</button>
+                  </div>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label={L("テーマ")}>
+                    {premiumKinds.map((kind) => (
+                      <button key={kind} type="button" aria-pressed={group.kind === kind} disabled={pending} onClick={() => changeKind(group, kind)} className={chip(group.kind === kind)}>
+                        {premiumKindLabels[kind]}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="block space-y-1">
+                    <span className="block text-xs font-semibold text-slate-300">{L("テーマ名")}</span>
+                    <Input name="title" value={group.title} onChange={(e) => updateGroup(group.key, { title: e.target.value })} maxLength={premiumGroupInputLimits.title}
+                      aria-invalid={contactField === titleField || undefined} disabled={pending} />
+                    {contactField === titleField ? contactError : null}
+                  </label>
+                  <label className="block space-y-1">
+                    <span className="block text-xs font-semibold text-slate-300">{L("何を意識して取り組んでいるか・何が目的か（任意）")}</span>
+                    <Textarea rows={2} name="focus_note" value={group.focus_note} onChange={(e) => updateGroup(group.key, { focus_note: e.target.value })}
+                      placeholder={L("例：加速局面で前傾を保つことを意識している")} maxLength={premiumGroupInputLimits.focus_note}
+                      aria-invalid={contactField === noteField || undefined} disabled={pending} />
+                    {contactField === noteField ? contactError : null}
+                  </label>
+                  <ol className="space-y-2" data-testid="premium-videos">
+                    {group.videos.map((video, index) => (
+                      <li key={video.key} data-testid="premium-video" className="space-y-2 rounded-lg border border-white/15 bg-white/5 p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="min-w-0 truncate text-xs text-slate-300">{L("{n}本目：{name}", { n: index + 1, name: video.file.name })}</p>
+                          <button type="button" className="shrink-0 text-xs text-slate-300 underline" disabled={pending}
+                            onClick={() => updateGroup(group.key, { videos: group.videos.filter((v) => v.key !== video.key) })}>{L("外す")}</button>
+                        </div>
+                        {group.kind === "race" ? raceInputs().map((input) => {
+                          const field = `${group.key}.${video.key}.${input.key}`;
+                          const common = {
+                            name: input.key,
+                            value: video[input.key],
+                            placeholder: input.placeholder,
+                            maxLength: premiumVideoInputLimits[input.key],
+                            "aria-invalid": contactField === field || undefined,
+                            disabled: pending,
+                          };
+                          return (
+                            <label key={input.key} className="block space-y-1">
+                              <span className="block text-xs font-semibold text-slate-300">{L("{label}（任意）", { label: input.label })}</span>
+                              {input.multiline
+                                ? <Textarea rows={2} {...common} onChange={(e) => updateVideo(group.key, video.key, { [input.key]: e.target.value })} />
+                                : <Input {...common} onChange={(e) => updateVideo(group.key, video.key, { [input.key]: e.target.value })} />}
+                              {contactField === field ? contactError : null}
+                            </label>
+                          );
+                        }) : null}
+                      </li>
+                    ))}
+                  </ol>
+                  {videos.length < maxPremiumVideos ? (
+                    <label className="block space-y-1">
+                      <span className="font-semibold">{L("このグループに動画を追加する")}</span>
+                      <input
+                        className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
+                        type="file"
+                        accept="video/mp4,video/quicktime,video/webm"
+                        value=""
+                        onChange={(e) => void addVideo(group.key, e.target.files?.[0] ?? null)}
+                        disabled={pending}
+                      />
                     </label>
-                  );
-                })}
-              </li>
-            ))}
+                  ) : null}
+                </li>
+              );
+            })}
           </ol>
           {videos.length < maxPremiumVideos ? (
-            <label className="block space-y-1">
-              <span className="font-semibold">{L("動画を追加する")}</span>
-              <input
-                className="block w-full text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-white/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-100"
-                type="file"
-                accept="video/mp4,video/quicktime,video/webm"
-                value=""
-                onChange={(e) => void addVideo(e.target.files?.[0] ?? null)}
-                disabled={pending}
-              />
-            </label>
+            <div className="space-y-2" data-testid="premium-add-group">
+              <p className="font-semibold">{L("グループを追加する")}</p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label={L("グループを追加する")}>
+                {premiumKinds.map((kind) => (
+                  <button key={kind} type="button" disabled={pending} onClick={() => addGroup(kind)} className={chip(false)}>
+                    {L("＋{label}", { label: premiumKindLabels[kind] })}
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : null}
         </section>
 
@@ -444,7 +524,7 @@ export function PremiumRequestForm() {
             <p className="text-xs text-slate-300">{L("プレミアムはチケットでは申し込めません。")}</p>
           </fieldset>
         ) : null}
-        {estimate ? <p className="text-sm text-slate-100">{L("申し込みが確定してから24時間以内に総括が届きます。")}</p> : null}
+        {estimate ? <p className="text-sm text-slate-100">{L("申し込みが確定してから24時間以内に、グループごとの回答とまとめが届きます。")}</p> : null}
         <p className="text-xs text-slate-300">{L("期限までに回答が届かなかった場合は、お支払いを取り消すか全額を返金します。チケット・クーポンは返還します。")}</p>
         {needsDeclaration ? <MinorPurchaseDeclaration checked={declared} onChange={declaration.setChecked} onShown={declaration.markShown} disabled={pending} /> : null}
         <Button type="submit" className="w-full bg-[#0d3d8f] hover:bg-[#0a49c2] active:bg-[#0c2654]" disabled={pending || !estimate || videos.length === 0 || (needsDeclaration && !declared)}>
