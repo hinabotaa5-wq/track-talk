@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -490,5 +491,52 @@ func TestSupportRecordRetentionCopiesEndOnContractDeletion(t *testing.T) {
 	runRetentionCleanup(t, h, clock, atJST(2020, 3, 18, 0, 0, 0))
 	if countSupportRecords(t, keys) != 0 {
 		t.Fatal("not deleted after the extended deadline")
+	}
+}
+
+// 本体 #1103（T2）：support 系の削除ステップで止まらず、後段（動画の保持期限削除の後の未使用アセットの一覧取得）まで到達する。
+func TestStorageCleanupReachesStepsAfterSupportRecords(t *testing.T) {
+	var listed atomic.Int32
+	cloud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		listed.Add(1)
+		json.NewEncoder(w).Encode(map[string]any{"resources": []any{}})
+	}))
+	t.Cleanup(cloud.Close)
+	now := atJST(2040, 1, 1, 0, 0, 0)
+	h := setupConfig(t, func(c *config.Config) {
+		c.StorageCleanupSecret = "retention-reach"
+		c.Clock = func() time.Time { return now }
+		c.CloudName = "demo"
+		c.CloudAPIKey = "key"
+		c.CloudAPISecret = "secret"
+		c.CloudAPIBase = cloud.URL
+	})
+	coach := uuid.New()
+	execSQLArgs(t, `INSERT INTO profiles(id,nickname) VALUES($1,'retention')`, coach)
+	keys := map[string]string{}
+	for _, target := range supportRecordTables {
+		keys[target.table] = seedDetachedSupportRecord(t, target.table, coach, atJST(2026, 6, 1, 0, 0, 0), strp("2026-07-01"))
+	}
+	rec := cleanupRequest(h, "retention-reach")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("cleanup %d %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"consultations_purged", "message_rooms_purged", "videos", "unused_assets_deleted", "original_videos_replaced"} {
+		if _, ok := body[key]; !ok {
+			t.Fatalf("result has no %s: %s", key, rec.Body.String())
+		}
+	}
+	for _, target := range supportRecordTables {
+		if supportRecordExists(t, target.table, target.key, keys[target.table]) {
+			t.Fatalf("%s not deleted", target.table)
+		}
+	}
+	// 未使用アセットの削除（動画の保持期限削除の後のステップ）が、3種類の一覧を取りに行っている。
+	if n := listed.Load(); n < 3 {
+		t.Fatalf("unused asset listing reached %d times, want >= 3", n)
 	}
 }

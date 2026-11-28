@@ -158,3 +158,51 @@ it("T2・T5: 役務の内容は表示項目で申込み時の表示が適用さ�
   expect(html).toContain("海外コーチ プレミアム（パイロット）は 1件 20,000円（税込）。");
   expect(html).toContain("海外コーチ スタンダード（パイロット）は 1回 10,000円（税込）。");
 });
+
+// 本体 #1098：運営者が販売する「プレミアム」（本体 #1053）の表記。商品名は「プレミアム」とし、「国内」の仕切りは出さない（補足 7232491277）。
+it("T1: プレミアムの対象説明があり、海外コーチ プレミアム（パイロット）と区別できる", () => {
+  const html = renderToStaticMarkup(<CommercePage />);
+  expect(html).toContain("運営者が販売する「プレミアム」についての表記です。海外コーチを対象とするパイロット運用の商品は、別途「海外コーチ プレミアム（パイロット）」に記載します。");
+  expect(html).not.toContain("国内プレミアム");
+  // スタンダードの説明の後、海外コーチ プレミアム（パイロット）の説明の前に並べる。
+  const premium = html.indexOf("運営者が販売する「プレミアム」");
+  expect(premium).toBeGreaterThan(html.indexOf("運営者が販売する「スタンダード"));
+  expect(premium).toBeLessThan(html.indexOf("運営者が販売する「海外コーチ プレミアム（パイロット）」"));
+});
+
+it("T2: プレミアムの価格はコーチごとに異なり、表示場所を示す。固定額は載せない", () => {
+  const html = renderToStaticMarkup(<CommercePage />);
+  const p = "<p>プレミアムの価格（1回・税込）はコーチごとに異なります。各コーチのページと申込画面に表示します。</p>";
+  expect(html).toContain(p);
+  expect(p).not.toMatch(/[\d,]+円/);
+  expect(html).not.toMatch(/<p>プレミアム[^<]*\d[\d,]*円/);
+});
+
+it("T3: プレミアムの役務の内容・提供時期は再設計後の仕様（グループ・合計最大6本・まとめ・24時間以内）", () => {
+  const html = renderToStaticMarkup(<CommercePage />);
+  const content = "<p>プレミアムでは、動画をテーマごとにグループに分けて、合計最大6本までまとめて送れます。グループごとに、何を意識して取り組んでいるか・何が目的かを書けます。コーチは、グループごとの回答と、全体の「まとめ」を返却します。</p>";
+  expect(html).toContain(content);
+  for (const word of ["合計最大6本", "グループ", "まとめ"]) expect(content).toContain(word);
+  const timing = "<p>プレミアムの契約は申込み時に成立し、受付中のコーチが担当します。決済を確認した依頼がコーチの対応中一覧に表示された時刻から24時間以内に、グループごとの回答とまとめを返却します。夜間も含めて数えます。補足のため再提出した場合は、再提出から24時間後が新しい返却期限です。</p>";
+  expect(html).toContain(timing);
+  expect(timing).toContain("24時間以内");
+  // 旧仕様（固定5枠・最大10本）はプレミアムの段落に書かない（最大10本はパイロット商品の記載）。
+  expect(html).not.toMatch(/<p>プレミアム[^<]*(10本|5枠)/);
+});
+
+// 支払・返金はプレミアム申込の実装（premium.go の createPremiumReviewRequest → スタンダードと同じ checkout（card・capture manual）、
+// submitPremiumReviewResponse → captureReturnedReview、キャンセル・期限切れ・返却・差し戻しは plan を問わない共通の処理）のとおり。
+it("T4: プレミアムの支払方法・支払時期・キャンセル・返金はスタンダードのカード払いと同じ扱いで書く", () => {
+  const html = renderToStaticMarkup(<CommercePage />);
+  expect(html).toContain("<p>プレミアムもインターネットの通信料は利用者の負担です。</p>");
+  expect(html).toContain("<p>プレミアムもクレジットカード（Apple Pay・Google Pay を含む）。1回ごとのお支払いです。チケットは使えません。</p>");
+  expect(html).toContain("<p>プレミアムのクレジットカード払いは、申込みの時に代金を確保し、回答（グループごとの回答とまとめ）が返却された時に確定します。</p>");
+  expect(html).toContain("<p>プレミアムのキャンセル・返金は、スタンダードのクレジットカード払いと同じ扱いです。コーチが対応を始める前は依頼画面からキャンセルできます。着手後は利用者都合でキャンセルできません。期限までに回答が返らなかった場合、コーチが理由を示して依頼を返却した場合、差し戻しから24時間以内（夜間も含めて数えます）に再提出がなかった場合は、申込みは終了します。これらの場合は代金の確保を取り消し、代金はお支払いいただきません。差し戻しの間は代金の確保の取消しはしません。終了した依頼は別のコーチには回りません。</p>");
+  // 各欄で、プレミアムの段落は海外コーチ プレミアム（パイロット）の段落の前に置く。
+  for (const [mine, pilot] of [
+    ["<p>プレミアムの価格", "<p>海外コーチ プレミアム（パイロット）は 1件"],
+    ["<p>プレミアムもクレジットカード", "<p>海外コーチ プレミアム（パイロット）はクレジットカード"],
+    ["<p>プレミアムのクレジットカード払い", "<p>海外コーチ プレミアム（パイロット）はお申込み"],
+    ["<p>プレミアムのキャンセル", "<p>海外コーチ プレミアム（パイロット）は、回答が提供される前"],
+  ]) expect(html.indexOf(mine)).toBeLessThan(html.indexOf(pilot));
+});
