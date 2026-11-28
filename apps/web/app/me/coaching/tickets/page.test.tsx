@@ -59,7 +59,7 @@ it("¥500 クーポンの枚数といちばん早い有効期限を出し、使�
   const section = container.querySelector('section[aria-label="クーポンの残り"]');
   expect(section?.textContent).toContain("¥500クーポンの残り 2枚");
   expect(section?.textContent).toContain("いちばん早い有効期限：");
-  expect(section?.textContent).toContain("スタンダードの申込みで1回に1枚使えます。チケットとは一緒に使えません。");
+  expect(section?.textContent).toContain("申込みで1回に1枚使えます。チケットとは一緒に使えません。");
   expect(section?.querySelector('a[href="/coaching"]')?.textContent).toBe("コーチを選んでクーポンを使う");
 });
 

@@ -107,6 +107,8 @@ function OfferEditor({ data, token, onChange, message, onEdit }: { data: CoachOf
   async function pickVideo(file: File | null) {
     setError("");
     if (!file) return;
+    // 種別（MIME）が動画でないファイルは、容量・長さを見る前に知らせる（本体 #1109）。
+    if (!file.type.startsWith("video/")) { setError(L("動画ファイルを選んでください")); return; }
     if (file.size > maxDemoBytes) { setError(L("見本動画のサイズが大きすぎます（100MBまで）")); return; }
     if (tooLong(await videoDuration(file))) { setError(L("見本動画は{seconds}秒以内にしてください", { seconds: maxReviewSeconds })); return; }
     setVideos((prev) => (prev.length >= maxVideos ? prev : [...prev, { key: `f${Date.now()}-${file.name}`, file }]));

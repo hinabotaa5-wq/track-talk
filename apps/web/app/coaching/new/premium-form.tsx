@@ -234,6 +234,11 @@ export function PremiumRequestForm() {
   async function addVideo(groupKey: number, picked: File | null) {
     setError("");
     if (!picked) return;
+    // 種別（MIME）が動画でないファイルは、容量・長さを見る前に知らせる（本体 #1109）。
+    if (!picked.type.startsWith("video/")) {
+      setError(L("動画ファイルを選んでください"));
+      return;
+    }
     if (videos.length >= maxPremiumVideos) {
       setError(L("動画は全部で{max}本までです", { max: maxPremiumVideos }));
       return;

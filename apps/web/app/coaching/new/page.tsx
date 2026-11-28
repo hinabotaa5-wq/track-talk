@@ -291,6 +291,12 @@ function StandardRequestPage() {
     setError("");
     setFile(picked);
     if (!picked) return;
+    // 種別（MIME）が動画でないファイルは、長さを見る前に知らせる（本体 #1109）。
+    if (!picked.type.startsWith("video/")) {
+      setError(L("動画ファイルを選んでください"));
+      setFile(null);
+      return;
+    }
     if (tooLong(await videoDuration(picked))) {
       setError(L("動画は{maxReviewSeconds}秒以内にしてください", { maxReviewSeconds }));
       setFile(null);

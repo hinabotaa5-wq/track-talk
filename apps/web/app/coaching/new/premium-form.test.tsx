@@ -146,6 +146,20 @@ it("合計6本で追加の入口が消える。1つのグループに6本入れ�
   expect(container.querySelector('[data-testid="premium-add-group"]')).toBeNull();
 });
 
+it("動画でないファイルを選ぶと「動画ファイルを選んでください」が出て取り込まれず、動画は従来どおり取り込まれる（本体 #1109 T3）", async () => {
+  await render();
+  await addGroup("レース全体");
+  const group = groups()[0];
+  const input = group.querySelector('input[type="file"]') as HTMLInputElement;
+  Object.defineProperty(input, "files", { configurable: true, value: [new File(["x"], "memo.png", { type: "image/png" })] });
+  await act(async () => { input.dispatchEvent(new Event("change", { bubbles: true })); });
+  await flush();
+  expect(container.textContent).toContain("動画ファイルを選んでください");
+  expect(group.querySelector('input[name="race_time"]')).toBeNull();
+  await addVideo(group, "race.mp4");
+  expect(container.textContent).not.toContain("動画ファイルを選んでください");
+  expect(group.querySelector('input[name="race_time"]')).not.toBeNull();
+});
 it("利用者を切り替えると、前の利用者のクーポン残数は新しい取得が終わるまで出さない（本体 #1108 T1）", async () => {
   let resolveTickets!: (value: unknown) => void;
   apiFetch.mockImplementation(async (path: string, options?: { token?: string }) => {
