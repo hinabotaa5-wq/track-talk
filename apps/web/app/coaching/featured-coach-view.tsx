@@ -79,12 +79,30 @@ export function FeaturedCoachView({ coachIDs }: { coachIDs: readonly string[] })
 // チケットの販売は終了した（本体 #1031）ので、「チケットを買う」は出さない。
 // 受付中の固定 CTA（本体 #1041）。タップした瞬間から下部タブと同じ「画面を開いています」の幕（ScreenLoader）を出す。
 // React 起動前のタップは data-pending-link／data-screen-loader を起動スクリプトと CSS が拾う。
-function FeaturedCtaLink({ href, children }: { href: string; children: ReactNode }) {
+// プレミアムだけ黒×ゴールドの高級仕様にする（本体 #1088）。スタンダードのクラスは変えない。大きさ・角丸・余白・太さ・タップ時の縮みは共通。
+const premiumCtaClass = "flex min-h-11 flex-1 items-center justify-center rounded-md border border-[#C9A227] bg-[linear-gradient(135deg,#0D0D0D,#2B2B2B)] px-3 text-sm font-semibold text-pure-white shadow-[inset_0_1px_0_rgba(255,215,120,0.45),0_2px_8px_rgba(0,0,0,0.35)] transition active:scale-[0.98]";
+const standardCtaClass = "flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]";
+
+function FeaturedCtaLink({ href, premium, children }: { href: string; premium: boolean; children: ReactNode }) {
   const id = useId();
   return (
-    <Link href={href} data-pending-link="" data-screen-loader="" onNavigate={() => markLinkPending(id, href)} className="flex min-h-11 flex-1 items-center justify-center rounded-md bg-[#EF442D] px-3 text-sm font-semibold text-pure-white transition active:scale-[0.98]">
+    <Link href={href} data-pending-link="" data-screen-loader="" onNavigate={() => markLinkPending(id, href)} className={premium ? premiumCtaClass : standardCtaClass}>
       {children}
     </Link>
+  );
+}
+
+// プレミアムのラベルを最初のスペースで「名称」と「価格」に分け、名称を金、価格を白で描く（本体 #1088）。全体の文字列は従来どおり。
+// ボタンは flex なので、間のスペースが消えないよう1つのインライン要素で包む。
+function PremiumCtaLabel({ label }: { label: string }) {
+  const at = label.indexOf(" ");
+  if (at < 0) return <span><span className="tracking-[0.06em] text-[#E8C766]">{label}</span></span>;
+  return (
+    <span>
+      <span className="tracking-[0.06em] text-[#E8C766]">{label.slice(0, at)}</span>
+      {" "}
+      <span className="text-pure-white">{label.slice(at + 1)}</span>
+    </span>
   );
 }
 
@@ -106,8 +124,8 @@ function FeaturedContent({ result }: { result: Loaded }) {
     ? L("プレミアム ¥{v0}", { v0: displayPriceAmount(coach.premium_price_yen) })
     : null;
   const ctas = [
-    { label: standardLabel, href: `/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card` },
-    ...(premiumLabel ? [{ label: premiumLabel, href: premiumRequestHref(coach.id) }] : []),
+    { label: standardLabel, href: `/coaching/new?coach=${encodeURIComponent(coach.id)}&pay=card`, premium: false },
+    ...(premiumLabel ? [{ label: premiumLabel, href: premiumRequestHref(coach.id), premium: true }] : []),
   ];
   const open = coach.on_duty;
 
@@ -135,11 +153,14 @@ function FeaturedContent({ result }: { result: Loaded }) {
           {open ? null : <p className="text-center text-xs font-semibold text-red-400">{L("現在は受付を停止しています")}</p>}
           <div className="flex gap-2">
             {ctas.map((item) => open ? (
-              <FeaturedCtaLink key={item.href} href={item.href}>
-                {item.label}
+              <FeaturedCtaLink key={item.href} href={item.href} premium={item.premium}>
+                {item.premium ? <PremiumCtaLabel label={item.label} /> : item.label}
               </FeaturedCtaLink>
             ) : (
-              <span key={item.href} aria-disabled="true" className="flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400">
+              // 停止中のプレミアムは黒系の背景と薄い金の枠でスタンダードと区別する。文字は灰色のまま色分けしない（本体 #1088）。
+              <span key={item.href} aria-disabled="true" className={item.premium
+                ? "flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md border border-[#C9A227]/40 bg-[linear-gradient(135deg,#0D0D0D,#2B2B2B)] px-3 text-sm font-semibold text-slate-400"
+                : "flex min-h-11 flex-1 cursor-not-allowed items-center justify-center rounded-md bg-white/10 px-3 text-sm font-semibold text-slate-400"}>
                 {item.label}
               </span>
             ))}

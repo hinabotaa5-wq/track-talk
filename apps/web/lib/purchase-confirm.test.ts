@@ -244,3 +244,31 @@ describe("reviewConfirmRows の申込内容の行（本体 #845）", () => {
   });
 });
 
+
+describe("reviewConfirmRows の「得られるもの」行（本体 #1086 W4、#1085 のドル表示との合成）", () => {
+  const base = { method: "card" as const, priceYen: 1000, couponYen: 500, hasVideo: true, question: "相談", eventLabel: "100m", videoFileName: "run.mp4", videoFileSizeBytes: 1 };
+  const titles = ["良い点", "改善点", "おすすめのドリル", "コーチなら明日から何をするか", "スタート局面の詳しい分析"];
+
+  it("offerTitles を渡したときだけ内容の直後に「、」で連結した行を出す", () => {
+    setActiveLocale("ja");
+    const rows = reviewConfirmRows({ ...base, offerTitles: titles });
+    const labels = rows.map((r) => r.label);
+    expect(labels.indexOf("得られるもの")).toBe(labels.indexOf("内容") + 1);
+    expect(rows.find((r) => r.label === "得られるもの")?.value).toBe(titles.join("、"));
+    expect(reviewConfirmRows(base).some((r) => r.label === "得られるもの")).toBe(false);
+    expect(reviewConfirmRows({ ...base, offerTitles: [] }).some((r) => r.label === "得られるもの")).toBe(false);
+  });
+
+  it("英語表示ではラベルだけ訳し、追加項目は原文のまま。同じ確認の金額はドルのまま", () => {
+    installEnglish(en);
+    setActiveLocale("en");
+    try {
+      const rows = reviewConfirmRows({ ...base, offerTitles: titles });
+      expect(rows.find((r) => r.label === en["得られるもの"])?.value).toContain("スタート局面の詳しい分析");
+      expect(rows.find((r) => r.label === en["クーポン"])?.value).toBe(en["−{v0}（¥500クーポン1枚）"].replace("{v0}", "$3.13"));
+      expect(rows.find((r) => r.label === en["お支払い額"])?.value).toBe(en["{v0}（税込）"].replace("{v0}", "$3.13"));
+    } finally {
+      setActiveLocale("ja");
+    }
+  });
+});
