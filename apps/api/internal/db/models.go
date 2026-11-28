@@ -1465,6 +1465,7 @@ type ReviewRequest struct {
 	CouponDiscountYen   int32      `json:"coupon_discount_yen"`
 	Plan                string     `json:"plan"`
 	OfferItems          []string   `json:"offer_items"`
+	FocusNote           *string    `json:"focus_note"`
 }
 
 type ReviewRequestVideo struct {

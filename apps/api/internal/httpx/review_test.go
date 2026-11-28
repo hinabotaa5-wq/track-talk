@@ -399,7 +399,8 @@ func TestCoachDutyToggleStopsNewRequestsOnly(t *testing.T) {
 	}
 }
 
-// TestReviewRequestAthleteInfo は、申込の任意4項目（本体 #1013 補足：PB・目標タイム・風速・その時の体のコンディション）を確かめる。
+// TestReviewRequestAthleteInfo は、申込の任意4項目（本体 #1013 補足：PB・目標タイム・風速・その時の体のコンディション）と、
+// 5項目目の「意識していること」（focus_note、本体 #1093 の A1〜A3）を確かめる。
 func TestReviewRequestAthleteInfo(t *testing.T) {
 	fakeCoachingCloudinary(t)
 	h := setup(t)
@@ -411,8 +412,10 @@ func TestReviewRequestAthleteInfo(t *testing.T) {
 		GoalTime      *string `json:"goal_time"`
 		WindSpeed     *string `json:"wind_speed"`
 		BodyCondition *string `json:"body_condition"`
+		FocusNote     *string `json:"focus_note"`
 	}
 	info := map[string]any{
+		"focus_note":     "接地で地面を押すこと",
 		"pb":             "11秒20（2025年）",
 		"goal_time":      "10秒台",
 		"wind_speed":     "+1.2",
@@ -428,7 +431,7 @@ func TestReviewRequestAthleteInfo(t *testing.T) {
 		if err := json.Unmarshal([]byte(body), &got); err != nil {
 			t.Fatalf("%s json %v %s", label, err, body)
 		}
-		for key, ptr := range map[string]*string{"pb": got.PB, "goal_time": got.GoalTime, "wind_speed": got.WindSpeed, "body_condition": got.BodyCondition} {
+		for key, ptr := range map[string]*string{"pb": got.PB, "goal_time": got.GoalTime, "wind_speed": got.WindSpeed, "body_condition": got.BodyCondition, "focus_note": got.FocusNote} {
 			w, ok := want[key].(string)
 			if !ok {
 				if ptr != nil || !strings.Contains(body, `"`+key+`":null`) {
@@ -450,7 +453,7 @@ func TestReviewRequestAthleteInfo(t *testing.T) {
 
 	// A6: 上限超過・連絡先らしき文字列は、その項目の名前つきで validation_error。上限ちょうどは通る長さ。
 	_, tv := demoRequester(t, h, tadmin)
-	limits := map[string]int{"pb": 100, "goal_time": 100, "wind_speed": 50, "body_condition": 300}
+	limits := map[string]int{"pb": 100, "goal_time": 100, "wind_speed": 50, "body_condition": 300, "focus_note": 300}
 	for key, limit := range limits {
 		body := reviewBodyFor(t, h, tv)
 		body[key] = strings.Repeat("あ", limit+1)
@@ -536,9 +539,9 @@ func TestReviewRequestAthleteInfo(t *testing.T) {
 	assertInfo("A7 create", rec.Body.String(), info)
 	var videoOnly infoView
 	_ = json.Unmarshal(rec.Body.Bytes(), &videoOnly)
-	var stored [4]*string
-	queryRowArgs(t, `SELECT pb, goal_time, wind_speed, body_condition FROM review_requests WHERE id = $1`, []any{videoOnly.ID}, &stored[0], &stored[1], &stored[2], &stored[3])
-	for i, want := range []string{"11秒20（2025年）", "10秒台", "+1.2", "前日に脚が張っていた"} {
+	var stored [5]*string
+	queryRowArgs(t, `SELECT pb, goal_time, wind_speed, body_condition, focus_note FROM review_requests WHERE id = $1`, []any{videoOnly.ID}, &stored[0], &stored[1], &stored[2], &stored[3], &stored[4])
+	for i, want := range []string{"11秒20（2025年）", "10秒台", "+1.2", "前日に脚が張っていた", "接地で地面を押すこと"} {
 		if stored[i] == nil || *stored[i] != want {
 			t.Fatalf("A7 stored[%d] %v", i, stored[i])
 		}

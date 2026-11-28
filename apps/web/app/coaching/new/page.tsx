@@ -31,7 +31,7 @@ import { couponCashPrice, couponCount, initialReviewPayment, parseReviewPayParam
 import { displayPriceAmount, formatDateTime, formatDisplayPrice } from "@/lib/format";
 import { reviewPriceYen } from "@/lib/review-pricing";
 import { offerTitles } from "@/lib/coach-offer";
-import { reviewAthleteInfoKeys, reviewAthleteInfoLabel, reviewConfirmRows, type ReviewAthleteInfo, type ReviewAthleteInfoKey } from "@/lib/purchase-confirm";
+import { reviewAthleteInfoKeys, reviewAthleteInfoLabel, reviewAthleteInfoMultilineKeys, reviewConfirmRows, type ReviewAthleteInfo, type ReviewAthleteInfoKey } from "@/lib/purchase-confirm";
 import type { CoachEvent, CoachingMe, ReviewCoachOption, ReviewEstimate, ReviewPayMethod, ReviewRequest } from "@/lib/types";
 import { looksLikeContact } from "@/lib/solicitation";
 import { useActionLock } from "@/lib/use-action-lock";
@@ -65,9 +65,10 @@ const chip = (on: boolean) =>
   }`;
 
 // 選手情報（任意）の上限と入力例（本体 #1013 補足）。サーバーの上限と同じ。
-const athleteInfoLimits: Record<ReviewAthleteInfoKey, number> = { pb: 100, goal_time: 100, wind_speed: 50, body_condition: 300 };
+const athleteInfoLimits: Record<ReviewAthleteInfoKey, number> = { focus_note: 300, pb: 100, goal_time: 100, wind_speed: 50, body_condition: 300 };
 function athleteInfoPlaceholder(key: ReviewAthleteInfoKey): string {
   switch (key) {
+    case "focus_note": return L("例：接地で地面を押すこと");
     case "pb": return L("例：11秒20（2025年）");
     case "goal_time": return L("例：10秒台");
     case "wind_speed": return L("例：+1.2、向かい風で強い");
@@ -490,10 +491,15 @@ function StandardRequestPage() {
             {reviewAthleteInfoKeys.map((key) => (
               <label key={key} className="block space-y-1">
                 <span className="block text-xs font-semibold text-slate-300">{reviewAthleteInfoLabel(key)}</span>
-                {key === "body_condition" ? (
+                {/* 「意識していること」（本体 #1093）だけ、何を書く欄かの補助文を添える。 */}
+                {key === "focus_note" ? (
+                  <span id="review-focus-note-help" className="block text-xs text-slate-400">{L("いま意識して取り組んでいること")}</span>
+                ) : null}
+                {reviewAthleteInfoMultilineKeys.includes(key) ? (
                   <Textarea
                     name={key}
                     rows={2}
+                    aria-describedby={key === "focus_note" ? "review-focus-note-help" : undefined}
                     value={athleteInfo[key] ?? ""}
                     onChange={(e) => { setAthleteInfo({ ...athleteInfo, [key]: e.target.value }); setAthleteInfoContact(null); }}
                     placeholder={athleteInfoPlaceholder(key)}

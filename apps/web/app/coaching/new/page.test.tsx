@@ -1220,13 +1220,15 @@ it.each([true, false])("B4: 選手情報の任意4欄を確認画面と送信内
   await render();
   const form = container.querySelector("form")!;
   const info = [...form.querySelectorAll("fieldset")].find((f) => f.querySelector("legend")?.textContent === "選手情報（任意）")!;
-  expect([...info.querySelectorAll("label > span")].map((s) => s.textContent)).toEqual(["PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]);
+  // 本体 #1093：「意識していること」（補助文つき）を相談内容の直下・PB の上に置く。
+  expect([...info.querySelectorAll("label > span")].map((s) => s.textContent)).toEqual(["意識していること", "いま意識して取り組んでいること", "PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]);
   // 相談内容の下に置く。
   expectAfter(info, form.querySelector("#review-question"));
   const inputs = [...info.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")];
-  expect(inputs.map((i) => i.name)).toEqual(["pb", "goal_time", "wind_speed", "body_condition"]);
-  expect(inputs.map((i) => i.required)).toEqual([false, false, false, false]);
-  expect(inputs.map((i) => i.maxLength)).toEqual([100, 100, 50, 300]);
+  expect(inputs.map((i) => i.name)).toEqual(["focus_note", "pb", "goal_time", "wind_speed", "body_condition"]);
+  expect(inputs.map((i) => i.required)).toEqual([false, false, false, false, false]);
+  expect(inputs.map((i) => i.maxLength)).toEqual([300, 100, 100, 50, 300]);
+  expect(inputs[0].getAttribute("placeholder")).toBe("例：接地で地面を押すこと");
   const setValue = async (el: HTMLInputElement | HTMLTextAreaElement, value: string) => {
     await act(async () => {
       const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -1236,9 +1238,10 @@ it.each([true, false])("B4: 選手情報の任意4欄を確認画面と送信内
   };
   await setValue(form.querySelector("textarea")!, "大会前の練習について相談したいです");
   if (filled) {
-    await setValue(inputs[0], "11秒20（2025年）");
-    await setValue(inputs[2], "+1.2");
-    await setValue(inputs[3], "前日に脚が張っていた");
+    await setValue(inputs[0], "接地で地面を押すこと");
+    await setValue(inputs[1], "11秒20（2025年）");
+    await setValue(inputs[3], "+1.2");
+    await setValue(inputs[4], "前日に脚が張っていた");
   }
   // 申込の動画は必須（#1036）。
   await pickVideo(new File(["x"], "run.mp4", { type: "video/mp4" }));
@@ -1248,23 +1251,24 @@ it.each([true, false])("B4: 選手情報の任意4欄を確認画面と送信内
   const labels = [...confirm.querySelectorAll("dt")].map((d) => d.textContent);
   const at = labels.indexOf("相談内容");
   if (filled) {
-    expect(labels.slice(at, at + 4)).toEqual(["相談内容", "PB（自己ベスト）", "風速", "その時の体のコンディション"]);
+    expect(labels.slice(at, at + 5)).toEqual(["相談内容", "意識していること", "PB（自己ベスト）", "風速", "その時の体のコンディション"]);
     const value = (label: string) => [...confirm.querySelectorAll("dt")].find((d) => d.textContent === label)!.nextElementSibling!.textContent;
+    expect(value("意識していること")).toBe("接地で地面を押すこと");
     expect(value("PB（自己ベスト）")).toBe("11秒20（2025年）");
     expect(value("風速")).toBe("+1.2");
     expect(value("その時の体のコンディション")).toBe("前日に脚が張っていた");
   }
-  for (const label of filled ? ["目標タイム"] : ["PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]) {
+  for (const label of filled ? ["目標タイム"] : ["意識していること", "PB（自己ベスト）", "目標タイム", "風速", "その時の体のコンディション"]) {
     expect(labels).not.toContain(label);
   }
   await act(async () => confirm.querySelector("button")!.click());
   const request = mocks.api.mock.calls.find(([path]) => path === "/v1/coaching/requests")!;
   const body = JSON.parse(request[1].body);
   expect(body.question).toBe("大会前の練習について相談したいです");
-  expect({ pb: body.pb, goal_time: body.goal_time, wind_speed: body.wind_speed, body_condition: body.body_condition }).toEqual(
+  expect({ focus_note: body.focus_note, pb: body.pb, goal_time: body.goal_time, wind_speed: body.wind_speed, body_condition: body.body_condition }).toEqual(
     filled
-      ? { pb: "11秒20（2025年）", goal_time: null, wind_speed: "+1.2", body_condition: "前日に脚が張っていた" }
-      : { pb: null, goal_time: null, wind_speed: null, body_condition: null },
+      ? { focus_note: "接地で地面を押すこと", pb: "11秒20（2025年）", goal_time: null, wind_speed: "+1.2", body_condition: "前日に脚が張っていた" }
+      : { focus_note: null, pb: null, goal_time: null, wind_speed: null, body_condition: null },
   );
   expect(body).not.toHaveProperty("goal_meet");
   expect(body).not.toHaveProperty("filming_context");

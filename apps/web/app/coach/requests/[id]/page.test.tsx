@@ -431,13 +431,14 @@ it("W1: 回答の型の4欄が順に出て、送信内容に cue・success_crite
 
 // 本体 #1013 補足 B5: 申込の選手情報は、値のある項目だけが相談内容と並んで出る。
 it("B5: 値のある選手情報だけが相談内容と並んで表示される", async () => {
-  const withInfo = { ...base, pb: "11秒20（2025年）", goal_time: null, wind_speed: "+1.2", body_condition: "" } as unknown as CoachReviewRequest;
+  const withInfo = { ...base, focus_note: "接地で地面を押すこと", pb: "11秒20（2025年）", goal_time: null, wind_speed: "+1.2", body_condition: "" } as unknown as CoachReviewRequest;
   apiFetch.mockImplementation(async (path: string) => (path.includes("/consultations") ? emptyRoom : withInfo));
   await renderPage();
   const request = container.querySelector('section[aria-label="依頼内容"]')!;
   const info = request.querySelector('dl[aria-label="選手情報"]')!;
-  expect([...info.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["PB（自己ベスト）", "風速"]);
-  expect([...info.querySelectorAll("dd")].map((d) => d.textContent)).toEqual(["11秒20（2025年）", "+1.2"]);
+  // 本体 #1093 W2：「意識していること」は値があるときだけ、選手情報の先頭に出る。
+  expect([...info.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["意識していること", "PB（自己ベスト）", "風速"]);
+  expect([...info.querySelectorAll("dd")].map((d) => d.textContent)).toEqual(["接地で地面を押すこと", "11秒20（2025年）", "+1.2"]);
   expect(request.textContent).toContain("スタートが遅いです");
   expect(questionHeadings()).not.toContain("相談内容");
   expect(request.textContent).not.toContain("目標タイム");
@@ -448,6 +449,7 @@ it("B5: 選手情報が1つも無い依頼（過去の申込）は、選手情�
   apiFetch.mockImplementation(async (path: string) => (path.includes("/consultations") ? emptyRoom : base));
   await renderPage();
   expect(container.querySelector('dl[aria-label="選手情報"]')).toBeNull();
+  expect(container.textContent).not.toContain("意識していること");
   expect(container.textContent).toContain("スタートが遅いです");
 });
 

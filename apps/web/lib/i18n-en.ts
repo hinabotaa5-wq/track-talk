@@ -1850,6 +1850,10 @@ export const en: Readonly<Record<string, string>> = {
   "例：10秒台": "e.g. 10.xx s",
   "例：+1.2、向かい風で強い": "e.g. +1.2, strong headwind",
   "例：前日に脚が張っていた": "e.g. legs felt tight from the day before",
+  // 申込の「意識していること」（本体 #1093）。
+  "意識していること": "What you're focusing on",
+  "いま意識して取り組んでいること": "What you're consciously working on right now",
+  "例：接地で地面を押すこと": "e.g. pushing the ground at foot contact",
   "おすすめのドリル": "Recommended drill",
   "見本動画": "Demo video",
   "確認質問（{v0}）": "Clarification question ({v0})",

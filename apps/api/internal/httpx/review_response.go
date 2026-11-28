@@ -172,6 +172,7 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 	out := s.coachRequestJSON(rr, coachSeesVideo(rr))
 	// 申込で選手が任意で書いた選手情報（本体 #1013 補足）。相談内容と並べて詳細でだけ見せる。未入力は null。
 	out["pb"], out["goal_time"], out["wind_speed"], out["body_condition"] = rr.Pb, rr.GoalTime, rr.WindSpeed, rr.BodyCondition
+	out["focus_note"] = rr.FocusNote // 意識していること（本体 #1093）
 	if err := s.withResponse(r.Context(), out, rr.ID); err != nil {
 		MapDBError(w, err)
 		return
