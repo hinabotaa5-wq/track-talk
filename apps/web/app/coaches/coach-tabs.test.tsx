@@ -189,7 +189,7 @@ it("英語でも見出しを出さず、切り替えの選択肢は Standard／P
   await act(async () => switchLink("Premium")!.click());
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
   const premiumPanel = panels().filter((panel) => !panel.hidden)[0].textContent ?? "";
-  expect(premiumPanel).toContain("Send up to 10 videos in total");
+  expect(premiumPanel).toContain("Send up to 6 videos in total, grouped by theme");
   expect(premiumPanel).toContain("Race, Start, Second half, Practice, Other");
   expect(premiumPanel).toMatch(/^[\x00-\x7F]*$/);
   expect(switchLink("Ongoing plan")).toBeUndefined();

@@ -28,7 +28,7 @@ describe("得られるもの（購入確認）", () => {
   });
 
   it("W9: プレミアムの購入確認には「得られるもの」の行を出さない", () => {
-    const rows = premiumConfirmRows({ priceYen: 30000, eventLabel: "100m", coachName: "テストコーチ", pb: "", goalTime: "", videos: [{ slot: "race", fileName: "a.mp4", fileSizeBytes: 1 }] });
+    const rows = premiumConfirmRows({ priceYen: 30000, eventLabel: "100m", coachName: "テストコーチ", pb: "", goalTime: "", groups: [{ title: "レース全体", count: 1 }] });
     expect(rows.some((r) => r.label === "得られるもの")).toBe(false);
   });
 

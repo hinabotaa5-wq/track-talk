@@ -12,24 +12,24 @@ import (
 )
 
 const createPremiumReviewResponse = `-- name: CreatePremiumReviewResponse :one
-INSERT INTO review_responses (request_id, coach_id, hitokoto, demo_video_public_id)
+INSERT INTO review_responses (request_id, coach_id, summary, demo_video_public_id)
 VALUES ($1, $2, $3, $4)
-RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video
+RETURNING request_id, coach_id, good_point, fix_points, drill, demo_video_public_id, created_at, clarify_reason, clarify_requested_at, clarification, clarified_at, helpful_asked_at, hidden_at, clarify_body, hitokoto, cue, success_criteria, next_video, summary
 `
 
 type CreatePremiumReviewResponseParams struct {
 	RequestID         uuid.UUID  `json:"request_id"`
 	CoachID           *uuid.UUID `json:"coach_id"`
-	Hitokoto          *string    `json:"hitokoto"`
+	Summary           *string    `json:"summary"`
 	DemoVideoPublicID *string    `json:"demo_video_public_id"`
 }
 
-// 総括の全体の一言診断（hitokoto）と任意の見本動画。スタンダードの型の欄は NULL のまま。
+// 最後の「まとめ」（summary）と任意の見本動画。スタンダードの型の欄と一言診断は NULL のまま。
 func (q *Queries) CreatePremiumReviewResponse(ctx context.Context, arg CreatePremiumReviewResponseParams) (ReviewResponse, error) {
 	row := q.db.QueryRow(ctx, createPremiumReviewResponse,
 		arg.RequestID,
 		arg.CoachID,
-		arg.Hitokoto,
+		arg.Summary,
 		arg.DemoVideoPublicID,
 	)
 	var i ReviewResponse
@@ -52,73 +52,128 @@ func (q *Queries) CreatePremiumReviewResponse(ctx context.Context, arg CreatePre
 		&i.Cue,
 		&i.SuccessCriteria,
 		&i.NextVideo,
+		&i.Summary,
 	)
 	return i, err
 }
 
 const createReviewRequestVideo = `-- name: CreateReviewRequestVideo :one
-
-INSERT INTO review_request_videos (request_id, position, slot, video_public_id, race_time, wind_speed, body_condition, practice_purpose)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING request_id, position, slot, video_public_id, race_time, wind_speed, body_condition, practice_purpose, created_at
+INSERT INTO review_request_videos (request_id, position, group_position, video_public_id, race_time, wind_speed, body_condition)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING request_id, position, video_public_id, race_time, wind_speed, body_condition, created_at, group_position
 `
 
 type CreateReviewRequestVideoParams struct {
-	RequestID       uuid.UUID `json:"request_id"`
-	Position        int16     `json:"position"`
-	Slot            string    `json:"slot"`
-	VideoPublicID   string    `json:"video_public_id"`
-	RaceTime        *string   `json:"race_time"`
-	WindSpeed       *string   `json:"wind_speed"`
-	BodyCondition   *string   `json:"body_condition"`
-	PracticePurpose *string   `json:"practice_purpose"`
+	RequestID     uuid.UUID `json:"request_id"`
+	Position      int16     `json:"position"`
+	GroupPosition int16     `json:"group_position"`
+	VideoPublicID string    `json:"video_public_id"`
+	RaceTime      *string   `json:"race_time"`
+	WindSpeed     *string   `json:"wind_speed"`
+	BodyCondition *string   `json:"body_condition"`
 }
 
-// プレミアム（本体 #1053）の動画と総括。
 func (q *Queries) CreateReviewRequestVideo(ctx context.Context, arg CreateReviewRequestVideoParams) (ReviewRequestVideo, error) {
 	row := q.db.QueryRow(ctx, createReviewRequestVideo,
 		arg.RequestID,
 		arg.Position,
-		arg.Slot,
+		arg.GroupPosition,
 		arg.VideoPublicID,
 		arg.RaceTime,
 		arg.WindSpeed,
 		arg.BodyCondition,
-		arg.PracticePurpose,
 	)
 	var i ReviewRequestVideo
 	err := row.Scan(
 		&i.RequestID,
 		&i.Position,
-		&i.Slot,
 		&i.VideoPublicID,
 		&i.RaceTime,
 		&i.WindSpeed,
 		&i.BodyCondition,
-		&i.PracticePurpose,
 		&i.CreatedAt,
+		&i.GroupPosition,
 	)
 	return i, err
 }
 
+const createReviewRequestVideoGroup = `-- name: CreateReviewRequestVideoGroup :exec
+
+INSERT INTO review_request_video_groups (request_id, position, kind, title, focus_note)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type CreateReviewRequestVideoGroupParams struct {
+	RequestID uuid.UUID `json:"request_id"`
+	Position  int16     `json:"position"`
+	Kind      string    `json:"kind"`
+	Title     string    `json:"title"`
+	FocusNote *string   `json:"focus_note"`
+}
+
+// プレミアム（本体 #1053、補足 7231984993 の再設計）の動画グループ・動画と返却。
+func (q *Queries) CreateReviewRequestVideoGroup(ctx context.Context, arg CreateReviewRequestVideoGroupParams) error {
+	_, err := q.db.Exec(ctx, createReviewRequestVideoGroup,
+		arg.RequestID,
+		arg.Position,
+		arg.Kind,
+		arg.Title,
+		arg.FocusNote,
+	)
+	return err
+}
+
 const createReviewResponseSection = `-- name: CreateReviewResponseSection :exec
-INSERT INTO review_response_sections (request_id, slot, body)
+INSERT INTO review_response_sections (request_id, group_position, body)
 VALUES ($1, $2, $3)
 `
 
 type CreateReviewResponseSectionParams struct {
-	RequestID uuid.UUID `json:"request_id"`
-	Slot      string    `json:"slot"`
-	Body      string    `json:"body"`
+	RequestID     uuid.UUID `json:"request_id"`
+	GroupPosition int16     `json:"group_position"`
+	Body          string    `json:"body"`
 }
 
 func (q *Queries) CreateReviewResponseSection(ctx context.Context, arg CreateReviewResponseSectionParams) error {
-	_, err := q.db.Exec(ctx, createReviewResponseSection, arg.RequestID, arg.Slot, arg.Body)
+	_, err := q.db.Exec(ctx, createReviewResponseSection, arg.RequestID, arg.GroupPosition, arg.Body)
 	return err
 }
 
+const listReviewRequestVideoGroups = `-- name: ListReviewRequestVideoGroups :many
+SELECT request_id, position, kind, title, focus_note, created_at FROM review_request_video_groups
+WHERE request_id = $1
+ORDER BY position
+`
+
+func (q *Queries) ListReviewRequestVideoGroups(ctx context.Context, requestID uuid.UUID) ([]ReviewRequestVideoGroup, error) {
+	rows, err := q.db.Query(ctx, listReviewRequestVideoGroups, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReviewRequestVideoGroup
+	for rows.Next() {
+		var i ReviewRequestVideoGroup
+		if err := rows.Scan(
+			&i.RequestID,
+			&i.Position,
+			&i.Kind,
+			&i.Title,
+			&i.FocusNote,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReviewRequestVideos = `-- name: ListReviewRequestVideos :many
-SELECT request_id, position, slot, video_public_id, race_time, wind_speed, body_condition, practice_purpose, created_at FROM review_request_videos
+SELECT request_id, position, video_public_id, race_time, wind_speed, body_condition, created_at, group_position FROM review_request_videos
 WHERE request_id = $1
 ORDER BY position
 `
@@ -135,13 +190,12 @@ func (q *Queries) ListReviewRequestVideos(ctx context.Context, requestID uuid.UU
 		if err := rows.Scan(
 			&i.RequestID,
 			&i.Position,
-			&i.Slot,
 			&i.VideoPublicID,
 			&i.RaceTime,
 			&i.WindSpeed,
 			&i.BodyCondition,
-			&i.PracticePurpose,
 			&i.CreatedAt,
+			&i.GroupPosition,
 		); err != nil {
 			return nil, err
 		}
@@ -154,12 +208,12 @@ func (q *Queries) ListReviewRequestVideos(ctx context.Context, requestID uuid.UU
 }
 
 const listReviewResponseSections = `-- name: ListReviewResponseSections :many
-SELECT request_id, slot, body FROM review_response_sections
+SELECT request_id, body, group_position FROM review_response_sections
 WHERE request_id = $1
-ORDER BY array_position(ARRAY['race', 'start', 'second_half', 'practice', 'other']::text[], slot)
+ORDER BY group_position
 `
 
-// 並びは枠の決まった順（レース全体→スタート→後半→練習→その他）。
+// 並びはグループの順（選手が作った順）。
 func (q *Queries) ListReviewResponseSections(ctx context.Context, requestID uuid.UUID) ([]ReviewResponseSection, error) {
 	rows, err := q.db.Query(ctx, listReviewResponseSections, requestID)
 	if err != nil {
@@ -169,7 +223,7 @@ func (q *Queries) ListReviewResponseSections(ctx context.Context, requestID uuid
 	var items []ReviewResponseSection
 	for rows.Next() {
 		var i ReviewResponseSection
-		if err := rows.Scan(&i.RequestID, &i.Slot, &i.Body); err != nil {
+		if err := rows.Scan(&i.RequestID, &i.Body, &i.GroupPosition); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

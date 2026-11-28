@@ -213,7 +213,7 @@ func (s *Server) resubmitReviewRequest(w http.ResponseWriter, r *http.Request) {
 		fields["question"] = "URL・メールアドレス・電話番号・SNS の ID など、連絡先らしきものは書けません"
 	}
 	if replace && rr.Plan == planPremium {
-		// プレミアムの動画は枠ごとに複数あるので、再提出では差し替えない（文章で答える。本体 #1053）。
+		// プレミアムの動画はグループごとに複数あるので、再提出では差し替えない（文章で答える。本体 #1053）。
 		fields["video_public_id"] = "プレミアムでは動画を差し替えられません。文章でコーチの質問に答えてください"
 	} else if replace && !cloudinary.ValidCoachingPublicID(video) {
 		fields["video_public_id"] = "動画を選び直してください"

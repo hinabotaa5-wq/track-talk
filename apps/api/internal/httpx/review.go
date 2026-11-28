@@ -302,9 +302,9 @@ type reviewRequestReq struct {
 	BodyCondition *string `json:"body_condition"`
 	// いま意識して取り組んでいること（本体 #1093）。任意・300字まで。空白だけ・未入力は NULL。
 	FocusNote *string `json:"focus_note"`
-	// プラン（standard／premium。空はスタンダード）と、プレミアムの動画（本体 #1053）。スタンダードでは videos を使わない。
+	// プラン（standard／premium。空はスタンダード）と、プレミアムの動画のグループ（本体 #1053 補足）。スタンダードでは groups を使わない。
 	Plan   string            `json:"plan"`
-	Videos []premiumVideoReq `json:"videos"`
+	Groups []premiumGroupReq `json:"groups"`
 	// 18歳未満が自分で払うときの、購入のたびの宣言（minor_purchase.go）。
 	minorDeclarationReq
 }

@@ -26,7 +26,7 @@ export default function ForCoachesPage() {
       <div className="space-y-3">
         <h1 className="text-2xl font-bold">{title}</h1>
         <p className="text-sm leading-7 text-slate-300">
-          TrackTalk is a Japanese service for sprinters — from high school athletes to serious amateurs — who want a coach&apos;s eye on their sprinting. Most of our athletes already train with a school or club coach; what they get from you is an expert second opinion from outside their usual environment, in two formats — a single video review, or a premium assessment across up to 10 videos.
+          TrackTalk is a Japanese service for sprinters — from high school athletes to serious amateurs — who want a coach&apos;s eye on their sprinting. Most of our athletes already train with a school or club coach; what they get from you is an expert second opinion from outside their usual environment, in two formats — a single video review, or a premium assessment across up to 6 videos.
         </p>
         <p className="text-sm leading-7 text-slate-300">We&apos;re inviting a small number of sprint coaches from overseas to join us.</p>
       </div>
@@ -40,7 +40,7 @@ export default function ForCoachesPage() {
         <p>
           <strong>2. Premium package (the deeper option)</strong>
           <br />
-          The athlete sends up to 10 videos at once, numbered so you can refer to them easily. You watch all of them and reply with one overall assessment — not a separate review of each video. The assessment gives a headline verdict, the top issues in priority order with the video numbers as evidence, a cue and drills for each, and the direction for the athlete&apos;s next training block.
+          The athlete sends up to 6 videos at once, grouped by theme (for example race, start or a practice drill — practice videos alone are fine) and with a note on what they are focusing on in each group. You watch all of them and write freely for each group, citing the group by name, then finish with one overall summary — not a separate review of each video.
         </p>
         <p>TrackTalk sells and supports both offers. Your part is the coaching itself — athletes never contact you directly, and we handle all communication.</p>
       </Rule>

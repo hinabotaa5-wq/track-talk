@@ -60,11 +60,13 @@ func (s *Server) reviewResponseJSON(rs db.ReviewResponse) map[string]any {
 	}
 	out := map[string]any{
 		"hidden": false,
-		// スタンダードの型の3欄。プレミアムの総括（本体 #1053）では null で、代わりに sections を出す。
+		// スタンダードの型の3欄。プレミアム（本体 #1053）では null で、代わりにグループごとの sections と summary を出す。
 		"good_point": stringOrNil(rs.GoodPoint),
 		"fix_points": rs.FixPoints,
 		"drill":      stringOrNil(rs.Drill),
 		"hitokoto":   rs.Hitokoto,
+		// プレミアムの最後のまとめ（本体 #1053 補足）。スタンダードでは null。
+		"summary": rs.Summary,
 		// 回答の新しい型の3欄（本体 #1013）。000191 より前の返答は null で、表示側で節ごと隠す。訳は付けない。
 		"cue":                  rs.Cue,
 		"success_criteria":     rs.SuccessCriteria,
@@ -178,7 +180,7 @@ func (s *Server) getCoachReviewRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.withReviewTranslations(r.Context(), out, rr)
-	// プレミアム（本体 #1053）は、枠ごとの動画（動画ごとの入力つき）と総括のブロックを足す。
+	// プレミアム（本体 #1053 補足）は、グループごとの動画（意識・目的とレースの入力つき）と返却のグループごとの記入・まとめを足す。
 	if err := s.withPremium(r.Context(), s.q, out, rr, coachSeesVideo(rr)); err != nil {
 		MapDBError(w, err)
 		return
@@ -211,8 +213,9 @@ type reviewResponseReq struct {
 	SuccessCriteria   string   `json:"success_criteria"`
 	NextVideo         string   `json:"next_video"`
 	DemoVideoPublicID string   `json:"demo_video_public_id"`
-	// プレミアムの総括の枠ごとのブロック（本体 #1053）。スタンダードでは使わない。
+	// プレミアムの返却（本体 #1053 補足）：グループごとの記入と最後のまとめ。スタンダードでは使わない。
 	Sections []premiumSectionReq `json:"sections"`
+	Summary  string              `json:"summary"`
 	// 依頼に固定した追加項目の本文（本体 #1086）。依頼の offer_items と同じ順・同じ数。
 	OfferItems []string `json:"offer_items"`
 }
@@ -232,7 +235,7 @@ func (s *Server) submitReviewResponse(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "validation_error", "JSONが不正です")
 		return
 	}
-	// プレミアム（本体 #1053）は総括（全体の一言診断＋枠ごとのブロック）で返す。担当でない依頼は従来どおり下の返却で 409 になる。
+	// プレミアム（本体 #1053 補足）はグループごとの記入＋最後のまとめで返す。担当でない依頼は従来どおり下の返却で 409 になる。
 	current, err := s.q.GetCoachReviewRequest(r.Context(), db.GetCoachReviewRequestParams{ID: id, CoachID: p.ID})
 	if err == nil && current.Plan == planPremium {
 		s.submitPremiumReviewResponse(w, r, p, current, req)
@@ -512,7 +515,7 @@ func (s *Server) writeRequesterReview(w http.ResponseWriter, r *http.Request, rr
 		return
 	}
 	s.withReviewTranslations(r.Context(), out, rr)
-	// プレミアム（本体 #1053）は、枠ごとの動画と総括のブロックを足す。
+	// プレミアム（本体 #1053 補足）は、グループごとの動画と返却のグループごとの記入・まとめを足す。
 	if err := s.withPremium(r.Context(), s.q, out, rr, true); err != nil {
 		MapDBError(w, err)
 		return

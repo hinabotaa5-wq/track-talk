@@ -722,13 +722,14 @@ export type ReviewResponse =
   | { hidden: true; created_at: string }
   | {
       hidden: false;
-      // スタンダードの回答の型の欄。プレミアムの総括（本体 #1053）では null で、代わりに sections が入る。
+      // スタンダードの回答の型の欄。プレミアム（本体 #1053）では null で、代わりに sections と summary が入る。
       good_point: string;
       fix_points: string[];
       drill: string;
       hitokoto: string | null;
-      // プレミアムの総括の枠ごとのブロック（動画がある枠だけ、決まった順）。スタンダードでは無い。
+      // プレミアムの返却（本体 #1053 補足）：グループごとの記入（グループの順）と最後のまとめ。スタンダードでは sections は無く summary は null。
       sections?: PremiumSection[];
+      summary?: string | null;
       // 回答の新しい型の3欄（本体 #1013）。この型より前の返答は null で、表示では節ごと出さない。訳は付かない。
       cue?: string | null;
       success_criteria?: string | null;
@@ -767,11 +768,11 @@ export type ReviewCoachOption = {
   offer_items?: string[];
 };
 
-// プレミアム（本体 #1053）。決まった5枠：レース全体／スタート／後半／練習／その他。
-export type PremiumSlot = "race" | "start" | "second_half" | "practice" | "other";
+// プレミアム（本体 #1053 補足）。動画をテーマごとのグループに分けて送る。kind はテーマのテンプレ：レース全体／スタート／後半／練習／その他。
+export type PremiumKind = "race" | "start" | "second_half" | "practice" | "other";
 export type ReviewPlan = "standard" | "premium";
 
-// プレミアムの動画1本。レース全体だけタイム・風速・コンディション、練習だけ目的が入る（未入力は null）。
+// プレミアムの動画1本。レース全体のグループの動画だけタイム・風速・コンディションが入る（未入力は null）。
 export type PremiumVideo = {
   position: number;
   video_url: string | null;
@@ -779,13 +780,13 @@ export type PremiumVideo = {
   race_time?: string | null;
   wind_speed?: string | null;
   body_condition?: string | null;
-  practice_purpose?: string | null;
 };
 
-// 枠ごとにまとめた動画。動画がない枠は API が出さない。
-export type PremiumVideoGroup = { slot: PremiumSlot; videos: PremiumVideo[] };
+// 動画のグループ。title はテーマ名（返却の見出し・引用単位）、focus_note は何を意識して取り組んでいるか・何が目的か（任意）。
+export type PremiumVideoGroup = { position: number; kind: PremiumKind; title: string; focus_note: string | null; videos: PremiumVideo[] };
 
-export type PremiumSection = { slot: PremiumSlot; body: string };
+// 返却のグループごとの記入。title はそのグループのテーマ名。
+export type PremiumSection = { group_position: number; title: string; body: string };
 
 // 選手の依頼一覧（GET /v1/me/coaching/requests）の1行。一覧ページが使う項目だけ（本体 #1072 の6項目＋プレミアムの印の plan、本体 #1053）。
 export type MyReviewRequestListItem = {
@@ -801,8 +802,8 @@ export type MyReviewRequestListItem = {
 export type ReviewRequest = {
   // スタンダード／プレミアム（本体 #1053）。古い API では無い（スタンダードとして扱う）。
   plan?: ReviewPlan;
-  // プレミアムの依頼にだけ入る、枠ごとの動画と本数。
-  premium_videos?: PremiumVideoGroup[];
+  // プレミアムの依頼にだけ入る、グループごとの動画と本数。
+  premium_groups?: PremiumVideoGroup[];
   video_count?: number;
   started_at?: string | null;
   canceled_at?: string | null;

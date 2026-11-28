@@ -8,8 +8,7 @@ import { useAuth } from "@/components/auth-provider";
 import { CoachInfoRequestForm, ReviewInfoHistory, SentBanner } from "@/components/review-info-request";
 import { ReviewResponseView } from "@/components/review-response";
 import { PremiumBadge, PremiumVideoGroups } from "@/components/premium-review";
-import { isPremium, maxPremiumSectionChars, premiumSlotLabels } from "@/lib/premium";
-import type { PremiumSlot } from "@/lib/types";
+import { isPremium, maxPremiumSectionChars, maxPremiumSummaryChars } from "@/lib/premium";
 import { CoachWithdrawForm } from "@/components/review-withdraw";
 import { CoachingConsultations } from "@/components/coaching-consultations";
 import { Button } from "@/components/ui/button";
@@ -180,13 +179,13 @@ function ResponseForm({ request, token, onSent, locale }: { request: CoachReview
   );
 }
 
-// プレミアムの総括（本体 #1053）：全体の一言診断（300字）＋動画がある枠ごとのブロック（各1000字）＋任意の見本動画。
-// 根拠は枠名で引用する（依頼内容の枠ごとのグループ表示がそのまま引用になる）。
+// プレミアムの返却（本体 #1053 補足）：動画があるグループごとの自由記入（各2000字、項目分けなし）＋最後のまとめ（2000字）＋任意の見本動画。
+// 根拠はグループ名（テーマ名）で引用する（依頼内容のグループ表示がそのまま引用になる）。
 function PremiumResponseForm({ request, token, onSent, locale }: { request: CoachReviewRequest; token: string | null; onSent: (r: CoachReviewRequest) => void; locale: Locale }) {
-  const slots = (request.premium_videos ?? []).map((group) => group.slot);
+  const groups = request.premium_groups ?? [];
   const guard = useSolicitationGuard();
-  const [hitokoto, setHitokoto] = useState("");
-  const [sections, setSections] = useState<Partial<Record<PremiumSlot, string>>>({});
+  const [summary, setSummary] = useState("");
+  const [sections, setSections] = useState<Record<number, string>>({});
   const [file, setFile] = useState<File | null>(null);
   const uploaded = useRef<{ file: File; id: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -208,7 +207,7 @@ function PremiumResponseForm({ request, token, onSent, locale }: { request: Coac
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!guard.allow([hitokoto, ...slots.map((slot) => sections[slot] ?? "")].join("\n"))) return;
+    if (!guard.allow([...groups.map((group) => sections[group.position] ?? ""), summary].join("\n"))) return;
     if (!acquire()) return;
     setErrors({});
     try {
@@ -226,7 +225,7 @@ function PremiumResponseForm({ request, token, onSent, locale }: { request: Coac
       const sent = await apiFetch<CoachReviewRequest>(`/v1/coaching/requests/${request.id}/response`, {
         method: "POST",
         token,
-        body: JSON.stringify({ hitokoto, sections: slots.map((slot) => ({ slot, body: sections[slot] ?? "" })), demo_video_public_id: demo }),
+        body: JSON.stringify({ sections: groups.map((group) => ({ group_position: group.position, body: sections[group.position] ?? "" })), summary, demo_video_public_id: demo }),
       });
       onSent(sent);
     } catch (err) {
@@ -239,24 +238,29 @@ function PremiumResponseForm({ request, token, onSent, locale }: { request: Coac
 
   return (
     <form onSubmit={onSubmit} className="space-y-4" data-testid="premium-response-form">
-      <h2 className="font-bold">{L("総括を書く")}</h2>
+      <h2 className="font-bold">{L("回答を書く")}</h2>
       <p className="text-xs text-slate-300">{t(locale, "coach.detail.contactNote")}</p>
-      <p className="text-xs text-slate-300">{L("全体の一言診断のあと、動画がある枠ごとに書きます。根拠は枠名で示してください（例：「スタートの動画2で…」）。")}</p>
+      <p className="text-xs text-slate-300">{L("動画のグループごとに自由に書き、最後にまとめを書きます。根拠はグループ名で示してください（例：「スタートの動画2で…」）。")}</p>
       {guard.warning}
-      <Field label={L("一言診断")} value={hitokoto} onChange={setHitokoto} error={errors.hitokoto} placeholder={L("全体の結論を1行で")} />
-      {slots.map((slot) => {
-        const value = sections[slot] ?? "";
+      {groups.map((group) => {
+        const value = sections[group.position] ?? "";
         const over = value.length > maxPremiumSectionChars;
-        const error = errors[`sections.${slot}`];
+        const error = errors[`sections.${group.position}`];
         return (
-          <label key={slot} className="block space-y-1 text-sm">
-            <span className="font-semibold">{premiumSlotLabels[slot]}</span>
-            <Textarea rows={5} value={value} onChange={(e) => setSections((prev) => ({ ...prev, [slot]: e.target.value }))} aria-invalid={Boolean(error) || over} />
+          <label key={group.position} className="block space-y-1 text-sm">
+            <span className="block break-words font-semibold">{group.title}</span>
+            <Textarea rows={6} value={value} onChange={(e) => setSections((prev) => ({ ...prev, [group.position]: e.target.value }))} aria-invalid={Boolean(error) || over} />
             <span className={`block text-right text-xs ${over ? "text-red-400" : "text-slate-300"}`}>{value.length}/{maxPremiumSectionChars}</span>
             {error ? <span className="block text-sm text-red-400">{error}</span> : null}
           </label>
         );
       })}
+      <label className="block space-y-1 text-sm">
+        <span className="font-semibold">{L("まとめ")}</span>
+        <Textarea rows={5} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder={L("全体を通しての結論と、次に取り組むこと")} aria-invalid={Boolean(errors.summary) || summary.length > maxPremiumSummaryChars} />
+        <span className={`block text-right text-xs ${summary.length > maxPremiumSummaryChars ? "text-red-400" : "text-slate-300"}`}>{summary.length}/{maxPremiumSummaryChars}</span>
+        {errors.summary ? <span className="block text-sm text-red-400">{errors.summary}</span> : null}
+      </label>
       <label className="block space-y-1 text-sm">
         <span className="font-semibold">{t(locale, "coach.detail.demoVideo", { seconds: maxReviewSeconds })}</span>
         <input
@@ -272,7 +276,7 @@ function PremiumResponseForm({ request, token, onSent, locale }: { request: Coac
       {errors.sections ? <p className="text-sm text-red-400">{errors.sections}</p> : null}
       {errors.form ? <p className="text-sm text-red-400">{errors.form}</p> : null}
       <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? t(locale, "common.sending") : L("総括を送る")}
+        {pending ? t(locale, "common.sending") : L("回答を送る")}
       </Button>
     </form>
   );
@@ -367,11 +371,11 @@ export default function CoachReviewRequestPage() {
 
       <section aria-label={L("依頼内容")} className="space-y-3 rounded-2xl border border-white/20 glass bg-white/5 p-4">
         <h2 className="text-sm font-semibold text-slate-300">{L("依頼内容")}</h2>
-        {/* プレミアム（本体 #1053）は、動画を枠ごとにまとめ、レース全体にはタイム・風速・コンディション、練習には目的を併記する。 */}
+        {/* プレミアム（本体 #1053 補足）は、動画をグループごとにまとめ、各グループの意識・目的と、レース全体のグループの動画のタイム・風速・コンディションを併記する。 */}
         {isPremium(request) ? (
           <>
             <AthleteInfo request={request} />
-            <PremiumVideoGroups groups={request.premium_videos ?? []} />
+            <PremiumVideoGroups groups={request.premium_groups ?? []} />
             <p className="text-xs text-slate-300"><time dateTime={request.created_at}>{formatDateTime(request.created_at)}</time></p>
           </>
         ) : null}

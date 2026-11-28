@@ -330,7 +330,7 @@ function ReviewRequestView() {
         {isPremium(request) ? (
           <>
             <PremiumAthleteInfo request={request} />
-            <PremiumVideoGroups groups={request.premium_videos ?? []} purgedNote={request.videos_purged ? reviewVideosPurgedNote() : null} />
+            <PremiumVideoGroups groups={request.premium_groups ?? []} purgedNote={request.videos_purged ? reviewVideosPurgedNote() : null} />
           </>
         ) : request.video_url ? (
           <video
