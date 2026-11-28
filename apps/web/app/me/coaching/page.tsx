@@ -29,8 +29,12 @@ function errorMessage(err: unknown, fallback: string) {
 
 export default function CoachingSetupPage() {
   const { session, token, loading } = useAuth();
-  const [me, setMe] = useState<CoachingMe | null>(null);
-  const [loadError, setLoadError] = useState("");
+  // 本体 #1108：取得した内容は「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ出す（#1011 の方式に揃える）。
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [meLoaded, setMeLoaded] = useState<{ key: string | null; me: CoachingMe | null }>({ key: null, me: null });
+  const [loadErrorLoaded, setLoadErrorLoaded] = useState<{ key: string | null; message: string }>({ key: null, message: "" });
+  const me = userKey && meLoaded.key === userKey ? meLoaded.me : null;
+  const loadError = userKey && loadErrorLoaded.key === userKey ? loadErrorLoaded.message : "";
   const [month, setMonth] = useState("");
   const [monthError, setMonthError] = useState("");
   const [guardianEmail, setGuardianEmail] = useState("");
@@ -38,44 +42,51 @@ export default function CoachingSetupPage() {
   const [linkMessage, setLinkMessage] = useState("");
   const { pending, acquire, release } = useActionLock();
   // チケットの残りと有効期限は、マイページに常に出す（本体 #569）。読めなかった時は出さない。
-  const [tickets, setTickets] = useState<TicketSummary | null>(null);
+  const [ticketsLoaded, setTicketsLoaded] = useState<{ key: string | null; tickets: TicketSummary | null }>({ key: null, tickets: null });
+  const tickets = userKey && ticketsLoaded.key === userKey ? ticketsLoaded.tickets : null;
 
   useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
-      .then((data) => { if (!cancelled) setTickets(data); })
-      .catch(() => { if (!cancelled) setTickets(null); });
-    return () => { cancelled = true; };
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<CoachingMe>("/v1/me/coaching", { token })
-      .then((data) => {
-        if (!cancelled) setMe(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setLoadError(errorMessage(err, L("読み込みに失敗しました")));
-      });
-    return () => {
-      cancelled = true;
+    if (!token || !userKey) return;
+    let alive = true;
+    const loadTickets = () => {
+      apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
+        .then((data) => { if (alive) setTicketsLoaded({ key: userKey, tickets: data }); })
+        .catch(() => { if (alive) setTicketsLoaded({ key: userKey, tickets: null }); });
     };
-  }, [token]);
+    const loadMe = () => {
+      apiFetch<CoachingMe>("/v1/me/coaching", { token })
+        .then((data) => { if (alive) setMeLoaded({ key: userKey, me: data }); })
+        .catch((err) => { if (alive) setLoadErrorLoaded({ key: userKey, message: errorMessage(err, L("読み込みに失敗しました")) }); });
+    };
+    const load = () => { loadTickets(); loadMe(); };
+    const refresh = () => { if (document.visibilityState === "visible") load(); };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1011 と同じ契機）。
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) load(); };
+    load();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
+    };
+  }, [token, userKey]);
 
   async function onBirthMonth(event: FormEvent) {
     event.preventDefault();
     if (!month || !acquire()) return;
     setMonthError("");
     try {
-      setMe(
-        await apiFetch<CoachingMe>("/v1/me/birth-month", {
+      setMeLoaded({
+        key: userKey,
+        me: await apiFetch<CoachingMe>("/v1/me/birth-month", {
           method: "PUT",
           token,
           body: JSON.stringify({ birth_month: month }),
         }),
-      );
+      });
     } catch (err) {
       setMonthError(err instanceof ApiRequestError ? err.fields?.birth_month || err.message : L("登録に失敗しました"));
     } finally {
@@ -99,7 +110,7 @@ export default function CoachingSetupPage() {
         token,
         body: JSON.stringify(guardianEmailLocked ? {} : { guardian_email: guardianEmail.trim() }),
       });
-      setMe((prev) => (prev ? { ...prev, guardian } : prev));
+      setMeLoaded({ key: userKey, me: me ? { ...me, guardian } : null });
       setGuardianEmail("");
       setLinkMessage(L("{v0} にメールを送りました。届いたメールのリンクから、保護者が同意します。", { v0: guardian.guardian_email ?? L("保護者") }));
     } catch (err) {

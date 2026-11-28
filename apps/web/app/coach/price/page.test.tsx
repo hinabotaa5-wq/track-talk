@@ -232,3 +232,34 @@ it("見本動画に動画でないファイルを選ぶと「動画ファイル�
   expect(offerSection().textContent).not.toContain("動画ファイルを選んでください");
   expect(offerSection().textContent).toContain("demo.mp4");
 });
+it("利用者を切り替えると、前のコーチの価格は新しい取得が終わるまで出さない（本体 #1108 T1）", async () => {
+  apiFetch.mockResolvedValue(prices());
+  await act(async () => root.render(<CoachPricePage />));
+  expect(section("スタンダード").textContent).toContain("1,000円（共通の価格）");
+  let resolveNext!: (value: CoachPrices) => void;
+  const next = new Promise<CoachPrices>((res) => { resolveNext = res; });
+  apiFetch.mockReset();
+  apiFetch.mockReturnValue(next);
+  auth.token = "token-b";
+  auth.session = { user: { id: "coach-b" } };
+  await act(async () => root.render(<CoachPricePage />));
+  expect(container.textContent).not.toContain("1,000円（共通の価格）");
+  await act(async () => { resolveNext(prices({ premium: { price_yen: 30000 } })); });
+  expect(section("プレミアム").textContent).toContain("30,000円");
+  auth.token = "token";
+  auth.session = { user: { id: "coach" } };
+});
+
+it("履歴キャッシュから戻ったら（pageshow persisted）価格を取り直す（本体 #1108 T2）", async () => {
+  apiFetch.mockResolvedValue(prices());
+  await act(async () => root.render(<CoachPricePage />));
+  expect(section("スタンダード").textContent).toContain("1,000円（共通の価格）");
+  apiFetch.mockClear();
+  apiFetch.mockResolvedValue(prices({ standard: { price_yen: 1500, is_default: false } }));
+  const restored = new Event("pageshow");
+  Object.defineProperty(restored, "persisted", { value: true });
+  await act(async () => { window.dispatchEvent(restored); });
+  await act(async () => { await Promise.resolve(); });
+  expect(apiFetch.mock.calls.some(([path]) => path === "/v1/coach/me/prices")).toBe(true);
+  expect(section("スタンダード").textContent).toContain("1,500円");
+});

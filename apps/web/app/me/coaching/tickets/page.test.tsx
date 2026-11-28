@@ -9,7 +9,8 @@ import Page from "./page";
 const mocks = vi.hoisted(() => ({ api: vi.fn(), router: { replace: vi.fn() }, query: "" }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router, useSearchParams: () => new URLSearchParams(mocks.query) }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
-vi.mock("@/components/auth-provider", () => ({ useAuth: () => ({ token: "test", loading: false, session: { user: { id: "athlete" } } }) }));
+const auth = vi.hoisted(() => ({ token: "test" as string | null, session: { user: { id: "athlete" } } as { user: { id: string } } | null, loading: false }));
+vi.mock("@/components/auth-provider", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => mocks.api(...args) }));
 const initial: TicketSummary = {
   balance: { available: 0, reserved: 0 }, products: [],
@@ -23,6 +24,7 @@ let root: Root;
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   mocks.api.mockReset(); mocks.router.replace.mockReset(); mocks.query = ""; sessionStorage.clear();
+  auth.token = "test"; auth.session = { user: { id: "athlete" } };
   container = document.createElement("div"); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -68,4 +70,40 @@ it("クーポンが0枚なら有効期限は出さず、紹介の説明ページ
   expect(section?.textContent).toContain("¥500クーポンの残り 0枚");
   expect(section?.textContent).not.toContain("いちばん早い有効期限");
   expect(section?.querySelector('a[href="/referral"]')?.textContent).toBe("紹介でクーポンをもらう方法");
+});
+
+// 本体 #1108：残高は利用者と組で持ち、切り替え・履歴復帰で前の利用者の分を出さない。
+const summaryWithBalance = (available: number): TicketSummary => ({ ...initial, balance: { available, reserved: 0 } });
+
+it("利用者を切り替えると、前の利用者の残高は新しい取得が終わるまで出さない（本体 #1108 T1）", async () => {
+  mocks.api.mockImplementation(summaryResponse(summaryWithBalance(3)));
+  await render();
+  expect(container.textContent).toContain("チケットの残り 3枚");
+  let resolveNext!: (value: TicketSummary) => void;
+  const next = new Promise<TicketSummary>((res) => { resolveNext = res; });
+  mocks.api.mockImplementation((path: string) => (path === "/v1/me/coaching/tickets" ? next : Promise.resolve({ referral: null })));
+  auth.token = "test-b"; auth.session = { user: { id: "athlete-b" } };
+  await render();
+  expect(container.textContent).not.toContain("チケットの残り 3枚");
+  await act(async () => { resolveNext(summaryWithBalance(5)); });
+  expect(container.textContent).toContain("チケットの残り 5枚");
+});
+
+it("履歴キャッシュから戻ったら（pageshow persisted）残高を取り直し、persisted でなければ取り直さない（本体 #1108 T2）", async () => {
+  mocks.api.mockImplementation(summaryResponse(summaryWithBalance(3)));
+  await render();
+  expect(container.textContent).toContain("チケットの残り 3枚");
+  mocks.api.mockClear();
+  mocks.api.mockImplementation(summaryResponse(summaryWithBalance(4)));
+  const restored = new Event("pageshow");
+  Object.defineProperty(restored, "persisted", { value: true });
+  await act(async () => { window.dispatchEvent(restored); });
+  await act(async () => { await Promise.resolve(); });
+  expect(mocks.api.mock.calls.some(([path]) => path === "/v1/me/coaching/tickets")).toBe(true);
+  expect(container.textContent).toContain("チケットの残り 4枚");
+  mocks.api.mockClear();
+  const plain = new Event("pageshow");
+  Object.defineProperty(plain, "persisted", { value: false });
+  await act(async () => { window.dispatchEvent(plain); });
+  expect(mocks.api.mock.calls.some(([path]) => path === "/v1/me/coaching/tickets")).toBe(false);
 });

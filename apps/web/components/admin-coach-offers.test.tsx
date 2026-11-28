@@ -64,3 +64,30 @@ it("見本も追加項目もない申請は「なし」と出す（全削除の�
   expect(after.textContent).toContain("追加項目なし");
   expect(after.textContent).toContain("見本動画なし");
 });
+
+it("利用者を切り替えると、前の利用者の申請一覧は新しい取得が終わるまで出さない（本体 #1108 T1）", async () => {
+  apiFetch.mockResolvedValue({ applications: [row("pending")] });
+  await act(async () => root.render(<AdminCoachOffers token="tok-a" />));
+  expect(container.textContent).toContain("テストコーチ");
+  let resolveNext!: (value: { applications: AdminCoachOfferApplication[] }) => void;
+  const next = new Promise<{ applications: AdminCoachOfferApplication[] }>((res) => { resolveNext = res; });
+  apiFetch.mockReset();
+  apiFetch.mockReturnValue(next);
+  await act(async () => root.render(<AdminCoachOffers token="tok-b" />));
+  expect(container.textContent).not.toContain("テストコーチ");
+  await act(async () => { resolveNext({ applications: [row("pending", { id: "app-b", coach_name: "別のコーチ" })] }); });
+  expect(container.textContent).toContain("別のコーチ");
+});
+
+it("履歴キャッシュから戻ったら（pageshow persisted）申請一覧を取り直す（本体 #1108 T2）", async () => {
+  apiFetch.mockResolvedValue({ applications: [row("pending")] });
+  await act(async () => root.render(<AdminCoachOffers token="tok-a" />));
+  apiFetch.mockClear();
+  apiFetch.mockResolvedValue({ applications: [row("pending", { coach_name: "新しいコーチ" })] });
+  const restored = new Event("pageshow");
+  Object.defineProperty(restored, "persisted", { value: true });
+  await act(async () => { window.dispatchEvent(restored); });
+  await act(async () => { await Promise.resolve(); });
+  expect(apiFetch).toHaveBeenCalledWith("/v1/admin/coaching/coach-offers", { token: "tok-a" });
+  expect(container.textContent).toContain("新しいコーチ");
+});

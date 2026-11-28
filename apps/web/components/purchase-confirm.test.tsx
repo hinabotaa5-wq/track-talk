@@ -23,6 +23,11 @@ async function render(props: { pending?: boolean; pendingLabel?: string; onConfi
 }
 const waiting = () => container.querySelector('[role="status"]');
 const buttons = () => [...container.querySelectorAll("button")];
+const background = () => {
+  const section = container.querySelector("section");
+  if (!section) return [];
+  return [...section.children].filter((el) => el !== waiting()) as HTMLElement[];
+};
 
 // 本体 #917 A1
 it("pending のあいだはストップウォッチと渡した文言を出し、pending でなければ出さない", async () => {
@@ -81,4 +86,27 @@ it("待っている間はキーボードのフォーカスを留め、解除す�
     expect(document.activeElement).toBe(back);
     expect(buttons().map((b) => b.disabled)).toEqual([false, false]);
   } finally { back.remove(); }
+});
+
+it("pending のあいだは背面（オーバーレイ以外の部分）が inert になり、終わると外れる", async () => {
+  await render({ pending: false });
+  expect(background().length).toBeGreaterThan(0);
+  for (const el of background()) expect(el.inert === true).toBe(false);
+
+  await render({ pending: true });
+  for (const el of background()) expect(el.inert === true).toBe(true);
+  expect((waiting() as HTMLElement).inert === true).toBe(false);
+
+  await render({ pending: false });
+  for (const el of background()) expect(el.inert === true).toBe(false);
+});
+
+it("pending のままアンマウントしても inert が残らない", async () => {
+  await render({ pending: true });
+  const elements = background();
+  expect(elements.length).toBeGreaterThan(0);
+  for (const el of elements) expect(el.inert === true).toBe(true);
+  await act(async () => root.unmount());
+  for (const el of elements) expect(el.inert === true).toBe(false);
+  root = createRoot(container);
 });

@@ -10,8 +10,9 @@ const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push }) }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a> }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("@/lib/api")>(), apiFetch: (...args: unknown[]) => apiFetch(...args) }));
+const auth = vi.hoisted(() => ({ session: { user: { id: "u1" } } as { user: { id: string } } | null, token: "tok" as string | null }));
 vi.mock("@/components/auth-provider", () => ({
-  useAuth: () => ({ session: { user: { id: "u1" } }, token: "tok", loading: false, profile: { purchase_notice_required: false } }),
+  useAuth: () => ({ session: auth.session, token: auth.token, loading: false, profile: { purchase_notice_required: false } }),
 }));
 vi.mock("@/lib/review", async (original) => ({ ...await original<typeof import("@/lib/review")>(), videoDuration: async () => 10 }));
 vi.mock("@/lib/cloudinary-upload", async (original) => ({
@@ -32,6 +33,7 @@ beforeEach(() => {
   uploads = 0;
   created.length = 0;
   push.mockReset();
+  auth.session = { user: { id: "u1" } }; auth.token = "tok";
   window.history.replaceState(null, "", "/coaching/new?plan=premium&coach=c1&pay=card");
   apiFetch.mockReset();
   apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
@@ -157,4 +159,27 @@ it("動画でないファイルを選ぶと「動画ファイルを選んでく�
   await addVideo(group, "race.mp4");
   expect(container.textContent).not.toContain("動画ファイルを選んでください");
   expect(group.querySelector('input[name="race_time"]')).not.toBeNull();
+});
+it("利用者を切り替えると、前の利用者のクーポン残数は新しい取得が終わるまで出さない（本体 #1108 T1）", async () => {
+  let resolveTickets!: (value: unknown) => void;
+  apiFetch.mockImplementation(async (path: string, options?: { token?: string }) => {
+    if (path.startsWith("/v1/coaching/nominees")) {
+      return { coaches: [{ id: "c1", nickname: "テストコーチ", photo_url: "", events: ["100m"], years: 1, best_record: "", achievements: "", premium_price_yen: 8000 }] };
+    }
+    if (path.startsWith("/v1/coaching/estimate")) return { payments: true, due_at: "2026-11-29T12:00:00+09:00" };
+    if (path === "/v1/me/coaching/tickets") {
+      if (options?.token === "tok") return { coupons: { available: 2, amount_yen: 500, next_expires_at: null } };
+      return new Promise((res) => { resolveTickets = res; });
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+  await render();
+  expect(container.textContent).toContain("¥500クーポン（残り 2 枚）");
+  auth.token = "tok-b"; auth.session = { user: { id: "u2" } };
+  await act(async () => root.render(<PremiumRequestForm />));
+  await flush();
+  expect(container.textContent).not.toContain("残り 2 枚");
+  await act(async () => { resolveTickets({ coupons: { available: 1, amount_yen: 500, next_expires_at: null } }); });
+  await flush();
+  expect(container.textContent).toContain("¥500クーポン（残り 1 枚）");
 });

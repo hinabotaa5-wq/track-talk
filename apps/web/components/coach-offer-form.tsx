@@ -38,18 +38,36 @@ function initialDraft(data: CoachOffers): { items: string[]; videos: DraftVideo[
 }
 
 export function CoachOfferSection({ token }: { token: string | null | undefined }) {
-  const [data, setData] = useState<CoachOffers | null>(null);
-  const [loadError, setLoadError] = useState("");
-  // 申請・取り下げのあとは編集欄を作り直すので、結果の知らせはここで持つ。
-  const [message, setMessage] = useState("");
+  // 本体 #1108：申請内容は「どの利用者の分か」（ここでは token）と組で持ち、表示中の利用者と一致するときだけ出す（#1011 の方式に揃える）。
+  const [loaded, setLoaded] = useState<{ key: string | null; data: CoachOffers | null }>({ key: null, data: null });
+  const [loadErrorLoaded, setLoadErrorLoaded] = useState<{ key: string | null; message: string }>({ key: null, message: "" });
+  const data = token && loaded.key === token ? loaded.data : null;
+  const loadError = token && loadErrorLoaded.key === token ? loadErrorLoaded.message : "";
+  // 申請・取り下げのあとは編集欄を作り直すので、結果の知らせはここで持つ（知らせも利用者と組で持つ）。
+  const [messageLoaded, setMessageLoaded] = useState<{ key: string | null; message: string }>({ key: null, message: "" });
+  const message = token && messageLoaded.key === token ? messageLoaded.message : "";
 
   useEffect(() => {
     if (!token) return;
-    let cancelled = false;
-    apiFetch<CoachOffers>("/v1/coach/me/offers", { token })
-      .then((d) => { if (!cancelled) setData(d); })
-      .catch(() => { if (!cancelled) setLoadError(L("添削項目・見本動画を読み込めませんでした")); });
-    return () => { cancelled = true; };
+    let alive = true;
+    const load = () => {
+      apiFetch<CoachOffers>("/v1/coach/me/offers", { token })
+        .then((d) => { if (alive) { setLoaded({ key: token, data: d }); setLoadErrorLoaded({ key: token, message: "" }); } })
+        .catch(() => { if (alive) setLoadErrorLoaded({ key: token, message: L("添削項目・見本動画を読み込めませんでした") }); });
+    };
+    const refresh = () => { if (document.visibilityState === "visible") load(); };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1011 と同じ契機）。
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) load(); };
+    load();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
+    };
   }, [token]);
 
   return (
@@ -59,7 +77,7 @@ export function CoachOfferSection({ token }: { token: string | null | undefined 
         {L("すべての回答に入る4項目に加えて、あなたが添削する項目を5件まで追加できます。見本動画はコーチ詳細に3本まで載せられます。運営が承認したあと、承認の時点で対応中だった依頼がすべて終わってから切り替わります。進行中の依頼は申し込まれたときの項目のままです。")}
       </p>
       {loadError ? <p role="alert" className="text-sm text-red-400">{loadError}</p> : null}
-      {data ? <OfferEditor key={`${data.pending?.updated_at ?? ""}-${data.approved?.id ?? ""}-${data.items.join("|")}`} data={data} token={token} onChange={(d, note) => { setData(d); setMessage(note); }} message={message} onEdit={() => setMessage("")} /> : null}
+      {data ? <OfferEditor key={`${data.pending?.updated_at ?? ""}-${data.approved?.id ?? ""}-${data.items.join("|")}`} data={data} token={token} onChange={(d, note) => { setLoaded({ key: token ?? null, data: d }); setMessageLoaded({ key: token ?? null, message: note }); }} message={message} onEdit={() => setMessageLoaded({ key: token ?? null, message: "" })} /> : null}
     </section>
   );
 }

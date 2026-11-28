@@ -40,26 +40,46 @@ function TicketsPage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const [summary, setSummary] = useState<TicketSummary | null>(null);
-  const [error, setError] = useState("");
+  // 本体 #1108：残高は「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ出す（#1011 の方式に揃える）。
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [loaded, setLoaded] = useState<{ key: string | null; summary: TicketSummary | null }>({ key: null, summary: null });
+  const [errorLoaded, setErrorLoaded] = useState<{ key: string | null; message: string }>({ key: null, message: "" });
+  const summary = userKey && loaded.key === userKey ? loaded.summary : null;
+  const error = userKey && errorLoaded.key === userKey ? errorLoaded.message : "";
 
   const load = useCallback(async () => {
+    if (!userKey) return;
     const data = await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token });
-    setSummary(data);
-  }, [token]);
+    setLoaded({ key: userKey, summary: data });
+    setErrorLoaded({ key: userKey, message: "" });
+  }, [token, userKey]);
 
   useEffect(() => {
     if (!loading && !session) router.replace(`/login?next=${encodeURIComponent("/me/coaching/tickets" + (params.toString() ? `?${params}` : ""))}`);
   }, [loading, session, router, params]);
 
   useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }).then((data) => {
-      if (!cancelled) setSummary(data);
-    }).catch((err) => { if (!cancelled) setError(err instanceof ApiRequestError ? err.message : L("読み込めませんでした")); });
-    return () => { cancelled = true; };
-  }, [token]);
+    if (!token || !userKey) return;
+    let alive = true;
+    const run = () => {
+      void load().catch((err) => {
+        if (alive) setErrorLoaded({ key: userKey, message: err instanceof ApiRequestError ? err.message : L("読み込めませんでした") });
+      });
+    };
+    const refresh = () => { if (document.visibilityState === "visible") run(); };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1011 と同じ契機）。
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) run(); };
+    run();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
+    };
+  }, [token, userKey, load]);
 
   if (loading || !session) return <PageLoading screen label={L("読み込み中...")} />;
   const purchases = (summary?.purchases ?? []).filter((p) => p.status !== "pending");
@@ -67,7 +87,7 @@ function TicketsPage() {
     <h1 className="text-2xl font-bold">{L("チケット・クーポン")}</h1>
     <SellerNote />
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}
-    <Button type="button" onClick={() => void load().catch(() => setError(L("読み込めませんでした")))}>{L("チケット情報を再読み込み")}</Button>
+    <Button type="button" onClick={() => void load().catch(() => setErrorLoaded({ key: userKey, message: L("読み込めませんでした") }))}>{L("チケット情報を再読み込み")}</Button>
     {summary ? <>
       {summary.coupons ? <CouponBalance coupons={summary.coupons} /> : null}
       <TicketBalance summary={summary} />

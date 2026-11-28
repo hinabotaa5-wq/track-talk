@@ -93,7 +93,9 @@ export function PremiumRequestForm() {
   const [coach, setCoach] = useState<ReviewCoachOption | null>(null);
   const [coachChecked, setCoachChecked] = useState(false);
   const [estimate, setEstimate] = useState<ReviewEstimate | null>(null);
-  const [ticketSummary, setTicketSummary] = useState<TicketSummary | null>(null);
+  // 本体 #1108：チケット・クーポンの残りは「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ使う（#1011 の方式に揃える）。
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [ticketLoaded, setTicketLoaded] = useState<{ key: string | null; data: TicketSummary | null }>({ key: null, data: null });
   const [pb, setPb] = useState("");
   const [goalTime, setGoalTime] = useState("");
   const [groups, setGroups] = useState<DraftGroup[]>([]);
@@ -112,6 +114,7 @@ export function PremiumRequestForm() {
   const [uploadPhase, setUploadPhase] = useState<"upload" | "saving">("upload");
   const { pending, acquire, release } = useActionLock();
 
+  const ticketSummary = userKey && ticketLoaded.key === userKey ? ticketLoaded.data : null;
   const priceYen = coach?.premium_price_yen ?? 0;
   const couponsLeft = couponCount(ticketSummary);
   const couponsUsable = couponsLeft >= 1;
@@ -183,13 +186,27 @@ export function PremiumRequestForm() {
   }, [token, event]);
 
   useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
-      .then((data) => { if (!cancelled) setTicketSummary(data); })
-      .catch(() => { if (!cancelled) setTicketSummary(null); });
-    return () => { cancelled = true; };
-  }, [token]);
+    if (!token || !userKey) return;
+    let alive = true;
+    const load = () => {
+      apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })
+        .then((data) => { if (alive) setTicketLoaded({ key: userKey, data }); })
+        .catch(() => { if (alive) setTicketLoaded({ key: userKey, data: null }); });
+    };
+    const refresh = () => { if (document.visibilityState === "visible") load(); };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1011 と同じ契機）。
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) load(); };
+    load();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
+    };
+  }, [token, userKey]);
 
   function addGroup(kind: PremiumKind) {
     setError("");
@@ -322,7 +339,7 @@ export function PremiumRequestForm() {
     } catch (err) {
       setError(apiErrorText(err, err instanceof Error ? err.message : L("送信に失敗しました")));
       if (err instanceof ApiRequestError && err.code === "coupon_unavailable") {
-        try { setTicketSummary(await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token })); } catch { /* 元のエラーを表示する。 */ }
+        try { setTicketLoaded({ key: userKey, data: await apiFetch<TicketSummary>("/v1/me/coaching/tickets", { token }) }); } catch { /* 元のエラーを表示する。 */ }
       }
       setUpload(null);
       setConfirming(false);
