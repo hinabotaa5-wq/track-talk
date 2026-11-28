@@ -42,7 +42,7 @@ it("SNS欄は、アカウント名またはURLを1〜3件（各300文字以内�
 });
 
 it("コーチ紹介に表示する「ひとこと」を、利用規約第5条と英語の Coach Privacy にも載せる", () => {
-  expect(article(renderToStaticMarkup(<TermsPage />), 5)).toContain("名前・担当種目・記録・成績や指導経験・顔写真・SNS・ホームページ欄の内容・ひとことを使用します。");
+  expect(article(renderToStaticMarkup(<TermsPage />), 5)).toContain("名前・担当種目・記録・成績や指導経験・顔写真・SNS・ホームページ欄の内容・ひとこと・見本動画（");
   expect(article(renderToStaticMarkup(<PrivacyPolicy />), 6)).toContain("ひとこと");
   expect(renderToStaticMarkup(<CoachPrivacyPage />)).toContain("and your profile comment (the short message to athletes).");
 });

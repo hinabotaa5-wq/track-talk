@@ -48,7 +48,15 @@ it("継続プランに旧手順の文が残っていない", async () => {
 it("スタンダードの案内は変わっていない", async () => {
   await act(async () => root.render(<CoachAboutView />));
   expect(container.textContent).toContain("受付をオンにすると、申込みが対応中の一覧に届きます");
-  expect(container.textContent).toContain("届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください");
+  expect(container.textContent).toContain("届いてから24時間以内に、全コーチ共通の良い点・直す点・おすすめのドリル・コーチなら明日から何をするかと、申込みの時に決まった追加の項目のすべてに回答して返してください。");
+});
+
+// 本体 #1091 T7：回答の内容は固定4項目＋申込み時に決まった追加項目。添削項目・見本動画は申請制で、承認の後に切り替わる。
+it("T7: 添削項目と見本動画は申請でき、承認の後、対応中の依頼が終わってから切り替わる", async () => {
+  await act(async () => root.render(<CoachAboutView />));
+  const text = container.textContent ?? "";
+  expect(text).not.toContain("届いてから24時間以内に良い点・直す点・おすすめのドリルを返してください");
+  expect(text).toContain("添削の追加の項目と、コーチのページに載せる見本動画は、コーチ画面から申請できます。運営の承認の後、料金と同じく対応中の依頼がすべて終わってから切り替わり、その後の新しい申込みから適用されます。");
 });
 
 // 本体 #1058：価格申請制に合わせ、料金はコーチごと・報酬はその70%。チケットの回だけ700円（一律700円とは書かない）。

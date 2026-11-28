@@ -142,3 +142,19 @@ it("クーポンの額面を API に一致させ、スタンダードの固定�
   expect(html).not.toContain(`（1回 ${(Number(price![1]) - Number(amount![1])).toLocaleString("ja-JP")}円（税込））`);
   expect(html).not.toMatch(/チケット\s*6枚\s*[\d,]+円/);
 });
+
+// 本体 #1091：添削項目・見本動画（#1086）に合わせ、役務の内容を表記する。価格まわりは変えない。
+it("T2・T5: 役務の内容は表示項目で申込み時の表示が適用され、見本動画は参考表示。価格まわりの行は従来どおり", () => {
+  const html = renderToStaticMarkup(<CommercePage />);
+  expect(html).toContain(">役務の内容</dt>");
+  expect(html).toContain("<p>スタンダードの回答の内容は、各コーチのページと申込画面に表示する項目（全コーチに共通の項目と、そのコーチが追加した項目）です。申込みの時に表示されていた項目が、その申込みに適用されます。申込みの後に項目が変わっても、申込み済みの依頼の回答の内容は変わりません。</p>");
+  expect(html).toContain("<p>コーチのページの見本動画は、参考のための表示で、役務の内容には含まれません。</p>");
+  // 項目名の一覧を静的に並べない。
+  expect(html).not.toContain("おすすめのドリル");
+  // 価格まわり（変更禁止）。
+  expect(html).toContain("<p>スタンダードの価格（1回・税込）はコーチごとに異なります。各コーチのページと申込画面に表示します。</p>");
+  expect(html).toContain("チケット1枚分の額（1,000円）");
+  expect(html).toContain("購入時の価格（1回 500円（税込）、都度払いのみ）");
+  expect(html).toContain("海外コーチ プレミアム（パイロット）は 1件 20,000円（税込）。");
+  expect(html).toContain("海外コーチ スタンダード（パイロット）は 1回 10,000円（税込）。");
+});
