@@ -11,7 +11,8 @@ import { useActionLock } from "@/lib/use-action-lock";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-type Payment = { id: string; source: "review" | "consultation"; amount_yen: number; status: string; created_at: string; minor?: boolean };
+// refunded_yen は返金済みの累計。Stripe ダッシュボードで一部だけ返金した支払いは partially_refunded（一部返金）になる。
+type Payment = { id: string; source: "review" | "consultation"; amount_yen: number; refunded_yen?: number; status: string; created_at: string; minor?: boolean };
 // 18歳未満の本人が自分で払った動画添削・追加質問の返金（自動の返金を含む）。admin_* は管理画面から返金した分。
 type MinorRefundCounts = { review_count: number; review_amount_yen: number; consultation_count: number; consultation_amount_yen: number; admin_count: number; admin_amount_yen: number };
 type Refund = { id: string; payment_id: string; source: string; amount_yen: number; reason: string; admin_id: string | null; origin: string; status: string; failure: string | null; stripe_refund_id: string | null; created_at: string };
@@ -21,7 +22,7 @@ type Data = { payments: Payment[]; refunds: Refund[]; adjustments: Adjustment[];
 function minorRefundLine(label: string, c: MinorRefundCounts) {
  return `${label}：スタンダード ${c.review_count}件 ${formatYen(c.review_amount_yen)} · 追加質問 ${c.consultation_count}件 ${formatYen(c.consultation_amount_yen)}（うち管理画面から ${c.admin_count}件 ${formatYen(c.admin_amount_yen)}）`;
 }
-const statusLabels: Record<string, string> = { captured: "確定済み", paid: "支払い済み", refund_pending: "返金処理中", refunded: "返金済み", pending: "処理中", succeeded: "完了", failed: "失敗" };
+const statusLabels: Record<string, string> = { captured: "確定済み", paid: "支払い済み", refund_pending: "返金処理中", partially_refunded: "一部返金", refunded: "返金済み", pending: "処理中", succeeded: "完了", failed: "失敗" };
 
 function PaymentAdmin() {
  const { token } = useAuth();
@@ -51,7 +52,12 @@ function PaymentAdmin() {
   const key = `${p.source}:${p.id}`;
   const reason = (reasons[key] ?? "").trim();
   if (!reason) { setError("返金理由を入力してください"); return; }
-  if (!(await confirmDialog({ title: "全額返金しますか？", body: `${formatYen(p.amount_yen)}を返金します。理由：${reason}`, confirmLabel: "全額返金する" }))) return;
+  const remaining = p.amount_yen - (p.refunded_yen ?? 0);
+  const partial = p.status === "partially_refunded";
+  const ok = partial
+   ? await confirmDialog({ title: "残額を返金しますか？", body: `返金済み${formatYen(p.refunded_yen ?? 0)}を除いた残り${formatYen(remaining)}を返金します。理由：${reason}`, confirmLabel: "残額を返金する" })
+   : await confirmDialog({ title: "全額返金しますか？", body: `${formatYen(p.amount_yen)}を返金します。理由：${reason}`, confirmLabel: "全額返金する" });
+  if (!ok) return;
   if (!acquire()) return;
   setError(""); setMessage("");
   try {
@@ -63,7 +69,7 @@ function PaymentAdmin() {
  return <div className="mx-auto max-w-3xl space-y-5">
   <h1 className="text-xl font-bold">スタンダード・追加質問の返金管理</h1>
   <Link href="/admin" className="text-sm text-blue-300 underline">運営画面に戻る</Link>
-  <p className="text-sm">確定済みのカード支払いを全額返金します。送金済みのコーチ報酬は今後の報酬と相殺します。コーチ・発生元返金で絞り込み、古い記録までページを送って確認できます。</p>
+  <p className="text-sm">確定済みのカード支払いを全額返金します（一部返金済みの支払いは残額を返金します）。送金済みのコーチ報酬は今後の報酬と相殺します。コーチ・発生元返金で絞り込み、古い記録までページを送って確認できます。</p>
   {error ? <p role="alert" className="text-red-400">{error}</p> : null}
   {message ? <p role="status">{message}</p> : null}
   <Button disabled={pending} onClick={() => void load().catch(() => setError("読み込めませんでした"))}>再読み込み</Button>
@@ -83,11 +89,11 @@ function PaymentAdmin() {
    </section> : null}
    <h2 className="font-bold">支払い</h2>
    <ul className="space-y-3">{data.payments.map(p => { const key = `${p.source}:${p.id}`; return <li key={key} className="space-y-2 rounded-xl border border-white/20 p-3 text-sm">
-    <p>{p.source === "review" ? "スタンダード" : "追加質問"} · {formatYen(p.amount_yen)} · {statusLabels[p.status] ?? p.status}{p.minor ? " · 未成年の購入" : ""}</p>
+    <p>{p.source === "review" ? "スタンダード" : "追加質問"} · {formatYen(p.amount_yen)} · {statusLabels[p.status] ?? p.status}{(p.refunded_yen ?? 0) > 0 ? ` · 返金済み ${formatYen(p.refunded_yen ?? 0)}` : ""}{p.minor ? " · 未成年の購入" : ""}</p>
     <p className="break-all text-xs">{p.id} · {formatDateTime(p.created_at)}</p>
-    {p.status === "captured" || p.status === "paid" || p.status === "refund_pending" ? <>
+    {p.status === "captured" || p.status === "paid" || p.status === "partially_refunded" || p.status === "refund_pending" ? <>
      <label className="block">返金理由<input className="mt-1 block w-full rounded border border-white/30 bg-transparent p-2" maxLength={1000} value={reasons[key] ?? ""} onChange={e => setReasons(old => ({ ...old, [key]: e.target.value }))} /></label>
-     <Button disabled={pending || !(reasons[key] ?? "").trim()} onClick={() => void refund(p)}>{p.status === "refund_pending" ? "返金状況を照合" : "全額返金する"}</Button>
+     <Button disabled={pending || !(reasons[key] ?? "").trim()} onClick={() => void refund(p)}>{p.status === "refund_pending" ? "返金状況を照合" : p.status === "partially_refunded" ? "残額を返金する" : "全額返金する"}</Button>
     </> : null}
    </li>; })}</ul>
    <h2 className="font-bold">コーチ報酬の相殺台帳</h2>

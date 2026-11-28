@@ -2,7 +2,7 @@ import { L } from "./i18n";
 import type { WorkOrder, WorkOrderTerms } from "@/lib/types";
 export type Consultation = {
   id: string; request_key: string; status: "draft" | "awaiting_payment" | "offered" | "in_review" | "answered" | "declined" | "expired" | "cancelled";
-  funding: "ticket" | "cash"; price_yen: number; payment_state: "unpaid" | "paid" | "refund_pending" | "refunded";
+  funding: "ticket" | "cash"; price_yen: number; payment_state: "unpaid" | "paid" | "refund_pending" | "partially_refunded" | "refunded"; refunded_yen?: number;
   minor: boolean;
   // 支払う人。18歳未満のパーソナル指導の相談は保護者、それ以外（18歳未満の添削のあとの相談を含む）は本人。
   payer: "requester" | "guardian";

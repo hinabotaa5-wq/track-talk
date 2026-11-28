@@ -328,7 +328,7 @@ func (s *Server) consultationOffer(ctx context.Context, q *db.Queries, room cons
 	return *c.AdditionalConsultationPriceYen, 100 - personalFeePercent, requiresVideo, nil
 }
 func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
-	out := map[string]any{"id": c.ID, "request_key": c.RequestKey, "status": c.Status, "funding": c.Funding, "price_yen": c.PriceYen, "payment_state": c.PaymentState, "payer": consultationPayer(c),
+	out := map[string]any{"id": c.ID, "request_key": c.RequestKey, "status": c.Status, "funding": c.Funding, "price_yen": c.PriceYen, "payment_state": c.PaymentState, "refunded_yen": c.RefundedYen, "payer": consultationPayer(c),
 		"minor": c.Minor, "question": c.Question, "answer": c.Answer, "video_public_id": c.VideoPublicID, "video_url": nil, "answer_video_url": nil,
 		"clarify_body": c.ClarifyBody, "clarification": c.Clarification, "clarify_requested_at": c.ClarifyRequestedAt, "clarified_at": c.ClarifiedAt,
 		"respond_by": c.RespondBy, "answer_by": c.AnswerBy, "answered_at": c.AnsweredAt, "created_at": c.CreatedAt, "expires_at": c.ExpiresAt,
@@ -360,7 +360,7 @@ func (s *Server) consultationJSON(c db.CoachingConsultation) map[string]any {
 func (s *Server) consultationJSONFor(c db.CoachingConsultation, role string) map[string]any {
 	out := s.consultationJSON(c)
 	if role == "coach" {
-		for _, k := range []string{"payer", "payment_state", "request_key", "minor"} {
+		for _, k := range []string{"payer", "payment_state", "refunded_yen", "request_key", "minor"} {
 			delete(out, k)
 		}
 	}

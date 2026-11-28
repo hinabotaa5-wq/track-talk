@@ -1232,6 +1232,7 @@ export const en: Readonly<Record<string, string>> = {
   "この追加質問を通報する": "Report this additional question",
   "全額返金済み": "Fully refunded",
   "全額返金を処理中": "Processing full refund",
+  "代金の一部を返金済み": "Partially refunded",
   "確保したチケットは残高に戻ります。": "Reserved tickets will return to your balance.",
   "対応待ちの追加相談": "Follow-up consultations awaiting action",
   "{v0}さん · {v1}": "{v0} · {v1}",

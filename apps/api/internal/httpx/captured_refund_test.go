@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/hinata/track-talk/apps/api/internal/config"
 	"github.com/hinata/track-talk/apps/api/internal/db"
 	"github.com/jackc/pgx/v5"
 	"net/http"
@@ -24,8 +25,13 @@ type capturedFixture struct {
 
 func newCapturedFixture(t *testing.T) capturedFixture {
 	t.Helper()
+	return newCapturedFixtureConfig(t, nil)
+}
+
+func newCapturedFixtureConfig(t *testing.T, mutate func(*config.Config)) capturedFixture {
+	t.Helper()
 	fakeCoachingCloudinary(t)
-	h, f := setupStripe(t)
+	h, f := setupStripeConfig(t, mutate)
 	admin := adminToken(t, h)
 	coach, _ := onDutyCoach(t, h, admin)
 	_, user := demoRequester(t, h, admin)
@@ -198,25 +204,37 @@ func TestCapturedRefundNetBelowMinimumAndZero(t *testing.T) {
 		})
 	}
 }
+
+// 本体 #1097：Dashboard の部分返金も同期する。部分返金では refunded にせず partially_refunded と累計で追い、
+// 同じ返金の重複・順不同の知らせでは累計・減額・通知が二重にならない（T1〜T3 の形）。
 func TestCapturedRefundDashboardIdempotentAndPartialAlert(t *testing.T) {
 	x := newCapturedFixture(t)
 	x.paid(t)
-	notify := func(amount int, status string) {
+	notify := func(id string, amount int, status string) {
 		t.Helper()
-		rec := stripeWebhook(t, x.h, testWebhookSecret, "refund.created", map[string]any{"id": "re_dashboard", "currency": "jpy", "payment_intent": x.intent, "amount": amount, "status": status})
+		rec := stripeWebhook(t, x.h, testWebhookSecret, "refund.created", map[string]any{"id": id, "currency": "jpy", "payment_intent": x.intent, "amount": amount, "status": status})
 		if rec.Code != 200 {
 			t.Fatal(rec.Body.String())
 		}
 	}
-	notify(500, "succeeded")
-	if reviewPaymentStatus(t, x.request) != "captured" {
-		t.Fatal("partial refund marked full")
+	notify("re_dashboard", 500, "succeeded")
+	if reviewPaymentStatus(t, x.request) != "partially_refunded" || scalar(t, `SELECT refunded_yen FROM review_payments WHERE id=$1`, x.payment) != 500 {
+		t.Fatal("partial refund not tracked")
 	}
-	notify(1500, "succeeded")
-	notify(1500, "succeeded")
-	notify(1500, "pending")
-	if reviewPaymentStatus(t, x.request) != "refunded" || scalar(t, `SELECT count(*) FROM coach_refund_adjustments`) != 1 {
+	// floor(1050 × 500 ÷ 1500) = 350 を送金済みの報酬から相殺する。
+	if scalar(t, `SELECT sum(amount_yen) FROM coach_refund_adjustments`) != 350 {
+		t.Fatal("partial offset")
+	}
+	notify("re_dashboard", 500, "succeeded")
+	notify("re_dashboard_rest", 1000, "succeeded")
+	notify("re_dashboard_rest", 1000, "succeeded")
+	notify("re_dashboard_rest", 1000, "pending")
+	notify("re_dashboard", 500, "pending")
+	if reviewPaymentStatus(t, x.request) != "refunded" || scalar(t, `SELECT refunded_yen FROM review_payments WHERE id=$1`, x.payment) != 1500 {
 		t.Fatal("dashboard duplicate")
+	}
+	if scalar(t, `SELECT count(*) FROM captured_payment_refunds`) != 2 || scalar(t, `SELECT sum(amount_yen) FROM coach_refund_adjustments`) != 1050 {
+		t.Fatal("offset total must equal the earning")
 	}
 }
 func TestCapturedRefundFailureRestoresAndCanRetry(t *testing.T) {

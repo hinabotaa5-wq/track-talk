@@ -156,8 +156,7 @@ func TestCapturedRefundCompletionNotice(t *testing.T) {
 				x.refund(t)
 				remoteID = "re_1"
 			} else {
-				event("succeeded", 500)
-				assertRefundNotice(t, h, payer, title, url, pushes, 0)
+				// 一部返金の通知は captured_partial_refund_test.go（本体 #1097）で確かめる。ここは全額の返金の通知だけを見る。
 				event("pending", 1500)
 			}
 			wantState, wantNotices := "refund_pending", 0

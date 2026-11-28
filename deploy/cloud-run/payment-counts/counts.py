@@ -7,12 +7,13 @@ import subprocess
 import sys
 import urllib.parse
 
-# Status enumerations as the code and migrations define them (checked through 000193).
+# Status enumerations as the code and migrations define them (checked through 000201).
 STATUS_COLUMNS = {
-    ("review_payments", "status"): ("pending", "authorized", "captured", "canceled", "refund_pending", "refunded"),
+    ("review_payments", "status"): ("pending", "authorized", "captured", "canceled", "refund_pending", "partially_refunded", "refunded"),
     ("coaching_payments", "status"): ("pending", "paid", "refunded", "partially_refunded"),
     ("coaching_ticket_purchases", "status"): ("pending", "paid", "partially_refunded", "refunded"),
-    ("coaching_consultations", "payment_state"): ("unpaid", "paid", "refund_pending", "refunded"),
+    # partially_refunded（000201、本体 #1097）は Stripe ダッシュボードの部分返金を同期した正規の状態。FLAGGED_STATES には入れない。
+    ("coaching_consultations", "payment_state"): ("unpaid", "paid", "refund_pending", "partially_refunded", "refunded"),
     ("coaching_contracts", "fulfillment_state"): ("open", "refund_pending", "refund_failed", "settled"),
     ("captured_payment_refunds", "status"): ("pending", "succeeded", "failed"),
     ("coaching_ticket_refunds", "status"): ("pending", "succeeded", "failed"),
@@ -38,13 +39,13 @@ LINKED = "EXISTS (SELECT 1 FROM review_payment_earning_links l WHERE l.payment_i
 ORPHANS = {
     # captured_refund.go missingReviewRefundLink: the refund API refuses these.
     "review_payment_settled_unlinked":
-        f"SELECT count(*) FROM review_payments p WHERE p.status IN ('captured','refund_pending','refunded') AND p.request_id IS NULL AND NOT {LINKED}",
+        f"SELECT count(*) FROM review_payments p WHERE p.status IN ('captured','refund_pending','partially_refunded','refunded') AND p.request_id IS NULL AND NOT {LINKED}",
     # A card hold whose request no longer exists.
     "review_payment_authorized_without_request":
         "SELECT count(*) FROM review_payments p WHERE p.status = 'authorized' AND p.request_id IS NULL",
     # queries/coach_payout.sql InsertReviewEarnings conditions, but no earning yet.
     "review_captured_returned_without_earning":
-        "SELECT count(*) FROM review_payments p JOIN review_requests r ON r.id = p.request_id WHERE p.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL AND NOT r.use_tickets AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)",
+        "SELECT count(*) FROM review_payments p JOIN review_requests r ON r.id = p.request_id WHERE p.status IN ('captured','partially_refunded') AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL AND NOT r.use_tickets AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)",
     # Review earnings without a payment link and without a ticket reservation (candidates only).
     # A review whose whole price was covered by a coupon has no payment by design (platform_subsidy_yen >= gross_yen, #1031).
     # Coupon reviews with a card payment keep the payment link; their payment amount is price - coupon and is never compared to the price here.
@@ -58,7 +59,7 @@ ORPHANS = {
         "SELECT count(*) FROM coaching_consultations c WHERE c.funding = 'cash' AND c.payment_state <> 'unpaid' AND NOT EXISTS (SELECT 1 FROM review_requests r WHERE r.id = c.review_request_id) AND NOT EXISTS (SELECT 1 FROM coaching_contracts k WHERE k.id = c.contract_id)",
     # queries/coaching_consultation.sql RecordConsultationEarnings conditions, but no earning.
     "consultation_answered_paid_without_earning":
-        "SELECT count(*) FROM coaching_consultations c WHERE c.status = 'answered' AND c.funding = 'cash' AND c.payment_state = 'paid' AND c.coach_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.consultation_id = c.id)",
+        "SELECT count(*) FROM coaching_consultations c WHERE c.status = 'answered' AND c.funding = 'cash' AND c.payment_state IN ('paid','partially_refunded') AND c.coach_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.consultation_id = c.id)",
     "ticket_purchase_paid_without_owner":
         "SELECT count(*) FROM coaching_ticket_purchases p WHERE p.status IN ('paid','partially_refunded') AND p.owner_id IS NULL",
     "captured_refund_without_payment":
@@ -90,7 +91,7 @@ REQUIRED_COLUMNS = sorted({*STATUS_COLUMNS, ("review_payments", "request_id"), (
                            ("coaching_ticket_purchases", "owner_id"), ("coaching_ticket_purchases", "session_expires_at"),
                            ("coaching_ticket_reservations", "request_id"), ("captured_payment_refunds", "source"),
                            ("captured_payment_refunds", "payment_id")} | {(t, "earning_id" if t in ("review_payment_earning_links", "captured_refund_earnings") else "id") for t in ROW_COUNT_TABLES})
-EXPECTED_MIGRATION = 200
+EXPECTED_MIGRATION = 201
 
 # row_security=off makes RLS raise an error instead of silently hiding rows from the count.
 BEGIN = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSET LOCAL row_security = off;\n"

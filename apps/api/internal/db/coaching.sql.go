@@ -504,7 +504,7 @@ WITH marked AS (
         last_transaction_at = (
             SELECT max(t) FROM (
                 SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
-                WHERE p.payer_id = gc.minor_id AND p.status IN ('captured', 'refunded')
+                WHERE p.payer_id = gc.minor_id AND p.status IN ('captured', 'partially_refunded', 'refunded')
                 UNION ALL
                 SELECT max(GREATEST(c.paid_at, CASE WHEN c.payment_state = 'refunded' THEN c.updated_at END)) FROM coaching_consultations c
                 WHERE c.requester_id = gc.minor_id AND c.contract_id IS NULL AND c.payment_state <> 'unpaid'
@@ -772,19 +772,19 @@ func (q *Queries) SetBirthMonth(ctx context.Context, arg SetBirthMonthParams) (P
 
 const sumMinorSelfPaidSpend = `-- name: SumMinorSelfPaidSpend :one
 SELECT COALESCE(sum(x.amount), 0)::bigint FROM (
-    SELECT amount_yen::bigint AS amount FROM review_payments
+    SELECT (amount_yen - refunded_yen)::bigint AS amount FROM review_payments
     WHERE payer_id = $1::uuid
       AND request_id IS DISTINCT FROM $2::uuid
       AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
-      AND (status IN ('authorized', 'captured', 'refund_pending') OR (status = 'pending' AND session_expires_at > now()))
+      AND (status IN ('authorized', 'captured', 'partially_refunded', 'refund_pending') OR (status = 'pending' AND session_expires_at > now()))
     UNION ALL
-    SELECT c.price_yen::bigint FROM coaching_consultations c
+    SELECT (c.price_yen - c.refunded_yen)::bigint FROM coaching_consultations c
     WHERE c.requester_id = $1::uuid
       AND c.funding = 'cash'
       AND c.contract_id IS NULL
       AND c.id IS DISTINCT FROM $3::uuid
       AND COALESCE(c.paid_at, c.updated_at) >= date_trunc('month', now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
-      AND (c.payment_state IN ('paid', 'refund_pending')
+      AND (c.payment_state IN ('paid', 'partially_refunded', 'refund_pending')
            OR (c.status = 'awaiting_payment' AND c.expires_at > now() AND (c.session_expires_at IS NULL OR c.session_expires_at > now())))
 ) x
 `

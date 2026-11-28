@@ -124,7 +124,7 @@ SELECT
         SELECT 1 FROM review_payments pay
         LEFT JOIN review_requests r ON r.id = pay.request_id
         WHERE pay.payer_id = sqlc.arg('user_id')
-          AND pay.status IN ('authorized', 'captured','refund_pending')
+          AND pay.status IN ('authorized', 'captured', 'partially_refunded', 'refund_pending')
           AND (pay.status IN ('authorized','refund_pending') OR r.id IS NULL OR r.returned_at IS NULL)
     )::boolean AS open_review_payment,
     -- コーチとして割り当てられた対応中の依頼は、退会で担当不在になるので、返却・終了まで退会させない。

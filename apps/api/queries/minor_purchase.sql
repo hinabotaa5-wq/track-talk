@@ -24,7 +24,7 @@ SET account_deleted_at = now(),
     last_transaction_at = (
         SELECT max(t) FROM (
             SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
-            WHERE p.payer_id = d.minor_id AND p.status IN ('captured', 'refunded')
+            WHERE p.payer_id = d.minor_id AND p.status IN ('captured', 'partially_refunded', 'refunded')
             UNION ALL
             SELECT max(GREATEST(c.paid_at, CASE WHEN c.payment_state = 'refunded' THEN c.updated_at END)) FROM coaching_consultations c
             WHERE c.requester_id = d.minor_id AND c.contract_id IS NULL AND c.payment_state <> 'unpaid'
@@ -56,13 +56,19 @@ WHERE d.account_deleted_at IS NOT NULL
 -- admin_* は、そのうち管理画面の返金 API（captured_payment_refunds の origin = 'admin'）で返金したもの。
 -- 期限切れなどの自動の返金も review_* / consultation_* に含む。
 WITH refunds AS (
-    SELECT 'review'::text AS source, p.id, p.amount_yen, p.refunded_at AS refunded_at
+    -- 一部返金（partially_refunded）は1件として、金額は返金済みの累計（refunded_yen）で数える（本体 #1097）。
+    -- 一部返金の日時は、その支払いで最後に成功した返金の日時。
+    SELECT 'review'::text AS source, p.id,
+           CASE WHEN p.status = 'refunded' THEN p.amount_yen ELSE p.refunded_yen END AS amount_yen,
+           CASE WHEN p.status = 'refunded' THEN p.refunded_at ELSE (SELECT max(f.succeeded_at) FROM captured_payment_refunds f WHERE f.source = 'review' AND f.payment_id = p.id AND f.status = 'succeeded') END AS refunded_at
     FROM review_payments p
-    WHERE p.minor AND p.status = 'refunded'
+    WHERE p.minor AND (p.status = 'refunded' OR (p.status = 'partially_refunded' AND p.refunded_yen > 0))
     UNION ALL
-    SELECT 'consultation'::text, c.id, c.price_yen, c.updated_at
+    SELECT 'consultation'::text, c.id,
+           CASE WHEN c.payment_state = 'refunded' THEN c.price_yen ELSE c.refunded_yen END,
+           CASE WHEN c.payment_state = 'refunded' THEN c.updated_at ELSE (SELECT max(f.succeeded_at) FROM captured_payment_refunds f WHERE f.source = 'consultation' AND f.payment_id = c.id AND f.status = 'succeeded') END
     FROM coaching_consultations c
-    WHERE c.minor AND c.contract_id IS NULL AND c.funding = 'cash' AND c.payment_state = 'refunded'
+    WHERE c.minor AND c.contract_id IS NULL AND c.funding = 'cash' AND (c.payment_state = 'refunded' OR (c.payment_state = 'partially_refunded' AND c.refunded_yen > 0))
 )
 SELECT
     count(*) FILTER (WHERE r.source = 'review')::bigint AS review_count,

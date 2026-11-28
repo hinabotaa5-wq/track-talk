@@ -15,7 +15,7 @@ import (
 const createReviewPayment = `-- name: CreateReviewPayment :one
 INSERT INTO review_payments (id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, minor, referral_code)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code
+RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen
 `
 
 type CreateReviewPaymentParams struct {
@@ -64,6 +64,7 @@ func (q *Queries) CreateReviewPayment(ctx context.Context, arg CreateReviewPayme
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }
@@ -82,7 +83,7 @@ const deleteUnpaidReviewRequests = `-- name: DeleteUnpaidReviewRequests :many
 DELETE FROM review_requests r
 WHERE r.status = 'awaiting_payment'
   AND r.created_at <= now() - interval '2 hours'
-  AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured', 'refund_pending'))
+  AND NOT EXISTS (SELECT 1 FROM review_payments pay WHERE pay.request_id = r.id AND pay.status IN ('authorized', 'captured', 'partially_refunded', 'refund_pending'))
 RETURNING r.id
 `
 
@@ -108,7 +109,7 @@ func (q *Queries) DeleteUnpaidReviewRequests(ctx context.Context) ([]uuid.UUID, 
 }
 
 const getLatestReviewPayment = `-- name: GetLatestReviewPayment :one
-SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code FROM review_payments
+SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen FROM review_payments
 WHERE request_id = $1 AND status <> 'pending'
 ORDER BY authorized_at
 LIMIT 1
@@ -137,12 +138,13 @@ func (q *Queries) GetLatestReviewPayment(ctx context.Context, requestID *uuid.UU
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }
 
 const getReusableReviewPayment = `-- name: GetReusableReviewPayment :one
-SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code FROM review_payments
+SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen FROM review_payments
 WHERE request_id = $1 AND method = $2 AND status = 'pending' AND session_expires_at > now() + interval '5 minutes'
 ORDER BY created_at DESC
 LIMIT 1
@@ -176,12 +178,13 @@ func (q *Queries) GetReusableReviewPayment(ctx context.Context, arg GetReusableR
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }
 
 const getReviewPaymentBySession = `-- name: GetReviewPaymentBySession :one
-SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code FROM review_payments
+SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen FROM review_payments
 WHERE checkout_session_id = $1
 `
 
@@ -207,12 +210,13 @@ func (q *Queries) GetReviewPaymentBySession(ctx context.Context, checkoutSession
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }
 
 const getReviewPaymentForRefund = `-- name: GetReviewPaymentForRefund :one
-SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code FROM review_payments WHERE id=$1 FOR UPDATE
+SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen FROM review_payments WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) GetReviewPaymentForRefund(ctx context.Context, id uuid.UUID) (ReviewPayment, error) {
@@ -237,12 +241,13 @@ func (q *Queries) GetReviewPaymentForRefund(ctx context.Context, id uuid.UUID) (
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }
 
 const listPendingReviewPayments = `-- name: ListPendingReviewPayments :many
-SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code FROM review_payments WHERE request_id = $1 AND status = 'pending' ORDER BY created_at DESC LIMIT 5
+SELECT id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen FROM review_payments WHERE request_id = $1 AND status = 'pending' ORDER BY created_at DESC LIMIT 5
 `
 
 // 支払い画面を開いたまま、まだ届いていない支払い（戻り画面で Stripe の状態を確かめる。本体 #569）。
@@ -274,6 +279,7 @@ func (q *Queries) ListPendingReviewPayments(ctx context.Context, requestID *uuid
 			&i.UpdatedAt,
 			&i.Minor,
 			&i.ReferralCode,
+			&i.RefundedYen,
 		); err != nil {
 			return nil, err
 		}
@@ -286,7 +292,7 @@ func (q *Queries) ListPendingReviewPayments(ctx context.Context, requestID *uuid
 }
 
 const listReviewPaymentsToCapture = `-- name: ListReviewPaymentsToCapture :many
-SELECT pay.id, pay.request_id, pay.payer_id, pay.method, pay.amount_yen, pay.checkout_session_id, pay.checkout_url, pay.session_expires_at, pay.payment_intent_id, pay.status, pay.authorized_at, pay.captured_at, pay.canceled_at, pay.refunded_at, pay.created_at, pay.updated_at, pay.minor, pay.referral_code FROM review_payments pay
+SELECT pay.id, pay.request_id, pay.payer_id, pay.method, pay.amount_yen, pay.checkout_session_id, pay.checkout_url, pay.session_expires_at, pay.payment_intent_id, pay.status, pay.authorized_at, pay.captured_at, pay.canceled_at, pay.refunded_at, pay.created_at, pay.updated_at, pay.minor, pay.referral_code, pay.refunded_yen FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status = 'authorized' AND r.returned_at IS NOT NULL
   AND NOT EXISTS (
@@ -327,6 +333,7 @@ func (q *Queries) ListReviewPaymentsToCapture(ctx context.Context) ([]ReviewPaym
 			&i.UpdatedAt,
 			&i.Minor,
 			&i.ReferralCode,
+			&i.RefundedYen,
 		); err != nil {
 			return nil, err
 		}
@@ -339,7 +346,7 @@ func (q *Queries) ListReviewPaymentsToCapture(ctx context.Context) ([]ReviewPaym
 }
 
 const listReviewPaymentsToRelease = `-- name: ListReviewPaymentsToRelease :many
-SELECT pay.id, pay.request_id, pay.payer_id, pay.method, pay.amount_yen, pay.checkout_session_id, pay.checkout_url, pay.session_expires_at, pay.payment_intent_id, pay.status, pay.authorized_at, pay.captured_at, pay.canceled_at, pay.refunded_at, pay.created_at, pay.updated_at, pay.minor, pay.referral_code FROM review_payments pay
+SELECT pay.id, pay.request_id, pay.payer_id, pay.method, pay.amount_yen, pay.checkout_session_id, pay.checkout_url, pay.session_expires_at, pay.payment_intent_id, pay.status, pay.authorized_at, pay.captured_at, pay.canceled_at, pay.refunded_at, pay.created_at, pay.updated_at, pay.minor, pay.referral_code, pay.refunded_yen FROM review_payments pay
 LEFT JOIN review_requests r ON r.id = pay.request_id
 WHERE pay.status IN ('authorized', 'captured')
   AND pay.authorized_at <= now() - interval '1 minute'
@@ -384,6 +391,7 @@ func (q *Queries) ListReviewPaymentsToRelease(ctx context.Context) ([]ReviewPaym
 			&i.UpdatedAt,
 			&i.Minor,
 			&i.ReferralCode,
+			&i.RefundedYen,
 		); err != nil {
 			return nil, err
 		}
@@ -401,7 +409,7 @@ SET status = 'captured',
     captured_at = now(),
     updated_at = now()
 WHERE id = $1 AND status = 'authorized'
-RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code
+RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen
 `
 
 func (q *Queries) MarkReviewPaymentCaptured(ctx context.Context, id uuid.UUID) (ReviewPayment, error) {
@@ -426,6 +434,7 @@ func (q *Queries) MarkReviewPaymentCaptured(ctx context.Context, id uuid.UUID) (
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }
@@ -438,7 +447,7 @@ SET status = $1::text,
     captured_at = CASE WHEN $1::text = 'captured' THEN now() END,
     updated_at = now()
 WHERE checkout_session_id = $3 AND status = 'pending'
-RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code
+RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen
 `
 
 type MarkReviewPaymentPaidParams struct {
@@ -470,6 +479,7 @@ func (q *Queries) MarkReviewPaymentPaid(ctx context.Context, arg MarkReviewPayme
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }
@@ -481,7 +491,7 @@ SET status = CASE WHEN status = 'authorized' THEN 'canceled' ELSE 'refunded' END
     refunded_at = CASE WHEN status = 'captured' THEN now() END,
     updated_at = now()
 WHERE id = $1 AND status IN ('authorized', 'captured')
-RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code
+RETURNING id, request_id, payer_id, method, amount_yen, checkout_session_id, checkout_url, session_expires_at, payment_intent_id, status, authorized_at, captured_at, canceled_at, refunded_at, created_at, updated_at, minor, referral_code, refunded_yen
 `
 
 // 仮押さえなら取り消し、確定済み（PayPay）なら返金した。
@@ -507,6 +517,7 @@ func (q *Queries) MarkReviewPaymentReleased(ctx context.Context, id uuid.UUID) (
 		&i.UpdatedAt,
 		&i.Minor,
 		&i.ReferralCode,
+		&i.RefundedYen,
 	)
 	return i, err
 }

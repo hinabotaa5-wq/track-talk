@@ -72,6 +72,29 @@ func (q *Queries) DeleteRefundCompletionNotice(ctx context.Context, id uuid.UUID
 	return err
 }
 
+const enqueueConsultationPartialRefundNotice = `-- name: EnqueueConsultationPartialRefundNotice :exec
+INSERT INTO refund_completion_notices (id, recipient_id, kind, url, amount_yen)
+VALUES ($1, $2, 'consultation_partial_refund', $3, $4::int)
+ON CONFLICT (id) DO NOTHING
+`
+
+type EnqueueConsultationPartialRefundNoticeParams struct {
+	ID          uuid.UUID `json:"id"`
+	RecipientID uuid.UUID `json:"recipient_id"`
+	Url         string    `json:"url"`
+	AmountYen   int32     `json:"amount_yen"`
+}
+
+func (q *Queries) EnqueueConsultationPartialRefundNotice(ctx context.Context, arg EnqueueConsultationPartialRefundNoticeParams) error {
+	_, err := q.db.Exec(ctx, enqueueConsultationPartialRefundNotice,
+		arg.ID,
+		arg.RecipientID,
+		arg.Url,
+		arg.AmountYen,
+	)
+	return err
+}
+
 const enqueueConsultationRefundNotice = `-- name: EnqueueConsultationRefundNotice :exec
 INSERT INTO refund_completion_notices (id, recipient_id, kind, url)
 VALUES ($1, $2, 'consultation_refund', $3)
@@ -86,6 +109,30 @@ type EnqueueConsultationRefundNoticeParams struct {
 
 func (q *Queries) EnqueueConsultationRefundNotice(ctx context.Context, arg EnqueueConsultationRefundNoticeParams) error {
 	_, err := q.db.Exec(ctx, enqueueConsultationRefundNotice, arg.ID, arg.RecipientID, arg.Url)
+	return err
+}
+
+const enqueueReviewPartialRefundNotice = `-- name: EnqueueReviewPartialRefundNotice :exec
+INSERT INTO refund_completion_notices (id, recipient_id, kind, url, amount_yen)
+SELECT $1, pay.payer_id, 'review_partial_refund',
+       COALESCE('/coaching/requests/' || r.id::text, '/me/coaching/requests'),
+       $2::int
+FROM review_payments pay
+LEFT JOIN review_requests r ON r.id = pay.request_id AND r.requester_id = pay.payer_id
+    AND r.status <> 'awaiting_payment'
+WHERE pay.id = $3 AND pay.payer_id IS NOT NULL
+ON CONFLICT (id) DO NOTHING
+`
+
+type EnqueueReviewPartialRefundNoticeParams struct {
+	OperationID uuid.UUID `json:"operation_id"`
+	AmountYen   int32     `json:"amount_yen"`
+	PaymentID   uuid.UUID `json:"payment_id"`
+}
+
+// Stripe ダッシュボードで一部だけ返金したとき（本体 #1097）。返金した金額を通知に出す。
+func (q *Queries) EnqueueReviewPartialRefundNotice(ctx context.Context, arg EnqueueReviewPartialRefundNoticeParams) error {
+	_, err := q.db.Exec(ctx, enqueueReviewPartialRefundNotice, arg.OperationID, arg.AmountYen, arg.PaymentID)
 	return err
 }
 
@@ -172,7 +219,7 @@ func (q *Queries) ListDueRefundCompletionNotices(ctx context.Context) ([]uuid.UU
 }
 
 const lockRefundCompletionNotice = `-- name: LockRefundCompletionNotice :one
-SELECT id, recipient_id, kind, url, pending_stripe_refund_id, next_attempt_at FROM refund_completion_notices WHERE id = $1 AND pending_stripe_refund_id IS NULL FOR UPDATE SKIP LOCKED
+SELECT id, recipient_id, kind, url, pending_stripe_refund_id, next_attempt_at, amount_yen FROM refund_completion_notices WHERE id = $1 AND pending_stripe_refund_id IS NULL FOR UPDATE SKIP LOCKED
 `
 
 func (q *Queries) LockRefundCompletionNotice(ctx context.Context, id uuid.UUID) (RefundCompletionNotice, error) {
@@ -185,6 +232,7 @@ func (q *Queries) LockRefundCompletionNotice(ctx context.Context, id uuid.UUID) 
 		&i.Url,
 		&i.PendingStripeRefundID,
 		&i.NextAttemptAt,
+		&i.AmountYen,
 	)
 	return i, err
 }

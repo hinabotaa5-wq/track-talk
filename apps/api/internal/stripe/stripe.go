@@ -238,6 +238,8 @@ type Refund struct {
 	Amount        int               `json:"amount"`
 	Status        string            `json:"status"`
 	PaymentIntent string            `json:"payment_intent"`
+	// Currency は返金の通貨（jpy など）。一覧・Webhook の返金オブジェクトにある。
+	Currency string `json:"currency"`
 }
 
 // CreateRefund は、支払いの一部か全部を返金する。

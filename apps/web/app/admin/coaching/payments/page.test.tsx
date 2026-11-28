@@ -44,6 +44,23 @@ it("返金理由が必要で、確認後に支払い単位の全額返金を送�
  expect(container.textContent).toContain("発生元の返金：refund-1");
 });
 
+it("一部返金の支払いは「一部返金」と返金済みの累計を表示し、残額の返金を確認してから送る", async () => {
+ const partial = { ...data, payments: [{ id: "payment-2", source: "consultation", amount_yen: 500, refunded_yen: 200, status: "partially_refunded", created_at: "2026-11-01T00:00:00Z" }] };
+ mocks.api.mockResolvedValue(partial); mocks.confirm.mockResolvedValue(true);
+ await act(async () => root.render(<Page />));
+ expect(container.textContent).toContain("追加質問 · 500円 · 一部返金 · 返金済み 200円");
+ const button = Array.from(container.querySelectorAll("button")).find(b => b.textContent === "残額を返金する")!;
+ const input = container.querySelector('input[maxlength="1000"]')!;
+ await act(async () => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "残りも返金");
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+ });
+ mocks.api.mockResolvedValueOnce({ message: "受け付けました" }).mockResolvedValueOnce(partial);
+ await act(async () => button.click());
+ expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ title: "残額を返金しますか？", body: expect.stringContaining("残り300円") }));
+ expect(mocks.api).toHaveBeenCalledWith("/v1/admin/coaching/payments/payment-2/refund", expect.objectContaining({ method: "POST", body: JSON.stringify({ source: "consultation", reason: "残りも返金" }) }));
+});
+
 it("権限エラーの場合は監査記録や返金ボタンを表示しない", async () => {
  mocks.api.mockRejectedValue(new Error("forbidden"));
  await act(async () => root.render(<Page />));
