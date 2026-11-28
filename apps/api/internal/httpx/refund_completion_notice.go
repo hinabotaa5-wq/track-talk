@@ -109,6 +109,16 @@ func refundCompletionMessage(notice db.RefundCompletionNotice) push.Message {
 	switch notice.Kind {
 	case "review_cancel":
 		message.Title = "スタンダードの仮押さえの取り消しが完了しました"
+	case "review_partial_refund":
+		// 一部だけの返金は、全額の返金が済んだと誤解されない文面にし、返金した金額を出す（本体 #1097）。
+		message.Title = "スタンダードの代金の一部を返金しました"
+		message.Body = partialRefundBody(notice)
+	case "consultation_partial_refund":
+		message.Title = "追加相談の代金の一部を返金しました"
+		if strings.HasPrefix(notice.Url, "/coaching/requests/") {
+			message.Title = "追加質問の代金の一部を返金しました"
+		}
+		message.Body = partialRefundBody(notice)
 	case "consultation_refund":
 		message.Title = "追加相談の返金が完了しました"
 		// 追加相談の返金は動画添削の追加質問とサポートプランの追加相談の両方で起きる。
@@ -119,4 +129,12 @@ func refundCompletionMessage(notice db.RefundCompletionNotice) push.Message {
 		}
 	}
 	return message
+}
+
+// partialRefundBody は、一部返金の通知の本文（返金した金額）。
+func partialRefundBody(notice db.RefundCompletionNotice) string {
+	if notice.AmountYen == nil {
+		return "お支払いの一部を返金しました。"
+	}
+	return "お支払いのうち " + formatYen64(int64(*notice.AmountYen)) + " を返金しました。"
 }

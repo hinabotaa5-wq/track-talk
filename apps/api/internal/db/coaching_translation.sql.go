@@ -116,7 +116,7 @@ func (q *Queries) ListConsultationTranslations(ctx context.Context, ids []uuid.U
 }
 
 const listEnCoachConsultations = `-- name: ListEnCoachConsultations :many
-SELECT c.id, c.requester_id, c.coach_id, c.request_key, c.review_request_id, c.contract_id, c.minor, c.funding, c.price_yen, c.share_percent, c.status, c.question, c.video_public_id, c.answer, c.answer_video_public_id, c.clarify_body, c.clarification, c.clarify_requested_at, c.clarified_at, c.respond_by, c.answer_by, c.answered_at, c.closed_at, c.expires_at, c.payment_state, c.checkout_session_id, c.checkout_url, c.session_expires_at, c.payment_intent_id, c.paid_at, c.hidden_at, c.purged_at, c.created_at, c.updated_at, c.videos_purged_at, c.offered_at FROM coaching_consultations c
+SELECT c.id, c.requester_id, c.coach_id, c.request_key, c.review_request_id, c.contract_id, c.minor, c.funding, c.price_yen, c.share_percent, c.status, c.question, c.video_public_id, c.answer, c.answer_video_public_id, c.clarify_body, c.clarification, c.clarify_requested_at, c.clarified_at, c.respond_by, c.answer_by, c.answered_at, c.closed_at, c.expires_at, c.payment_state, c.checkout_session_id, c.checkout_url, c.session_expires_at, c.payment_intent_id, c.paid_at, c.hidden_at, c.purged_at, c.created_at, c.updated_at, c.videos_purged_at, c.offered_at, c.refunded_yen FROM coaching_consultations c
 JOIN profiles p ON p.id = c.coach_id
 WHERE p.locale = 'en'
   AND (c.status IN ('offered','in_review','answered','declined')
@@ -173,6 +173,7 @@ func (q *Queries) ListEnCoachConsultations(ctx context.Context) ([]CoachingConsu
 			&i.UpdatedAt,
 			&i.VideosPurgedAt,
 			&i.OfferedAt,
+			&i.RefundedYen,
 		); err != nil {
 			return nil, err
 		}

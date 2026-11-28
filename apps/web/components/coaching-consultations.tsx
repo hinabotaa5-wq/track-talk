@@ -252,6 +252,7 @@ function ConsultationCard({ consultation: c, kind, sendEnabled, role, base, toke
       {role === "coach" && c.terms && c.status === "offered" ? <WorkOrderTermsView terms={c.terms} offered /> : null}
       {role === "coach" && c.work_order ? <WorkOrderView order={c.work_order} /> : null}
     </>}
+    {c.payment_state === "partially_refunded" ? <p className="text-sm text-slate-300">{L("代金の一部を返金済み")}{c.refunded_yen ? `（${consultationPrice(kind, role, c.refunded_yen)}）` : ""}</p> : null}
     {c.payment_state === "refund_pending" || c.payment_state === "refunded" ? <p className="text-sm text-slate-300">{c.payment_state === "refunded" ? L("全額返金済み") : L("全額返金を処理中")}</p> : null}
     {c.funding === "ticket" && ["declined", "expired", "cancelled"].includes(c.status) ? <p className="text-xs text-slate-300">{L("確保したチケットは残高に戻ります。")}</p> : null}
     {error ? <p role="alert" className="text-sm text-red-400">{error}</p> : null}

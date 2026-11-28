@@ -57,6 +57,10 @@ type fakeStripe struct {
 	chargeAmounts map[string]int
 	// 失敗・取り消しとして答えた返金（refunds の位置）。決済額の判定の累計に入れない。
 	failedRefunds map[int]bool
+	// 日次照合の返金一覧（payment_intent を付けない GET /v1/refunds）に返す返金。Dashboard だけで作られた返金の代わり（本体 #1097）。
+	listedRefunds []map[string]any
+	// 日次照合の返金一覧を読んだときの条件（照合の幅の確かめに使う）。
+	refundListQueries []url.Values
 }
 
 // chargeCap は、その PaymentIntent に返金できる累計の上限（分からなければ 0＝上限を見ない）。
@@ -229,6 +233,9 @@ func setupStripeConfig(t *testing.T, mutate func(*config.Config)) (http.Handler,
 			}
 			f.transfers = append(f.transfers, r.PostForm)
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("tr_%d", len(f.transfers)), "amount": json.Number(r.PostForm.Get("amount"))})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/refunds" && r.URL.Query().Get("payment_intent") == "":
+			f.refundListQueries = append(f.refundListQueries, r.URL.Query())
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": append([]map[string]any{}, f.listedRefunds...), "has_more": false})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/refunds":
 			refunds := []map[string]any{}
 			for i, form := range f.refunds {

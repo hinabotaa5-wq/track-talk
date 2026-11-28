@@ -17,6 +17,9 @@ import (
 // 記録と合わない返金・送金が Webhook か日次の照合で見つかったら、運営へメールする。
 // メール本文には種類・Stripe のオブジェクト ID・金額・日時だけを入れ、鍵や個人情報は入れない。
 
+// refundReconcileWindow は、日次照合で Stripe から読み直す返金の幅。Stripe の Webhook の再送（最大3日）が尽きた後も拾う。
+const refundReconcileWindow = 8 * 24 * time.Hour
+
 type refundNotice struct {
 	RefundID      string
 	PaymentIntent string
@@ -265,8 +268,10 @@ func (s *Server) checkPayout(ctx context.Context, payoutID string, amount int, w
 		key)
 }
 
-// reconcileStripeMoney は、Webhook の取りこぼし対策の日次照合。過去25時間の返金・送金を
+// reconcileStripeMoney は、Webhook の取りこぼし対策の日次照合。返金は過去8日、送金は過去25時間を
 // Stripe から一覧し、同じ照合にかける。1日に1回だけ（プロセス再起動時はその日に再実行されうる）。
+// 返金は検知の前に Webhook と同じ同期（syncStripeRefund）を試み、同期できたものは検知しない（本体 #1097）。
+// Webhook の再送が尽きた後の返金も拾えるよう、返金の照合の幅は8日にしている。使う鍵は本体側（s.stripe）。
 func (s *Server) reconcileStripeMoney(ctx context.Context) error {
 	if !s.stripe.Configured() {
 		return nil
@@ -281,11 +286,18 @@ func (s *Server) reconcileStripeMoney(ctx context.Context) error {
 	s.securityMu.Unlock()
 
 	since := s.now().Add(-25 * time.Hour)
-	refunds, err := s.stripe.ListRefunds(ctx, since)
+	refunds, err := s.stripe.ListRefunds(ctx, s.now().Add(-refundReconcileWindow))
 	if err != nil {
 		return err
 	}
 	for _, r := range refunds {
+		synced, err := s.syncStripeRefund(ctx, r)
+		if err != nil {
+			slog.Warn("stripe refund reconcile sync", "refund", r.ID, "err", err)
+		}
+		if synced {
+			continue
+		}
 		s.alertUnknownRefund(ctx, refundNotice{RefundID: r.ID, PaymentIntent: r.PaymentIntent, Amount: r.Amount}, s.now())
 	}
 	transfers, err := s.stripe.ListTransfers(ctx, since)

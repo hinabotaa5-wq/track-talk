@@ -395,6 +395,7 @@ type CoachingConsultation struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 	VideosPurgedAt      *time.Time `json:"videos_purged_at"`
 	OfferedAt           *time.Time `json:"offered_at"`
+	RefundedYen         int32      `json:"refunded_yen"`
 }
 
 type CoachingConsultationAccessLog struct {
@@ -1350,6 +1351,7 @@ type RefundCompletionNotice struct {
 	Url                   string    `json:"url"`
 	PendingStripeRefundID *string   `json:"pending_stripe_refund_id"`
 	NextAttemptAt         time.Time `json:"next_attempt_at"`
+	AmountYen             *int32    `json:"amount_yen"`
 }
 
 type Report struct {
@@ -1404,6 +1406,7 @@ type ReviewPayment struct {
 	UpdatedAt         time.Time  `json:"updated_at"`
 	Minor             bool       `json:"minor"`
 	ReferralCode      *string    `json:"referral_code"`
+	RefundedYen       int32      `json:"refunded_yen"`
 }
 
 type ReviewPaymentEarningLink struct {

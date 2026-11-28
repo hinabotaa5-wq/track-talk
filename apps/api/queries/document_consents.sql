@@ -19,7 +19,7 @@ UPDATE document_consents dc SET account_deleted_at = now(),
     last_transaction_at = (
         SELECT max(t) FROM (
             SELECT max(GREATEST(p.captured_at, p.refunded_at)) AS t FROM review_payments p
-            WHERE p.payer_id = dc.user_id AND p.status IN ('captured', 'refunded')
+            WHERE p.payer_id = dc.user_id AND p.status IN ('captured', 'partially_refunded', 'refunded')
             UNION ALL
             SELECT max(GREATEST(c.paid_at, CASE WHEN c.payment_state = 'refunded' THEN c.updated_at END)) FROM coaching_consultations c
             WHERE c.requester_id = dc.user_id AND c.contract_id IS NULL AND c.payment_state <> 'unpaid'

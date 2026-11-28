@@ -14,6 +14,23 @@ INSERT INTO refund_completion_notices (id, recipient_id, kind, url)
 VALUES ($1, $2, 'consultation_refund', $3)
 ON CONFLICT (id) DO NOTHING;
 
+-- name: EnqueueReviewPartialRefundNotice :exec
+-- Stripe ダッシュボードで一部だけ返金したとき（本体 #1097）。返金した金額を通知に出す。
+INSERT INTO refund_completion_notices (id, recipient_id, kind, url, amount_yen)
+SELECT sqlc.arg(operation_id), pay.payer_id, 'review_partial_refund',
+       COALESCE('/coaching/requests/' || r.id::text, '/me/coaching/requests'),
+       sqlc.arg(amount_yen)::int
+FROM review_payments pay
+LEFT JOIN review_requests r ON r.id = pay.request_id AND r.requester_id = pay.payer_id
+    AND r.status <> 'awaiting_payment'
+WHERE pay.id = sqlc.arg(payment_id) AND pay.payer_id IS NOT NULL
+ON CONFLICT (id) DO NOTHING;
+
+-- name: EnqueueConsultationPartialRefundNotice :exec
+INSERT INTO refund_completion_notices (id, recipient_id, kind, url, amount_yen)
+VALUES ($1, $2, 'consultation_partial_refund', $3, sqlc.arg(amount_yen)::int)
+ON CONFLICT (id) DO NOTHING;
+
 -- name: ListDueRefundCompletionNotices :many
 SELECT id FROM refund_completion_notices WHERE pending_stripe_refund_id IS NULL AND next_attempt_at <= now()
 ORDER BY next_attempt_at, id LIMIT 50;

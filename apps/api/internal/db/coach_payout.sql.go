@@ -267,7 +267,7 @@ SELECT gen_random_uuid(), r.coach_id, 'review', r.id, pay.amount_yen + r.coupon_
        (pay.amount_yen + r.coupon_discount_yen) * $1::int / 100, r.returned_at, r.coupon_discount_yen
 FROM review_payments pay
 JOIN review_requests r ON r.id = pay.request_id
-WHERE pay.status = 'captured' AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL
+WHERE pay.status IN ('captured', 'partially_refunded') AND r.returned_at IS NOT NULL AND r.coach_id IS NOT NULL
   AND NOT r.use_tickets
   AND NOT EXISTS (SELECT 1 FROM coach_earnings e WHERE e.review_request_id = r.id)
 LIMIT 100

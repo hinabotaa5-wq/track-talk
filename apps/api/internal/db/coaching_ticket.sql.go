@@ -1357,10 +1357,10 @@ func (q *Queries) SettleTicketReservation(ctx context.Context, arg SettleTicketR
 
 const sumMonthlyCoachingSpend = `-- name: SumMonthlyCoachingSpend :one
 SELECT COALESCE(sum(x.amount),0)::bigint FROM (
- SELECT amount_yen::bigint AS amount FROM review_payments WHERE payer_id = $1::uuid
+ SELECT (amount_yen-refunded_yen)::bigint AS amount FROM review_payments WHERE payer_id = $1::uuid
  AND request_id IS DISTINCT FROM $2::uuid
  AND created_at >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
- AND (status IN ('authorized','captured','refund_pending') OR (status='pending' AND session_expires_at>now()))
+ AND (status IN ('authorized','captured','partially_refunded','refund_pending') OR (status='pending' AND session_expires_at>now()))
  UNION ALL
  SELECT (pay.amount_yen-pay.refunded_yen)::bigint FROM coaching_payments pay JOIN coaching_contracts ct ON ct.id=pay.contract_id
  WHERE ct.requester_id = $1::uuid AND ct.id IS DISTINCT FROM $3::uuid
@@ -1372,10 +1372,10 @@ SELECT COALESCE(sum(x.amount),0)::bigint FROM (
  AND COALESCE(paid_at,created_at) >= date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
  AND (status IN ('paid','partially_refunded') OR (status='pending' AND session_expires_at>now()))
  UNION ALL
- SELECT c.price_yen::bigint FROM coaching_consultations c WHERE c.requester_id=$1::uuid
+ SELECT (c.price_yen-c.refunded_yen)::bigint FROM coaching_consultations c WHERE c.requester_id=$1::uuid
  AND c.funding='cash' AND c.id IS DISTINCT FROM $5::uuid
  AND COALESCE(c.paid_at,c.updated_at)>=date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo') AT TIME ZONE 'Asia/Tokyo'
- AND (c.payment_state IN ('paid','refund_pending') OR (c.status='awaiting_payment' AND c.expires_at>now() AND (c.session_expires_at IS NULL OR c.session_expires_at>now())))
+ AND (c.payment_state IN ('paid','partially_refunded','refund_pending') OR (c.status='awaiting_payment' AND c.expires_at>now() AND (c.session_expires_at IS NULL OR c.session_expires_at>now())))
 ) x
 `
 
