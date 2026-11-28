@@ -1,12 +1,14 @@
 import { L } from "@/lib/i18n";
-import type { PremiumSlot, ReviewRequest } from "./types";
+import type { PremiumKind, ReviewRequest } from "./types";
 
-// プレミアム（本体 #1053）。決まった5枠に、申込全体で1〜10本の動画を送り、コーチが総括（全体の一言診断＋枠ごとのブロック）で返す。
-// 枠・本数・入力の上限は API（apps/api/internal/httpx/premium.go）と揃える。
+// プレミアム（本体 #1053、補足 7231984993・補足2 7231991592 の再設計）。動画をテーマごとのグループに分けて申込全体で1〜6本送り、
+// コーチがグループごとの自由記入＋最後の「まとめ」で返す。制限は合計6本だけ（グループ数・グループごとの本数に制限なし）。
+// テンプレ・本数・入力の上限は API（apps/api/internal/httpx/premium.go）と揃える。
 
-export const premiumSlots: PremiumSlot[] = ["race", "start", "second_half", "practice", "other"];
+// グループのテーマのテンプレ。全部を埋める必要はなく、同じテンプレのグループを何個作ってもよい。
+export const premiumKinds: PremiumKind[] = ["race", "start", "second_half", "practice", "other"];
 
-export const premiumSlotLabels: Record<PremiumSlot, string> = {
+export const premiumKindLabels: Record<PremiumKind, string> = {
   get race() { return L("レース全体"); },
   get start() { return L("スタート"); },
   get second_half() { return L("後半"); },
@@ -14,12 +16,24 @@ export const premiumSlotLabels: Record<PremiumSlot, string> = {
   get other() { return L("その他"); },
 };
 
-export const maxPremiumVideos = 10;
-// 総括の枠ごとのブロックの上限。全体の一言診断はスタンダードの回答と同じ300字。
-export const maxPremiumSectionChars = 1000;
+export const maxPremiumVideos = 6;
+// 返却のグループごとの記入と、最後のまとめの上限。
+export const maxPremiumSectionChars = 2000;
+export const maxPremiumSummaryChars = 2000;
 
-// 動画ごとの入力の上限（すべて任意）。レース全体：この時のタイム・風速・その時の体のコンディション。練習：その練習をした目的。
-export const premiumVideoInputLimits = { race_time: 100, wind_speed: 50, body_condition: 300, practice_purpose: 300 } as const;
+// グループの入力の上限（テーマ名以外は任意）。意識・目的は全グループ共通、タイム・風速・コンディションはレース全体のグループの動画だけ。
+export const premiumGroupInputLimits = { title: 30, focus_note: 300 } as const;
+export const premiumVideoInputLimits = { race_time: 100, wind_speed: 50, body_condition: 300 } as const;
+
+// defaultGroupTitle は、テンプレを選んだときのテーマ名。同じ名前がもうあれば番号を付ける（返却の引用単位はテーマ名なので重ねない）。
+export function defaultGroupTitle(kind: PremiumKind, taken: string[]): string {
+  const base = premiumKindLabels[kind];
+  if (!taken.includes(base)) return base;
+  for (let n = 2; ; n++) {
+    const title = `${base}${n}`;
+    if (!taken.includes(title)) return title;
+  }
+}
 
 export function isPremium(request: Pick<ReviewRequest, "plan">): boolean {
   return request.plan === "premium";

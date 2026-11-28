@@ -145,7 +145,7 @@ function FeaturedContent({ result }: { result: Loaded }) {
       <FeaturedSteps
         testID="featured-premium-steps"
         heading={L("プレミアム")}
-        steps={[L("枠ごとに動画を送るだけ（最大10本まで）"), L("コーチがまとめて見て診断"), L("24時間以内に総括で返却")]}
+        steps={[L("テーマごとに動画を送るだけ（最大6本まで）"), L("コーチがまとめて見て診断"), L("24時間以内に回答とまとめを返却")]}
       />
 
       <div data-testid="featured-cta" className="glass fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-20 border-t border-white/20 bg-white/10 p-3 md:bottom-0 md:pb-[max(0.75rem,env(safe-area-inset-bottom))]">

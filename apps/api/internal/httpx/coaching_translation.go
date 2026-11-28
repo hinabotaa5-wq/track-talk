@@ -405,7 +405,7 @@ func reviewResponseSourceHash(rs db.ReviewResponse) string {
 
 // ensureReviewResponseTranslation はコーチの回答3点（良い点・直す点・ドリル）を1回の呼び出しで和訳する。
 func (s *Server) ensureReviewResponseTranslation(ctx context.Context, rs db.ReviewResponse, existing *db.ReviewTranslation) (translateOutcome, error) {
-	// プレミアムの総括（本体 #1053）には回答3点がないので訳さない（総括の訳は対象外）。
+	// プレミアムの返却（本体 #1053）には回答3点がないので訳さない（グループごとの記入・まとめの訳は対象外）。
 	if rs.HiddenAt != nil || rs.GoodPoint == nil {
 		return translateNone, nil
 	}

@@ -14,7 +14,7 @@ export type ReviewResponseCoach = { nickname: string | null; photo_url: string }
 // 互換：2026-11-25 の型（本体 #1013）で書かれた返答のキュー・成功の目安・次に撮る動画は、値があるときだけ
 // 従来の見出しのまま 改善点の後（キュー）・ドリルの後（成功の目安→次に撮る動画）に出す。新しい返答では null なので出ない。
 // hitokoto が無い過去の返答は「コーチなら明日から何をするか」の節を出さない。
-// プレミアムの総括（本体 #1053）は型が別で、hitokoto を冒頭の「一言診断」として出し、その後に枠ごとのブロックを出す。
+// プレミアム（本体 #1053 補足）は型が別で、グループごとの記入を出し、最後（末尾）に「まとめ」を出す。
 // 1回プランは会話ではなく完結した回答なので、項目ごとの吹き出しに分けず1枚の回答ドキュメントとして出す（本体 #984）。
 // 海外コーチの回答3点は、和訳があれば和訳を主に・原文を直下に併記する（本体 #916）。コーチ本人の画面（viewer="coach"）は原文だけ。
 export function ReviewResponseView({ response, viewer = "requester", coach }: { response: ReviewResponse; viewer?: "requester" | "coach"; coach?: ReviewResponseCoach }) {
@@ -24,7 +24,7 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
     );
   }
   const mine = viewer === "coach";
-  // プレミアムの総括（本体 #1053）は、全体の一言診断と枠ごとのブロックだけを出す（スタンダードの型の欄はない）。
+  // プレミアム（本体 #1053 補足）は、グループごとの記入と最後のまとめだけを出す（スタンダードの型の欄はない）。
   const premium = Array.isArray(response.sections);
   const good = coachText(response.good_point ?? "", response.good_point_ja, { mine });
   const fixes = premium ? [] : coachTexts(response.fix_points, response.fix_points_ja, { mine });
@@ -45,12 +45,14 @@ export function ReviewResponseView({ response, viewer = "requester", coach }: { 
         </div>
       </header>
       {premium ? (<>
-        {response.hitokoto ? (
-          <DocSection title={L("一言診断")} tone="text-violet-300">
-            <p className="whitespace-pre-wrap text-slate-100">{response.hitokoto}</p>
-          </DocSection>
-        ) : null}
         <PremiumSummarySections sections={response.sections ?? []} />
+        {response.summary ? (
+          <div data-testid="premium-summary">
+            <DocSection title={L("まとめ")} tone="text-violet-300">
+              <p className="whitespace-pre-wrap text-slate-100">{response.summary}</p>
+            </DocSection>
+          </div>
+        ) : null}
       </>) : (<>
       <DocSection title={L("良い点")} tone="text-emerald-300">
         <p className="whitespace-pre-wrap text-slate-100">{good.text}</p>

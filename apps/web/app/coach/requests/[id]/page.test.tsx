@@ -509,3 +509,69 @@ it("W5: 追加項目の欄のエラーはその欄の下に出る", async () => 
   const label = [...responseForm().querySelectorAll("label")].find((l) => l.querySelector("span.font-semibold")?.textContent === "スタート局面の詳しい分析")!;
   expect(label.textContent).toContain("「スタート局面の詳しい分析」を入力してください");
 });
+
+// プレミアム（本体 #1053 補足）：動画はグループごとに出し、各グループの意識・目的と、レース全体のグループの動画のタイム等を併記する（T8）。
+// 返却はグループごとの自由記入＋最後のまとめ（T9）。旧形の一言診断・枠は出さない。
+const premiumRequest = {
+  ...base,
+  plan: "premium",
+  question: "",
+  pb: "10秒98",
+  goal_time: "10秒80",
+  video_count: 3,
+  premium_groups: [
+    { position: 1, kind: "race", title: "レース全体", focus_note: "後半の失速を減らしたい", videos: [
+      { position: 1, video_url: "https://example.test/1.mp4", thumbnail_url: null, race_time: "11秒02", wind_speed: "+1.2", body_condition: "脚が張っていた" },
+    ] },
+    { position: 2, kind: "practice", title: "ミニハードル", focus_note: "接地を体の真下に", videos: [
+      { position: 2, video_url: "https://example.test/2.mp4", thumbnail_url: null },
+      { position: 3, video_url: "https://example.test/3.mp4", thumbnail_url: null },
+    ] },
+  ],
+} as unknown as CoachReviewRequest;
+
+it("プレミアム：グループごとに動画と意識・目的・レースの入力を出し、返却はグループごとの記入と最後のまとめ", async () => {
+  const sent: unknown[] = [];
+  apiFetch.mockImplementation(async (path: string, options?: { method?: string; body?: string }) => {
+    if (!options?.method && path.includes("/consultations")) return emptyRoom;
+    if (options?.method === "POST") {
+      sent.push(JSON.parse(options.body ?? "{}"));
+      return {
+        ...premiumRequest,
+        status: "returned",
+        response: { ...responded.response, good_point: null, fix_points: null, drill: null, hitokoto: null, summary: "全体のまとめ",
+          sections: [{ group_position: 1, title: "レース全体", body: "レースの回答" }, { group_position: 2, title: "ミニハードル", body: "練習の回答" }] },
+      };
+    }
+    return premiumRequest;
+  });
+  await renderPage();
+  const groups = container.querySelector('[data-testid="premium-video-groups"]')!;
+  const race = groups.querySelector('[data-testid="premium-group-1"]')!.textContent!;
+  const practice = groups.querySelector('[data-testid="premium-group-2"]')!.textContent!;
+  expect(race).toContain("レース全体");
+  expect(race).toContain("後半の失速を減らしたい");
+  expect(race).toContain("11秒02");
+  expect(race).toContain("+1.2");
+  expect(practice).toContain("ミニハードル");
+  expect(practice).toContain("接地を体の真下に");
+  expect(practice).not.toContain("この時のタイム");
+  expect(container.textContent).toContain("10秒98");
+
+  const form = container.querySelector('[data-testid="premium-response-form"]') as HTMLFormElement;
+  const labels = [...form.querySelectorAll("label > span.font-semibold")].map((s) => s.textContent);
+  expect(labels).toEqual(["レース全体", "ミニハードル", "まとめ", "見本動画（任意、60秒まで）"]);
+  expect(form.textContent).not.toContain("一言診断");
+  const areas = [...form.querySelectorAll("textarea")] as HTMLTextAreaElement[];
+  await fillTextarea(areas[0], "レースの回答");
+  await fillTextarea(areas[1], "練習の回答");
+  await fillTextarea(areas[2], "全体のまとめ");
+  await act(async () => submitButton("回答を送る").click());
+  expect(sent).toEqual([{ sections: [{ group_position: 1, body: "レースの回答" }, { group_position: 2, body: "練習の回答" }], summary: "全体のまとめ", demo_video_public_id: "" }]);
+  // 返却後の表示：グループごとの記入のあと、まとめが末尾に出る。
+  const article = container.querySelector('article[aria-label="コーチの回答"]')!;
+  const text = article.textContent!;
+  expect(text.indexOf("レースの回答")).toBeLessThan(text.indexOf("練習の回答"));
+  expect(text.indexOf("練習の回答")).toBeLessThan(text.indexOf("全体のまとめ"));
+  expect(article.querySelector('[data-testid="premium-summary"]')?.textContent).toContain("まとめ");
+});

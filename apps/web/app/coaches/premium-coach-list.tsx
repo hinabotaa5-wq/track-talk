@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { formatDisplayPrice } from "@/lib/format";
 import { coachEventLabels } from "@/lib/coach-recruit";
 import { coachDisplayText, countryFlagEmoji } from "@/lib/coach-display";
-import { maxPremiumVideos, premiumRequestHref, premiumSlotLabels, premiumSlots } from "@/lib/premium";
+import { maxPremiumVideos, premiumKindLabels, premiumKinds, premiumRequestHref } from "@/lib/premium";
 import type { PublicCoach } from "@/lib/types";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -44,8 +44,8 @@ export function PremiumCoachList({ onSettled }: { onSettled?: () => void }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-200">
-        {L("決まった5枠（{slots}）に、合わせて{max}本まで動画を送れます。コーチが全部を見て、総括で返します。", {
-          slots: premiumSlots.map((slot) => premiumSlotLabels[slot]).join(L("、")),
+        {L("動画をテーマごとのグループ（{slots}など）に分けて、合わせて{max}本まで送れます。練習の動画だけでも大丈夫です。コーチがグループごとに回答し、最後にまとめを返します。", {
+          slots: premiumKinds.map((kind) => premiumKindLabels[kind]).join(L("、")),
           max: maxPremiumVideos,
         })}
       </p>

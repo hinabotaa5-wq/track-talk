@@ -92,7 +92,7 @@ it("紹介バナー → 見出し文 → コーチについて（顔写真・記
   expect(stepHeading(steps())).toBe("スタンダード");
   expect(premiumSteps()?.tagName).toBe("OL");
   expect(premiumSteps()?.className).toBe(steps()?.className);
-  expect(stepTexts(premiumSteps())).toEqual(["1枠ごとに動画を送るだけ（最大10本まで）", "2コーチがまとめて見て診断", "324時間以内に総括で返却"]);
+  expect(stepTexts(premiumSteps())).toEqual(["1テーマごとに動画を送るだけ（最大6本まで）", "2コーチがまとめて見て診断", "324時間以内に回答とまとめを返却"]);
   expect(stepHeading(premiumSteps())).toBe("プレミアム");
   expect(before(steps(), premiumSteps())).toBe(true);
   expect(container.textContent).not.toContain("どんな添削が返ってくるか");
@@ -362,7 +362,7 @@ it("英語表示では固定文を英語で出す", async () => {
   expect(container.textContent).toContain("Returned within 24 hours");
   expect(stepHeading(steps())).toBe("Standard");
   expect(stepHeading(premiumSteps())).toBe("Premium");
-  expect(stepTexts(premiumSteps())).toEqual(["1Just send videos for each slot (up to 10)", "2The coach reviews them all and diagnoses", "3Summary returned within 24 hours"]);
+  expect(stepTexts(premiumSteps())).toEqual(["1Just send videos grouped by theme (up to 6)", "2The coach reviews them all and diagnoses", "3Answers and a summary returned within 24 hours"]);
   expect(container.textContent).not.toContain("FAQ");
 });
 

@@ -14,10 +14,12 @@ it("海外コーチ向けの英語の紹介ページ：確定原稿の金額・�
   expect(text).toContain("Premium: athletes pay $127 (¥20,000) per package — you receive $100 of that.");
   expect(text).toContain("Reviews: athletes pay $65 (¥10,000) per review — you receive $50 of that.");
   expect(text).toContain("in Japan a single review costs the athlete ¥1,000 and the coach receives ¥700");
-  expect(text).toContain("in two formats — a single video review, or a premium assessment across up to 10 videos.");
+  // プレミアムは合計6本・テーマごとのグループ・グループごとの記入＋まとめ（#1053 補足 2026-11-28）。
+  expect(text).toContain("in two formats — a single video review, or a premium assessment across up to 6 videos.");
   expect(text).toContain("2. Premium package (the deeper option)");
-  expect(text).toContain("The athlete sends up to 10 videos at once, numbered so you can refer to them easily. You watch all of them and reply with one overall assessment — not a separate review of each video.");
-  expect(text).toContain("a cue and drills for each, and the direction for the athlete's next training block.");
+  expect(text).toContain("The athlete sends up to 6 videos at once, grouped by theme (for example race, start or a practice drill — practice videos alone are fine) and with a note on what they are focusing on in each group.");
+  expect(text).toContain("You watch all of them and write freely for each group, citing the group by name, then finish with one overall summary — not a separate review of each video.");
+  expect(text).not.toContain("up to 10");
   // 月額パッケージの旧文言は残さない（C1）。
   for (const old of ["$380", "¥60,000", "$300", "20 videos", "one-month", "monthly packages", "36 hours", "revise it each week", "across a full month"]) expect(text).not.toContain(old);
   expect(text).not.toContain("no set cap");

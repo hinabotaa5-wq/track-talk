@@ -1469,15 +1469,23 @@ type ReviewRequest struct {
 }
 
 type ReviewRequestVideo struct {
-	RequestID       uuid.UUID `json:"request_id"`
-	Position        int16     `json:"position"`
-	Slot            string    `json:"slot"`
-	VideoPublicID   string    `json:"video_public_id"`
-	RaceTime        *string   `json:"race_time"`
-	WindSpeed       *string   `json:"wind_speed"`
-	BodyCondition   *string   `json:"body_condition"`
-	PracticePurpose *string   `json:"practice_purpose"`
-	CreatedAt       time.Time `json:"created_at"`
+	RequestID     uuid.UUID `json:"request_id"`
+	Position      int16     `json:"position"`
+	VideoPublicID string    `json:"video_public_id"`
+	RaceTime      *string   `json:"race_time"`
+	WindSpeed     *string   `json:"wind_speed"`
+	BodyCondition *string   `json:"body_condition"`
+	CreatedAt     time.Time `json:"created_at"`
+	GroupPosition int16     `json:"group_position"`
+}
+
+type ReviewRequestVideoGroup struct {
+	RequestID uuid.UUID `json:"request_id"`
+	Position  int16     `json:"position"`
+	Kind      string    `json:"kind"`
+	Title     string    `json:"title"`
+	FocusNote *string   `json:"focus_note"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type ReviewResponse struct {
@@ -1499,6 +1507,7 @@ type ReviewResponse struct {
 	Cue                *string    `json:"cue"`
 	SuccessCriteria    *string    `json:"success_criteria"`
 	NextVideo          *string    `json:"next_video"`
+	Summary            *string    `json:"summary"`
 }
 
 type ReviewResponseItem struct {
@@ -1509,9 +1518,9 @@ type ReviewResponseItem struct {
 }
 
 type ReviewResponseSection struct {
-	RequestID uuid.UUID `json:"request_id"`
-	Slot      string    `json:"slot"`
-	Body      string    `json:"body"`
+	RequestID     uuid.UUID `json:"request_id"`
+	Body          string    `json:"body"`
+	GroupPosition int16     `json:"group_position"`
 }
 
 type ReviewTranslation struct {

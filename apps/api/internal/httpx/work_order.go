@@ -89,11 +89,15 @@ func (s *Server) reviewWorkOrderTerms(ctx context.Context, q *db.Queries, rr db.
 		work = fmt.Sprintf("動画1本の添削（%s）。相談に答えて文章で返却", rr.Event)
 	}
 	if rr.Plan == planPremium {
+		groups, err := q.ListReviewRequestVideoGroups(ctx, rr.ID)
+		if err != nil {
+			return workOrderTerms{}, err
+		}
 		videos, err := q.ListReviewRequestVideos(ctx, rr.ID)
 		if err != nil {
 			return workOrderTerms{}, err
 		}
-		work = fmt.Sprintf("プレミアム（%s）。枠ごとの動画%d本を見て、総括（全体の一言診断と枠ごとの回答）を文章で返却", rr.Event, len(videos))
+		work = fmt.Sprintf("プレミアム（%s）。%dグループ・動画%d本を見て、グループごとの回答と最後のまとめを文章で返却", rr.Event, len(groups), len(videos))
 	}
 	return buildWorkOrderTerms(work, price*share/100, rr.DueAt, consignedAt), nil
 }
