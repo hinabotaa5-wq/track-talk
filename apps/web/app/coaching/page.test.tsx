@@ -52,6 +52,14 @@ it("メタ説明は旧ハブ前提（準備中・コーチ募集）をやめ、�
   expect(metadata.description).toContain("コーチの一覧");
 });
 
+it("特集モードのメタ説明は回答の固定4項目（良い点・直す点・おすすめのドリル・コーチなら明日から何をするか）を全て含む（本体 #1095）", async () => {
+  flags.featured = ["c-featured"];
+  vi.resetModules();
+  const featured = (await import("./page")).metadata;
+  expect(featured.description).toBe("トラックトーク（TrackTalk）のオンラインコーチング。走りの動画を1本送ると、コーチが良い点・直す点・おすすめのドリル・コーチなら明日から何をするかを24時間以内に返します。");
+  for (const item of ["良い点", "直す点", "おすすめのドリル", "コーチなら明日から何をするか"]) expect(featured.description).toContain(item);
+});
+
 it("コーチングと一覧の両方を開けると、カードメニューではなく一覧を出す", async () => {
   flags.coaching = true;
   flags.list = true;

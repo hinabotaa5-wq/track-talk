@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "コーチング",
   description: featuredCoachIDs.length
-    ? "トラックトーク（TrackTalk）のオンラインコーチング。走りの動画を1本送ると、コーチが良い点・直す点・おすすめのドリルを24時間以内に返します。" // i18n-data
+    ? "トラックトーク（TrackTalk）のオンラインコーチング。走りの動画を1本送ると、コーチが良い点・直す点・おすすめのドリル・コーチなら明日から何をするかを24時間以内に返します。" // i18n-data
     : "トラックトーク（TrackTalk）のオンラインコーチングで見てくれるコーチの一覧です。記録・成績や指導経験を、依頼する前に確かめられます。", // i18n-data
 };
 
