@@ -37,8 +37,11 @@ function Items({ items }: { items: readonly string[] }) {
 }
 
 export function AdminCoachOffers({ token }: { token: string | null | undefined }) {
-  const [rows, setRows] = useState<AdminCoachOfferApplication[] | null>(null);
-  const [error, setError] = useState("");
+  // 本体 #1108：一覧は「どの利用者の分か」（ここでは token）と組で持ち、表示中の利用者と一致するときだけ出す（#1011 の方式に揃える）。
+  const [rowsLoaded, setRowsLoaded] = useState<{ key: string | null; rows: AdminCoachOfferApplication[] | null }>({ key: null, rows: null });
+  const [errorLoaded, setErrorLoaded] = useState<{ key: string | null; message: string }>({ key: null, message: "" });
+  const rows = token && rowsLoaded.key === token ? rowsLoaded.rows : null;
+  const error = token && errorLoaded.key === token ? errorLoaded.message : "";
   const [pending, setPending] = useState(false);
 
   const fetchRows = useCallback(
@@ -49,21 +52,35 @@ export function AdminCoachOffers({ token }: { token: string | null | undefined }
   useEffect(() => {
     if (!token) return;
     let live = true;
-    fetchRows()
-      .then((list) => { if (live) setRows(list); })
-      .catch((e) => { if (live) setError(apiErrorText(e, L("読み込めませんでした"))); });
-    return () => { live = false; };
+    const load = () => {
+      fetchRows()
+        .then((list) => { if (live) { setRowsLoaded({ key: token, rows: list }); setErrorLoaded({ key: token, message: "" }); } })
+        .catch((e) => { if (live) setErrorLoaded({ key: token, message: apiErrorText(e, L("読み込めませんでした")) }); });
+    };
+    const refresh = () => { if (document.visibilityState === "visible") load(); };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1011 と同じ契機）。
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) load(); };
+    load();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
+    return () => {
+      live = false;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
+    };
   }, [token, fetchRows]);
 
   async function approve(id: string) {
     if (pending) return;
     setPending(true);
-    setError("");
+    setErrorLoaded({ key: token ?? null, message: "" });
     try {
       await apiFetch(`/v1/admin/coaching/coach-offers/${id}/approve`, { method: "POST", token });
-      setRows(await fetchRows());
+      setRowsLoaded({ key: token ?? null, rows: await fetchRows() });
     } catch (e) {
-      setError(apiErrorText(e, L("承認できませんでした")));
+      setErrorLoaded({ key: token ?? null, message: apiErrorText(e, L("承認できませんでした")) });
     } finally {
       setPending(false);
     }

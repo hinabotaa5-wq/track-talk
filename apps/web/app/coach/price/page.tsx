@@ -27,23 +27,41 @@ import { useEffect, useState, type FormEvent } from "react";
 export default function CoachPricePage() {
   const { session, token, loading } = useAuth();
   const router = useRouter();
-  const [data, setData] = useState<CoachPrices | null>(null);
-  const [error, setError] = useState("");
+  // 本体 #1108：価格は「どの利用者の分か」と組で持ち、表示中の利用者と一致するときだけ出す（#1011 の方式に揃える）。
+  const userKey = token ? session?.user?.id ?? token : null;
+  const [loaded, setLoaded] = useState<{ key: string | null; data: CoachPrices | null }>({ key: null, data: null });
+  const [errorLoaded, setErrorLoaded] = useState<{ key: string | null; message: string }>({ key: null, message: "" });
+  const data = userKey && loaded.key === userKey ? loaded.data : null;
+  const error = userKey && errorLoaded.key === userKey ? errorLoaded.message : "";
 
   useEffect(() => {
     if (!loading && !session) router.replace(`/login?next=${encodeURIComponent("/coach/price")}`);
   }, [loading, session, router]);
 
   useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    apiFetch<CoachPrices>("/v1/coach/me/prices", { token })
-      .then((d) => { if (!cancelled) setData(d); })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiRequestError && err.status === 403 ? L("承認されたコーチだけが価格を申請できます") : L("価格を読み込めませんでした"));
-      });
-    return () => { cancelled = true; };
-  }, [token]);
+    if (!token || !userKey) return;
+    let alive = true;
+    const load = () => {
+      apiFetch<CoachPrices>("/v1/coach/me/prices", { token })
+        .then((d) => { if (alive) { setLoaded({ key: userKey, data: d }); setErrorLoaded({ key: userKey, message: "" }); } })
+        .catch((err) => {
+          if (alive) setErrorLoaded({ key: userKey, message: err instanceof ApiRequestError && err.status === 403 ? L("承認されたコーチだけが価格を申請できます") : L("価格を読み込めませんでした") });
+        });
+    };
+    const refresh = () => { if (document.visibilityState === "visible") load(); };
+    // 履歴キャッシュ（bfcache）から戻ったときも取り直す（本体 #1011 と同じ契機）。
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) load(); };
+    load();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", restored);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restored);
+    };
+  }, [token, userKey]);
 
   if (loading || !session || (data === null && !error)) return <PageLoading screen label={L("読み込み中...")} />;
 
@@ -56,7 +74,7 @@ export default function CoachPricePage() {
             {L("プランごとに1回あたりの価格を申請できます（{v0}以上）。運営が承認したあと、承認の時点で対応中だった依頼がすべて終わってから新しい価格に切り替わります。進行中の依頼は申し込まれたときの価格のままです。", { v0: formatYen(data.min_price_yen ?? coachPriceMinYen) })}
           </p>
           {data.plans.map((plan) => (
-            <PlanPrice key={plan.plan} state={plan} token={token} onChange={setData} />
+            <PlanPrice key={plan.plan} state={plan} token={token} onChange={(d) => setLoaded({ key: userKey, data: d })} />
           ))}
           {/* 添削項目・見本動画の申請（本体 #1086）。価格とは別に出せる。 */}
           <CoachOfferSection token={token} />
